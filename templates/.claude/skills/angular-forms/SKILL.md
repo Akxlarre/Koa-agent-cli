@@ -7,6 +7,9 @@ description: >
   Usa Signal Forms (experimental v21+) para proyectos nuevos, Reactive Forms para producción estable.
 user-invocable: false
 allowed-tools: Read, Edit, Write, Glob, Grep
+paths:
+  - "src/app/**/*.component.ts"
+  - "src/app/**/*.component.html"
 ---
 
 # Angular Forms — Signal Forms & Reactive Forms

@@ -10,7 +10,8 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Architect Guard** — Cada Edit/Write es validado en tiempo real. Se bloquean: `*ngIf`, `@Input()`, colores hardcodeados, imports de Supabase en UI, `@angular/animations`, `@keyframes`.
 - **File Protector** — No puedes modificar los archivos del sistema de hooks (`.claude/hooks/`, `settings.json`, `architect.js`).
 - **Bash Guard** — No puedes crear archivos `.ts/.html/.scss` via Bash. Usa Edit/Write.
-- **Compact Recovery** — Si el contexto se compacta, los índices se re-inyectan automáticamente.
+- **Compact Recovery** — Si el contexto se compacta, los índices se re-inyectan automáticamente (PostCompact).
+- **Failure Tracker** — Los errores de tools se registran en `.claude/temp/LESSONS_LEARNED.md` con dedup y rotación automática (max 20).
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
 

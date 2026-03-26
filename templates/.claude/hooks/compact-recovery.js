@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 /**
- * compact-recovery.js — SessionStart Hook (matcher: "compact")
+ * compact-recovery.js — PostCompact Hook
  *
- * Cuando Claude Code compacta la conversación para liberar contexto,
- * se pierden detalles importantes como el contenido de los índices.
- *
- * Este hook re-inyecta los índices del proyecto al contexto de Claude
- * automáticamente después de cada compactación.
+ * Se ejecuta automáticamente después de cada compactación de contexto.
+ * Re-inyecta los índices del proyecto al contexto de Claude para que
+ * no se pierda la memoria de lo que ya existe en el proyecto.
  *
  * stdout → se agrega directamente al contexto de Claude.
  */

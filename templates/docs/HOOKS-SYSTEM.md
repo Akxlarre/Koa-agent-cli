@@ -1,4 +1,4 @@
-# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v5.0)
+# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.1)
 
 > Este documento explica cómo el sistema de hooks convierte las reglas arquitectónicas
 > en **constraints** reales que Claude no puede ignorar.
@@ -36,8 +36,11 @@ Claude recibe un prompt del humano
     ├─ Claude termina de responder
     │   └─ Stop → prompt hook → "¿Actualizaste los índices?" → si no → sigue trabajando
     │
+    ├─ Un tool falla
+    │   └─ PostToolUseFailure → failure-tracker.js → registra en LESSONS_LEARNED.md
+    │
     └─ Contexto se compacta
-        └─ SessionStart (compact) → compact-recovery.js → re-inyecta índices
+        └─ PostCompact → compact-recovery.js → re-inyecta índices
 ```
 
 ## Hooks Activos
@@ -102,13 +105,22 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
   - Operaciones destructivas (`rm -rf`) sobre directorios críticos
 
 ### 4. Compact Recovery (`compact-recovery.js`)
-- **Evento**: SessionStart
-- **Matcher**: `compact`
+- **Evento**: PostCompact
+- **Matcher**: ninguno (se ejecuta en cada compactación)
 - **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contenido
   de todos los archivos `indices/*.md` al contexto. Claude nunca pierde la memoria
   de lo que existe en el proyecto.
 
-### 5. Sync Check (prompt hook)
+### 5. Failure Tracker (`failure-tracker.js`)
+- **Evento**: PostToolUseFailure
+- **Matcher**: ninguno (captura todos los fallos de tools)
+- **Función**: Registra errores de ejecución de tools en `.claude/temp/LESSONS_LEARNED.md`
+  con guardrails automáticos:
+  - **Max 20 entradas** — las más antiguas rotan automáticamente
+  - **Deduplicación** — errores repetidos incrementan un contador en vez de duplicarse
+  - **Contexto** — registra el tool, error y archivo/comando involucrado
+
+### 6. Sync Check (prompt hook)
 - **Evento**: Stop
 - **Matcher**: ninguno (se ejecuta en cada respuesta)
 - **Tipo**: `prompt` (evaluado por modelo Haiku)
@@ -116,7 +128,7 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
   componentes/servicios nuevos sin actualizar los índices. Si detecta drift,
   fuerza a Claude a continuar y actualizar los índices.
 
-### 6. Prettier (post-edit.js)
+### 7. Prettier (post-edit.js)
 - **Evento**: PostToolUse
 - **Matcher**: `Edit|Write|MultiEdit`
 - **Función**: Formatea automáticamente con Prettier cada archivo editado.

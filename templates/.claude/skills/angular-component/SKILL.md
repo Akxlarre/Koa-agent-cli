@@ -7,6 +7,9 @@ description: >
   Incluye: OnPush, signal inputs/outputs, control flow nativo (@if, @for), accesibilidad ARIA.
 user-invocable: false
 allowed-tools: Read, Edit, Write, Glob, Grep
+paths:
+  - "src/app/**/*.component.ts"
+  - "src/app/**/*.component.html"
 ---
 
 # Angular Component — v20+ Standalone

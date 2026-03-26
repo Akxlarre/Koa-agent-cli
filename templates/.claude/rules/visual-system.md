@@ -1,3 +1,11 @@
+---
+paths:
+  - "src/app/**/*.html"
+  - "src/app/**/*.scss"
+  - "src/app/shared/**/*.ts"
+  - "src/styles/**/*.scss"
+---
+
 # Sistema Visual
 
 ## Prioridad de UI

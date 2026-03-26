@@ -1,3 +1,9 @@
+---
+paths:
+  - "src/app/**/*.ts"
+  - "src/app/**/*.html"
+---
+
 # Reglas Arquitectónicas
 
 ## Estructura de carpetas canónica

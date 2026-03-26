@@ -1,3 +1,9 @@
+---
+paths:
+  - "src/app/core/facades/**/*.ts"
+  - "src/app/features/**/*.ts"
+---
+
 # Patrón SWR (Stale-While-Revalidate) + Realtime
 
 ## Principio

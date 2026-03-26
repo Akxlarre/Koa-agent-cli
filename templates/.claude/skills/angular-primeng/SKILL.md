@@ -7,6 +7,9 @@ description: >
   Usar siempre junto con angular-component y design-system.
 user-invocable: false
 allowed-tools: Read, Edit, Glob
+paths:
+  - "src/app/**/*.component.ts"
+  - "src/app/**/*.component.html"
 ---
 
 # Angular + PrimeNG — Best Practices v20+

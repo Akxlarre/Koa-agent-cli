@@ -1,3 +1,8 @@
+---
+paths:
+  - "src/app/**/*.html"
+---
+
 # AI-Readability (Interfaces para Máquinas)
 
 En la Arquitectura v5.0, el software que construyes no solo debe ser operable por humanos, sino también por **agentes IA externos** (bots exploradores, asistentes en segundo plano, integraciones agénticas).

@@ -1,3 +1,9 @@
+---
+paths:
+  - "src/app/core/models/**/*.ts"
+  - "src/app/core/facades/**/*.ts"
+---
+
 # Reglas del Sistema de Modelos (`core/models/`)
 
 Este documento define la ley arquitectónica para la gestión de interfaces y tipos en el proyecto.

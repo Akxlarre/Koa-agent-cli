@@ -40,9 +40,18 @@
         ]
       }
     ],
-    "SessionStart": [
+    "PostToolUseFailure": [
       {
-        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/failure-tracker.js"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
         "hooks": [
           {
             "type": "command",

@@ -1,3 +1,11 @@
+---
+paths:
+  - "src/app/core/facades/*notification*"
+  - "src/app/core/services/toast*"
+  - "src/app/features/**/*.ts"
+  - "src/app/layout/**/*.ts"
+---
+
 # Sistema de Notificaciones y Alertas (3 Capas)
 
 ## Arquitectura

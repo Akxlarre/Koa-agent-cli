@@ -1,3 +1,10 @@
+---
+paths:
+  - "src/app/shared/**/*.ts"
+  - "src/app/features/**/*.ts"
+  - "src/app/features/**/*.html"
+---
+
 # Estrategia de Selección de Componentes
 
 ## Arbol de decision (OBLIGATORIO antes de crear un componente)

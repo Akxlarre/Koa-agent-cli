@@ -16,6 +16,8 @@ si intentas violar las reglas. No necesitas que el humano te lo recuerde:
 
 - **Discovery Gate**: No puedes escribir código sin leer primero los índices
 - **Architect Guard**: Cada Edit/Write se valida contra las reglas arquitectónicas
+- **Failure Tracker**: Los errores de tools se registran automáticamente con dedup y rotación
+- **Compact Recovery**: Los índices se re-inyectan automáticamente tras compactación de contexto
 - **Sync Check**: Al terminar, se verifica si actualizaste los índices
 
 Detalle completo: `docs/HOOKS-SYSTEM.md`

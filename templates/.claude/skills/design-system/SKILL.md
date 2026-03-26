@@ -9,11 +9,19 @@ description: >
   Usar junto a angular-component y angular-signals.
 user-invocable: false
 allowed-tools: Read, Edit, Glob, Grep
+paths:
+  - "src/app/**/*.html"
+  - "src/app/**/*.scss"
+  - "src/app/**/*.component.ts"
+  - "src/styles/**/*.scss"
 ---
 
 # Design System — Referencia completa
 
 Ver guía completa de tokens y componentes en [BRAND_GUIDELINES.md](BRAND_GUIDELINES.md).
+
+## Componentes disponibles en el proyecto:
+!`cat indices/COMPONENTS.md 2>/dev/null || echo "(índice no encontrado — leer manualmente)"`
 
 ## Stack técnico
 

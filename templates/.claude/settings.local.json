@@ -4,12 +4,12 @@
       "Skill(angular-component)",
       "Skill(design-system)",
       "Skill(sync-indices)",
-      "Bash(ng build:*)",
-      "Bash(ls:*)",
-      "Bash(node:*)",
-      "Bash(npm run:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npx ng:*)"
+      "Bash(ng build *)",
+      "Bash(ls *)",
+      "Bash(node *)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npx ng *)"
     ]
   }
 }

@@ -14,6 +14,14 @@ allowed-tools: Read, Edit, Glob, Grep
 
 Tu tarea es revisar el trabajo de esta sesión y mantener los índices del proyecto actualizados.
 
+## Contexto dinámico de la sesión
+
+### Archivos modificados en esta sesión:
+!`git diff --name-only HEAD 2>/dev/null || echo "(no git changes detected)"`
+
+### Archivos sin trackear:
+!`git ls-files --others --exclude-standard src/ supabase/ 2>/dev/null || echo "(none)"`
+
 ## Proceso
 
 1. **Lee los cuatro índices actuales**:

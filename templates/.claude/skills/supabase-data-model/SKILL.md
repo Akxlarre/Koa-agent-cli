@@ -8,6 +8,10 @@ description: >
   Respetar RLS en TODAS las tablas nuevas.
 user-invocable: false
 allowed-tools: Read, Edit, Write, Glob, Grep
+paths:
+  - "supabase/**"
+  - "src/app/core/facades/**/*.ts"
+  - "src/app/core/services/supabase*"
 ---
 
 # Skill: supabase-data-model

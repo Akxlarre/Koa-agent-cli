@@ -1,3 +1,10 @@
+---
+paths:
+  - "src/app/core/facades/**/*.ts"
+  - "src/app/core/services/**/*.ts"
+  - "src/app/features/**/*.ts"
+---
+
 # Reglas Arquitectónicas para Facades (`core/facades/`)
 
 Este documento define la ley arquitectónica para la capa de Fachada (Facade) en el proyecto.

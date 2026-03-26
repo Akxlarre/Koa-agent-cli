@@ -1,3 +1,10 @@
+---
+paths:
+  - "src/app/core/**/*.ts"
+  - "src/app/features/**/*.ts"
+  - "**/*.spec.ts"
+---
+
 # Agentic Test-Driven Development (TDD) y Determinismo
 
 Para contrarrestar la naturaleza no-determinista y mitigar el riesgo de deuda técnica silenciosa, estás obligado a operar bajo un estricto **Agentic TDD** — pero enfocado donde aporta valor real, no como burocracia.

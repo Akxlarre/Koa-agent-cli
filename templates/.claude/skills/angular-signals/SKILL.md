@@ -7,6 +7,8 @@ description: >
   También activar para patrones RxJS interop (toSignal, toObservable).
 user-invocable: false
 allowed-tools: Read, Edit, Write, Glob, Grep
+paths:
+  - "src/app/**/*.ts"
 ---
 
 # Angular Signals — Estado Reactivo v20+

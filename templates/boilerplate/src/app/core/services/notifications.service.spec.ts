@@ -24,7 +24,7 @@ describe("NotificationsService", () => {
 
     service.markAsRead(unread.id);
     const updated = service.notifications().find((n) => n.id === unread.id);
-    expect(updated?.read).toBeTrue();
+    expect(updated?.read).toBe(true);
   });
 
   it("markAsRead() should decrement unreadCount by 1", () => {
@@ -44,7 +44,7 @@ describe("NotificationsService", () => {
   it("markAllAsRead() should mark every notification as read", () => {
     service.markAllAsRead();
     service.notifications().forEach((n) => {
-      expect(n.read).toBeTrue();
+      expect(n.read).toBe(true);
     });
   });
 
@@ -60,7 +60,7 @@ describe("NotificationsService", () => {
   it("filteredNotifications() with 'unread' should contain only unread items", () => {
     service.setFilter("unread");
     service.filteredNotifications().forEach((n) => {
-      expect(n.read).toBeFalse();
+      expect(n.read).toBe(false);
     });
   });
 

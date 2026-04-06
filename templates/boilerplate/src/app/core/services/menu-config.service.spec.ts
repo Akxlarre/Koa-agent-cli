@@ -27,7 +27,7 @@ describe("MenuConfigService", () => {
 
   it("no icon should use 'pi pi-' prefix — must be Lucide names", () => {
     service.menuItems().forEach((item) => {
-      expect(item.icon.startsWith("pi ")).toBeFalse();
+      expect(item.icon.startsWith("pi ")).toBe(false);
     });
   });
 
@@ -39,7 +39,7 @@ describe("MenuConfigService", () => {
 
   it("every routerLink should start with '/'", () => {
     service.menuItems().forEach((item) => {
-      expect(item.routerLink.startsWith("/")).toBeTrue();
+      expect(item.routerLink.startsWith("/")).toBe(true);
     });
   });
 });

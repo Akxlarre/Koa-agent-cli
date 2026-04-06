@@ -49,15 +49,21 @@ function parseMajor(versionLike) {
 }
 
 /**
- * Parse --no-supabase / --no-gsap / --no-primeng flags from process.argv.
- * Returns { supabase, gsap, primeng } — all default to true.
+ * Parse stack flags from process.argv.
+ * - --no-supabase / --no-primeng: opt-out (default: enabled)
+ * - --with-gsap: opt-in (default: disabled). --no-gsap kept as alias for compatibility.
+ * - --with-ngrx-signals: opt-in NgRx Signal Store (default: disabled)
+ * - --with-e2e: opt-in Playwright E2E testing (default: disabled)
+ * Returns { supabase, gsap, primeng, ngrxSignals, e2e }.
  */
 function parseCliFlags() {
     const args = process.argv.slice(2);
     return {
-        supabase: !args.includes('--no-supabase'),
-        gsap:     !args.includes('--no-gsap'),
-        primeng:  !args.includes('--no-primeng'),
+        supabase:     !args.includes('--no-supabase'),
+        gsap:         args.includes('--with-gsap') && !args.includes('--no-gsap'),
+        primeng:      !args.includes('--no-primeng'),
+        ngrxSignals:  args.includes('--with-ngrx-signals'),
+        e2e:          args.includes('--with-e2e'),
     };
 }
 
@@ -77,9 +83,11 @@ function readKoaConfig(cliFlags) {
         }
     }
     return {
-        supabase: (fileFlags.supabase ?? true) && cliFlags.supabase,
-        gsap:     (fileFlags.gsap     ?? true) && cliFlags.gsap,
-        primeng:  (fileFlags.primeng  ?? true) && cliFlags.primeng,
+        supabase:    (fileFlags.supabase    ?? true)  && cliFlags.supabase,
+        gsap:        (fileFlags.gsap        ?? false) || cliFlags.gsap,
+        primeng:     (fileFlags.primeng     ?? true)  && cliFlags.primeng,
+        ngrxSignals: (fileFlags.ngrxSignals ?? false) || cliFlags.ngrxSignals,
+        e2e:         (fileFlags.e2e         ?? false) || cliFlags.e2e,
     };
 }
 
@@ -233,12 +241,16 @@ async function main() {
     await preflight();
     printBanner();
 
-    if (!stack.supabase || !stack.gsap || !stack.primeng) {
-        const disabled = Object.entries(stack)
+    if (!stack.supabase || !stack.primeng) {
+        const disabled = Object.entries({ supabase: stack.supabase, primeng: stack.primeng })
             .filter(([, v]) => !v)
             .map(([k]) => `--no-${k}`)
             .join(' ');
         console.log(chalk.yellow(`ℹ Modo parcial activo: ${disabled}`));
+        console.log('');
+    }
+    if (stack.gsap) {
+        console.log(chalk.cyan('ℹ GSAP animations incluido (--with-gsap)'));
         console.log('');
     }
 
@@ -333,7 +345,7 @@ async function main() {
 
         // --- Spinner: npm install ---
         const spinnerNpm = ora({
-            text: chalk.yellow('Instalando dependencias (Tailwind, PrimeNG, GSAP, Supabase)...'),
+            text: chalk.yellow('Instalando dependencias (Tailwind, PrimeNG, Supabase...)...'),
             color: 'yellow'
         }).start();
 
@@ -349,6 +361,22 @@ async function main() {
                 ...(stack.supabase ? ['@supabase/supabase-js'] : []),
             ];
             await run(NPM, ['install', ...installPkgs], { cwd: targetDir });
+
+            // Optional: NgRx Signal Store
+            if (stack.ngrxSignals) {
+                await run(NPM, ['install', '@ngrx/signals'], { cwd: targetDir });
+                console.log(chalk.green('   ✓ @ngrx/signals instalado'));
+            }
+
+            // Optional: Playwright E2E
+            if (stack.e2e) {
+                await run(NPM, ['install', '--save-dev', '@playwright/test'], { cwd: targetDir });
+                console.log(chalk.green('   ✓ @playwright/test instalado'));
+            }
+
+            // Install Vitest devDependencies (Angular 21+ test runner)
+            const devInstallPkgs = ['vitest', '@analogjs/vitest-angular', 'jsdom'];
+            await run(NPM, ['install', '--save-dev', ...devInstallPkgs], { cwd: targetDir });
             spinnerNpm.succeed(chalk.green('Dependencias instaladas'));
 
             // Initialize Supabase (only if supabase is enabled)
@@ -421,6 +449,13 @@ async function main() {
 
         const projectName = answers.projectName || path.basename(targetDir);
 
+        // 2a. Copy AGENTS.md as .cursorrules (Cursor/Copilot/Windsurf compatibility)
+        const agentsMdPath = path.join(targetDir, 'AGENTS.md');
+        if (fs.existsSync(agentsMdPath)) {
+            fs.copyFileSync(agentsMdPath, path.join(targetDir, '.cursorrules'));
+            console.log(chalk.green('   ✓ .cursorrules creado (copia de AGENTS.md)'));
+        }
+
         // 2. Inject project name into both CLAUDE.md locations
         injectVars(path.join(targetDir, 'CLAUDE.md'), projectName);
         injectVars(path.join(targetDir, '.claude', 'CLAUDE.md'), projectName);
@@ -439,6 +474,13 @@ async function main() {
                 if (fs.existsSync(BOILERPLATE_SCRIPTS)) {
                     copyRecursiveSync(BOILERPLATE_SCRIPTS, path.join(targetDir, 'scripts'));
                     console.log(chalk.green('   ✓ scripts/ copiado'));
+                }
+
+                // Copy vitest.config.ts to project root (Angular 21+ test runner)
+                const vitestConfigSrc = path.join(BOILERPLATE_DIR, 'vitest.config.ts');
+                if (fs.existsSync(vitestConfigSrc)) {
+                    fs.copyFileSync(vitestConfigSrc, path.join(targetDir, 'vitest.config.ts'));
+                    console.log(chalk.green('   ✓ vitest.config.ts copiado'));
                 }
 
                 // Copy postcss.config.json to project root (Tailwind v4)
@@ -503,8 +545,16 @@ async function main() {
                     }
                     buildOptions.optimization.styles.inlineCritical = false;
 
+                    // 3. Add Vitest test target (replaces Karma which ng new skips with --skip-tests)
+                    if (!angularJson.projects[projectKey].architect.test) {
+                        angularJson.projects[projectKey].architect.test = {
+                            builder: '@analogjs/vitest-angular:test',
+                            options: { configFile: 'vitest.config.ts' },
+                        };
+                    }
+
                     fs.writeFileSync(angularJsonPath, JSON.stringify(angularJson, null, 2));
-                    console.log(chalk.green('   ✓ angular.json parcheado (tailwind.css + inlineCritical: false)'));
+                    console.log(chalk.green('   ✓ angular.json parcheado (tailwind.css + inlineCritical: false + test target Vitest)'));
                 }
 
                 // Patch index.html: add Google Fonts <link preconnect> (avoids render-blocking @import)
@@ -542,16 +592,73 @@ async function main() {
                     }
                 }
 
+                // Copy Playwright E2E boilerplate (only if --with-e2e)
+                if (stack.e2e) {
+                    const E2E_BOILERPLATE = path.join(TEMPLATES_DIR, 'boilerplate-e2e');
+                    if (fs.existsSync(E2E_BOILERPLATE)) {
+                        // Copy playwright.config.ts to project root
+                        const playwrightConfigSrc = path.join(E2E_BOILERPLATE, 'playwright.config.ts');
+                        if (fs.existsSync(playwrightConfigSrc)) {
+                            fs.copyFileSync(playwrightConfigSrc, path.join(targetDir, 'playwright.config.ts'));
+                        }
+                        // Copy e2e/ directory
+                        const e2eSrc = path.join(E2E_BOILERPLATE, 'e2e');
+                        if (fs.existsSync(e2eSrc)) {
+                            copyRecursiveSync(e2eSrc, path.join(targetDir, 'e2e'));
+                        }
+                        console.log(chalk.green('   ✓ Playwright E2E boilerplate copiado (e2e/, playwright.config.ts)'));
+                    }
+                }
+
+                // Copy NgRx Signal Store boilerplate (only if --with-ngrx-signals)
+                if (stack.ngrxSignals) {
+                    const NGRX_BOILERPLATE = path.join(TEMPLATES_DIR, 'boilerplate-ngrx', 'src');
+                    if (fs.existsSync(NGRX_BOILERPLATE)) {
+                        copyRecursiveSync(NGRX_BOILERPLATE, path.join(targetDir, 'src'));
+                        console.log(chalk.green('   ✓ NgRx Signal Store boilerplate copiado (core/state/)'));
+                    }
+                }
+
+                // Add View Transitions router config and CSS animation files (only if no GSAP)
+                if (!stack.gsap) {
+                    // Patch app.config.ts to add withViewTransitions()
+                    if (fs.existsSync(appConfigPath)) {
+                        let configStr2 = fs.readFileSync(appConfigPath, 'utf8');
+                        if (!configStr2.includes('withViewTransitions')) {
+                            configStr2 = configStr2.replace(
+                                /from '@angular\/router';/,
+                                `from '@angular/router';\nimport { withViewTransitions } from '@angular/router';`
+                            );
+                            configStr2 = configStr2.replace(
+                                /provideRouter\(routes\)/,
+                                'provideRouter(routes, withViewTransitions())'
+                            );
+                            fs.writeFileSync(appConfigPath, configStr2);
+                            console.log(chalk.green('   ✓ app.config.ts: withViewTransitions() agregado'));
+                        }
+                    }
+                }
+
                 // Inject claude headless scripts into package.json
                 const pkgPath = path.join(targetDir, 'package.json');
                 if (fs.existsSync(pkgPath)) {
                     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
                     pkg.scripts = {
                         ...pkg.scripts,
+                        'test': 'ng test',
+                        'test:watch': 'ng test --watch',
+                        'test:ci': 'ng test --watch=false --reporter=verbose',
+                        'test:coverage': 'ng test --watch=false --coverage',
+                        ...(stack.e2e ? {
+                            'e2e': 'playwright test',
+                            'e2e:ui': 'playwright test --ui',
+                            'e2e:headed': 'playwright test --headed',
+                            'e2e:report': 'playwright show-report',
+                        } : {}),
                         'claude:review': 'claude -p "Revisa el código de esta sesión y sugiere mejoras de arquitectura" --allowedTools Read,Glob,Grep',
                         'claude:sync': 'claude -p "Ejecuta /sync-indices para actualizar los índices del proyecto" --allowedTools Read,Edit,Glob,Grep',
                         'claude:fix': 'claude -p "Ejecuta ng lint, identifica los errores y corrígelos" --allowedTools Read,Edit,Bash',
-                        'claude:tdd': 'claude -p "Ejecuta las pruebas unitarias (ng test --watch=false). Si fallan, auto-corrige la lógica hasta que el compilador pase en verde." --allowedTools Read,Edit,Bash',
+                        'claude:tdd': 'claude -p "Ejecuta las pruebas unitarias (npm run test:ci). Si fallan, auto-corrige la lógica hasta que Vitest pase en verde." --allowedTools Read,Edit,Bash',
                         'lint:arch': 'node scripts/lint-arch-wrapper.js',
                         'indices:sync': 'node scripts/indices-sync.js'
                     };
@@ -585,7 +692,7 @@ async function main() {
                     'scripts/architect.js',
                     '.mcp.json',
                 ],
-                stack: { angular: true, tailwind: true, primeng: stack.primeng, gsap: stack.gsap, supabase: stack.supabase },
+                stack: { angular: true, tailwind: true, primeng: stack.primeng, gsap: stack.gsap, supabase: stack.supabase, ngrxSignals: stack.ngrxSignals, e2e: stack.e2e },
             };
             fs.writeFileSync(blueprintPath, JSON.stringify(blueprint, null, 2));
         } catch (e) {

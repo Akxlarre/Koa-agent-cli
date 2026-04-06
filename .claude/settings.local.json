@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(find /c/Users/Akxlarre/claude-agent-cli -type f -name *.pen)",
-      "Bash(grep -r \"MCP\\\\|mcp\\\\|pencil\\\\|Pencil\" /c/Users/Akxlarre/claude-agent-cli --include=*.md --include=*.json)"
+      "Bash(grep -r \"MCP\\\\|mcp\\\\|pencil\\\\|Pencil\" /c/Users/Akxlarre/claude-agent-cli --include=*.md --include=*.json)",
+      "WebSearch",
+      "Bash(head:*)",
+      "WebFetch(domain:nx.dev)",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(node:*)",
+      "Bash(grep -l \"DETAIL:BEGIN\" templates/indices/*.md)"
     ]
   }
 }

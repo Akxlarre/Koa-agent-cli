@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { provideIcons, Search, Plus, X } from "lucide-angular";
+import { vi } from "vitest";
+import { LucideAngularModule, Search, Plus, X } from "lucide-angular";
 import { EmptyStateComponent } from "./empty-state.component";
 import { GsapAnimationsService } from "@core/services/gsap-animations.service";
 
@@ -7,16 +8,13 @@ describe("EmptyStateComponent", () => {
   let fixture: ComponentFixture<EmptyStateComponent>;
   let component: EmptyStateComponent;
 
-  const gsapMock = jasmine.createSpyObj("GsapAnimationsService", [
-    "addPressFeedback",
-  ]);
+  const gsapMock = { addPressFeedback: vi.fn() };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EmptyStateComponent],
+      imports: [EmptyStateComponent, LucideAngularModule.pick({ Search, Plus, X })],
       providers: [
         { provide: GsapAnimationsService, useValue: gsapMock },
-        provideIcons({ Search, Plus, X }),
       ],
     }).compileComponents();
 
@@ -104,7 +102,7 @@ describe("EmptyStateComponent", () => {
   it("should emit action when action button is clicked", () => {
     fixture.componentRef.setInput("actionLabel", "Crear elemento");
     fixture.detectChanges();
-    const spy = jasmine.createSpy("action");
+    const spy = vi.fn();
     component.action.subscribe(spy);
     fixture.nativeElement.querySelector("button").click();
     expect(spy).toHaveBeenCalledTimes(1);

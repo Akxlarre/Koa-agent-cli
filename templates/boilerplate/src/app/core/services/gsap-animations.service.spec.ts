@@ -21,7 +21,7 @@ describe("GsapAnimationsService (server context)", () => {
   });
 
   it("canAnimate() should return false in server context", () => {
-    expect(service.canAnimate()).toBeFalse();
+    expect(service.canAnimate()).toBe(false);
   });
 
   it("animateThemeChange() should invoke the onSwap callback", async () => {
@@ -29,11 +29,11 @@ describe("GsapAnimationsService (server context)", () => {
     await service.animateThemeChange(() => {
       called = true;
     });
-    expect(called).toBeTrue();
+    expect(called).toBe(true);
   });
 
   it("animateThemeChange() should return a resolved Promise", async () => {
-    await expectAsync(service.animateThemeChange(() => {})).toBeResolved();
+    await expect(service.animateThemeChange(() => {})).resolves.toBeUndefined();
   });
 
   it("animateCounter() should set textContent directly when not animating", () => {
@@ -54,7 +54,7 @@ describe("GsapAnimationsService (server context)", () => {
     service.animatePageLeave(el, () => {
       called = true;
     });
-    expect(called).toBeTrue();
+    expect(called).toBe(true);
   });
 
   it("animatePanelOut() should invoke onComplete immediately when not animating", () => {
@@ -63,7 +63,7 @@ describe("GsapAnimationsService (server context)", () => {
     service.animatePanelOut(el, () => {
       called = true;
     });
-    expect(called).toBeTrue();
+    expect(called).toBe(true);
   });
 
   it("animateDrawerOut() should invoke onComplete immediately when not animating", () => {
@@ -72,7 +72,7 @@ describe("GsapAnimationsService (server context)", () => {
     service.animateDrawerOut(el, () => {
       called = true;
     });
-    expect(called).toBeTrue();
+    expect(called).toBe(true);
   });
 
   it("addPressFeedback() should return a no-op cleanup function when not animating", () => {

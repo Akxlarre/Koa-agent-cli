@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { provideIcons, Settings, AlertCircle } from "lucide-angular";
+import { LucideAngularModule, Settings, AlertCircle } from "lucide-angular";
 import { IconComponent } from "./icon.component";
 
 describe("IconComponent", () => {
@@ -8,8 +8,7 @@ describe("IconComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [IconComponent],
-      providers: [provideIcons({ Settings, AlertCircle })],
+      imports: [IconComponent, LucideAngularModule.pick({ Settings, AlertCircle })],
     }).compileComponents();
 
     fixture = TestBed.createComponent(IconComponent);

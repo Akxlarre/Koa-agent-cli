@@ -149,11 +149,19 @@ Sobreescribir **solo Layer 3 (Brand)** en `_variables.scss`:
 - Los component tokens (Layer 4) como `--btn-primary-bg: var(--ds-brand)` heredan automáticamente — no necesitan cambios.
 - **NUNCA** crear selectores `[data-brand="x"]` ni CSS condicional por cliente. Un proyecto = una marca. Si necesitas multi-tenant runtime, eso es una feature distinta que requiere `ThemeService` extendido.
 
-## Animaciones y Motion Physics (GSAP obligatorio)
+## Animaciones
 
-- **PROHIBIDO** `@angular/animations` ni CSS `@keyframes` para entradas de vistas.
-- **PERMITIDO** CSS `@keyframes` SOLO para animaciones de estado continuo (loops como `.indicator-live`, `.badge-pulse`).
-- **PROHIBIDO** inventar `durations` o `eases` arbitrarios en GSAP. Usa variables CSS (`--duration-*`, `--ease-*`).
+- **PROHIBIDO** `@angular/animations` (redundante con CSS nativo y GSAP)
+- **SIEMPRE** respetar `prefers-reduced-motion` en cualquier animación
+
+### Sin GSAP (default — `blueprint.gsap: false`)
+- Entradas de vistas: clases CSS `.animate-fade-in-up`, `.animate-fade-in`, `.animate-stagger` de `src/styles/_animations.scss`
+- Navegación entre rutas: `withViewTransitions()` en `app.config.ts` + estilos en `src/styles/_view-transitions.scss`
+- `@keyframes` permitido en cualquier archivo SCSS
+
+### Con GSAP (`blueprint.gsap: true`, flag `--with-gsap`)
 - **OBLIGATORIO** `GsapAnimationsService` en `ngAfterViewInit`
 - Métodos clave: `animateBentoGrid()`, `animateHero()`, `animateCounter()`, `addCardHover()`
 - Siempre `clearProps: 'transform'` tras animaciones de movimiento
+- **PROHIBIDO** `@keyframes` en estilos de componente (`src/app/`). Solo en design system global (`src/styles/`)
+- **PROHIBIDO** inventar `durations` o `eases` arbitrarios. Usa variables CSS (`--duration-*`, `--ease-*`)

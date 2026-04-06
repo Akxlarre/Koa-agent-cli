@@ -1,5 +1,6 @@
 import { TestBed } from "@angular/core/testing";
 import { provideRouter, Router } from "@angular/router";
+import { vi } from "vitest";
 import type { User } from "@core/models/user.model";
 import { AuthFacade } from "./auth.facade";
 import { SupabaseService } from "./supabase.service";
@@ -7,16 +8,21 @@ import { SupabaseService } from "./supabase.service";
 describe("AuthFacade", () => {
   let service: AuthFacade;
   let router: Router;
-  let supabaseSpy: jasmine.SpyObj<SupabaseService>;
+  let supabaseSpy: {
+    getUser: ReturnType<typeof vi.fn>;
+    signIn: ReturnType<typeof vi.fn>;
+    signUp: ReturnType<typeof vi.fn>;
+    signOut: ReturnType<typeof vi.fn>;
+    resetPasswordForEmail: ReturnType<typeof vi.fn>;
+    client: unknown;
+  };
 
   beforeEach(() => {
     const mockSupabaseClient = {
       auth: {
-        onAuthStateChange: jasmine
-          .createSpy("onAuthStateChange")
-          .and.returnValue({
-            data: { subscription: { unsubscribe: () => {} } },
-          }),
+        onAuthStateChange: vi.fn().mockReturnValue({
+          data: { subscription: { unsubscribe: () => {} } },
+        }),
       },
       from: () => ({
         select: () => ({
@@ -27,19 +33,14 @@ describe("AuthFacade", () => {
       }),
     };
 
-    supabaseSpy = jasmine.createSpyObj<SupabaseService>("SupabaseService", [
-      "getUser",
-      "signIn",
-      "signUp",
-      "signOut",
-      "resetPasswordForEmail",
-    ]);
-    supabaseSpy.getUser.and.resolveTo({ data: { user: null } } as any);
-    supabaseSpy.signIn.and.resolveTo({ error: null } as any);
-    supabaseSpy.signUp.and.resolveTo({ data: null, error: null } as any);
-    supabaseSpy.signOut.and.resolveTo({ error: null } as any);
-    supabaseSpy.resetPasswordForEmail.and.resolveTo({ error: null } as any);
-    (supabaseSpy as any).client = mockSupabaseClient;
+    supabaseSpy = {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      signIn: vi.fn().mockResolvedValue({ error: null }),
+      signUp: vi.fn().mockResolvedValue({ data: null, error: null }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+      resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
+      client: mockSupabaseClient,
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -61,7 +62,7 @@ describe("AuthFacade", () => {
   });
 
   it("isAuthenticated should be false when no user is set", () => {
-    expect(service.isAuthenticated()).toBeFalse();
+    expect(service.isAuthenticated()).toBe(false);
   });
 
   it("setUser() should update currentUser signal", () => {
@@ -85,7 +86,7 @@ describe("AuthFacade", () => {
       initials: "T",
     };
     service.setUser(user);
-    expect(service.isAuthenticated()).toBeTrue();
+    expect(service.isAuthenticated()).toBe(true);
   });
 
   it("setUser(null) should clear user and set isAuthenticated to false", () => {
@@ -99,7 +100,7 @@ describe("AuthFacade", () => {
     service.setUser(user);
     service.setUser(null);
     expect(service.currentUser()).toBeNull();
-    expect(service.isAuthenticated()).toBeFalse();
+    expect(service.isAuthenticated()).toBe(false);
   });
 
   it("logout() should clear the current user", () => {
@@ -116,7 +117,7 @@ describe("AuthFacade", () => {
   });
 
   it("logout() should navigate to '/'", () => {
-    const navigateSpy = spyOn(router, "navigate");
+    const navigateSpy = vi.spyOn(router, "navigate");
     service.logout();
     expect(navigateSpy).toHaveBeenCalledWith(["/"]);
   });
@@ -130,15 +131,15 @@ describe("AuthFacade", () => {
   });
 
   it("login() should return null error on success", async () => {
-    supabaseSpy.signIn.and.resolveTo({ error: null } as any);
+    supabaseSpy.signIn.mockResolvedValue({ error: null });
     const result = await service.login("user@example.com", "correct");
     expect(result.error).toBeNull();
   });
 
   it("login() should return an Error instance on failure", async () => {
-    supabaseSpy.signIn.and.resolveTo({
+    supabaseSpy.signIn.mockResolvedValue({
       error: new Error("Invalid credentials"),
-    } as any);
+    });
     const result = await service.login("user@example.com", "wrong");
     expect(result.error).toBeInstanceOf(Error);
     expect(result.error?.message).toBe("Invalid credentials");
@@ -152,6 +153,6 @@ describe("AuthFacade", () => {
   });
 
   it("whenReady should resolve after getUser() completes", async () => {
-    await expectAsync(service.whenReady).toBeResolved();
+    await expect(service.whenReady).resolves.toBeDefined();
   });
 });

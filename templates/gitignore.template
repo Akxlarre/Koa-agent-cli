@@ -27,3 +27,9 @@ bazel-out/
 .claude/temp/
 .gemini/
 indices/
+
+# Playwright E2E
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

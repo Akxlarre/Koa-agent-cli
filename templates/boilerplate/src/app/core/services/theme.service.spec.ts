@@ -1,34 +1,37 @@
 import { TestBed } from "@angular/core/testing";
+import { vi } from "vitest";
 import { ThemeService } from "./theme.service";
 import { GsapAnimationsService } from "./gsap-animations.service";
 import { ToastService } from "./toast.service";
 
 describe("ThemeService", () => {
   let service: ThemeService;
-  let gsapSpy: jasmine.SpyObj<GsapAnimationsService>;
-  let toastSpy: jasmine.SpyObj<ToastService>;
+  let gsapSpy: { animateThemeChange: ReturnType<typeof vi.fn> };
+  let toastSpy: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    warning: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     // Ensure clean state before each test
     localStorage.removeItem("app-color-mode");
     document.documentElement.removeAttribute("data-mode");
 
-    gsapSpy = jasmine.createSpyObj<GsapAnimationsService>(
-      "GsapAnimationsService",
-      ["animateThemeChange"],
-    );
-    // Mock calls the callback synchronously so state changes are immediate
-    gsapSpy.animateThemeChange.and.callFake((callback) => {
-      callback();
-      return Promise.resolve();
-    });
+    gsapSpy = {
+      animateThemeChange: vi.fn().mockImplementation((callback) => {
+        callback();
+        return Promise.resolve();
+      }),
+    };
 
-    toastSpy = jasmine.createSpyObj<ToastService>("ToastService", [
-      "success",
-      "error",
-      "warning",
-      "info",
-    ]);
+    toastSpy = {
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+      info: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -50,20 +53,20 @@ describe("ThemeService", () => {
   });
 
   it("darkMode should start as false when no preference is saved", () => {
-    expect(service.darkMode()).toBeFalse();
+    expect(service.darkMode()).toBe(false);
   });
 
   it("isThemeTransitioning should start as false", () => {
-    expect(service.isThemeTransitioning()).toBeFalse();
+    expect(service.isThemeTransitioning()).toBe(false);
   });
 
   it("syncWithSystem should start as false", () => {
-    expect(service.syncWithSystem()).toBeFalse();
+    expect(service.syncWithSystem()).toBe(false);
   });
 
   it("setColorMode('dark') should set darkMode to true", () => {
     service.setColorMode("dark");
-    expect(service.darkMode()).toBeTrue();
+    expect(service.darkMode()).toBe(true);
   });
 
   it("setColorMode('dark') should apply data-mode='dark' to documentElement", () => {
@@ -76,7 +79,7 @@ describe("ThemeService", () => {
     // Flush the .finally() microtask so isThemeTransitioning resets
     await Promise.resolve();
     service.setColorMode("light");
-    expect(service.darkMode()).toBeFalse();
+    expect(service.darkMode()).toBe(false);
   });
 
   it("setColorMode('light') after dark should remove data-mode attribute", async () => {
@@ -90,12 +93,12 @@ describe("ThemeService", () => {
     service.setColorMode("dark");
     await Promise.resolve();
     service.setColorMode("system");
-    expect(service.syncWithSystem()).toBeTrue();
+    expect(service.syncWithSystem()).toBe(true);
   });
 
   it("cycleColorMode() should transition light → dark on first call", () => {
     service.cycleColorMode();
-    expect(service.darkMode()).toBeTrue();
+    expect(service.darkMode()).toBe(true);
   });
 
   it("cycleColorMode() should call animateThemeChange", () => {

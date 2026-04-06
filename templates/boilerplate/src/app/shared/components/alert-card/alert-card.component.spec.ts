@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { vi } from "vitest";
 import {
-  provideIcons,
+  LucideAngularModule,
   AlertCircle,
   AlertTriangle,
   Info,
@@ -14,16 +15,16 @@ describe("AlertCardComponent", () => {
   let fixture: ComponentFixture<AlertCardComponent>;
   let component: AlertCardComponent;
 
-  const gsapMock = jasmine.createSpyObj("GsapAnimationsService", [
-    "addPressFeedback",
-  ]);
+  const gsapMock = { addPressFeedback: vi.fn() };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AlertCardComponent],
+      imports: [
+        AlertCardComponent,
+        LucideAngularModule.pick({ AlertCircle, AlertTriangle, Info, CheckCircle, X }),
+      ],
       providers: [
         { provide: GsapAnimationsService, useValue: gsapMock },
-        provideIcons({ AlertCircle, AlertTriangle, Info, CheckCircle, X }),
       ],
     }).compileComponents();
 
@@ -117,7 +118,7 @@ describe("AlertCardComponent", () => {
   it("should emit action when action button is clicked", () => {
     fixture.componentRef.setInput("actionLabel", "Reintentar");
     fixture.detectChanges();
-    const spy = jasmine.createSpy("action");
+    const spy = vi.fn();
     component.action.subscribe(spy);
     fixture.nativeElement.querySelector("button").click();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -144,7 +145,7 @@ describe("AlertCardComponent", () => {
   it("should emit dismissed when dismiss button is clicked", () => {
     fixture.componentRef.setInput("dismissible", true);
     fixture.detectChanges();
-    const spy = jasmine.createSpy("dismissed");
+    const spy = vi.fn();
     component.dismissed.subscribe(spy);
     fixture.nativeElement.querySelector("[aria-label='Cerrar']").click();
     expect(spy).toHaveBeenCalledTimes(1);

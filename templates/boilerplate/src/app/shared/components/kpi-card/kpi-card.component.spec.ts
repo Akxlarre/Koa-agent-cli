@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { provideIcons, TrendingUp, TrendingDown } from "lucide-angular";
+import { vi } from "vitest";
+import { LucideAngularModule, TrendingUp, TrendingDown } from "lucide-angular";
 import { KpiCardComponent } from "./kpi-card.component";
 import { GsapAnimationsService } from "@core/services/gsap-animations.service";
 
@@ -7,16 +8,13 @@ describe("KpiCardComponent", () => {
   let fixture: ComponentFixture<KpiCardComponent>;
   let component: KpiCardComponent;
 
-  const gsapMock = jasmine.createSpyObj("GsapAnimationsService", [
-    "animateCounter",
-  ]);
+  const gsapMock = { animateCounter: vi.fn() };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [KpiCardComponent],
+      imports: [KpiCardComponent, LucideAngularModule.pick({ TrendingUp, TrendingDown })],
       providers: [
         { provide: GsapAnimationsService, useValue: gsapMock },
-        provideIcons({ TrendingUp, TrendingDown }),
       ],
     }).compileComponents();
 

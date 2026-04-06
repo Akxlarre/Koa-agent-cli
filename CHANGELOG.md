@@ -11,6 +11,7 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 ### Changed
 - **indices-sync.js**: Ahora usa cache incremental por mtime. Solo re-parsea archivos modificados desde la última ejecución. Cache en `.claude/temp/indices-cache.json` (ya en `.gitignore`).
 - **testing-tdd.md**: Dumb components sin lógica ya no requieren tests obligatorios. Solo obligatorio si tienen `computed()` o lógica derivada.
+- **Bug Fix**: Se añadió `templates/.claude/hooks/package.json` para forzar `type: commonjs` en los hooks. Esto evita errores de `require is not defined` en proyectos que usan `type: module` (ESM).
 
 ### Migración desde 6.0
 1. Reemplazar `scripts/indices-sync.js` con la versión nueva

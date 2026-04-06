@@ -35,6 +35,7 @@ Funciones puras sin estado ni dependencias Angular. Importar desde `@core/utils`
 | `validation.utils` | `validateEmail()` | `core/utils/validation.utils.ts` | ✅ Estable |
 | Barrel | `export *` de todos los utils | `core/utils/index.ts` | ✅ Estable |
 
+<!-- DETAIL:BEGIN -->
 ## Auto-Index — Servicios detectados por AST (generado automáticamente)
 
 <!-- AUTO-GENERATED:BEGIN -->

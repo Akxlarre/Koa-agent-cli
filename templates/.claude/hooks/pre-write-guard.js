@@ -8,7 +8,8 @@
  *   1. FILE PROTECTION    — Bloquea edits a archivos críticos del sistema de hooks
  *   2. DISCOVERY GATE     — Obliga a leer los índices antes de escribir código fuente
  *   3. ARCHITECT GUARD    — Validación rápida de reglas arquitectónicas en el contenido nuevo
- *   4. CONTEXT INJECTION  — Inyecta rules y skills relevantes según el tipo de archivo
+ *   4. CONTEXT INJECTION  — Inyecta contexto relevante según el tipo de archivo
+ *                           (con dedup de sesión: cada categoría se inyecta solo 1 vez)
  *
  * Exit codes:
  *   0 = permitir la operación (opcionalmente con additionalContext via JSON stdout)
@@ -23,7 +24,7 @@ const path = require('path');
 const os = require('os');
 
 // ─── Read stack from blueprint.json (fail-open) ──────────────────────────────
-let STACK = { angular: true, tailwind: true, primeng: true, gsap: true, supabase: true };
+let STACK = { angular: true, tailwind: true, primeng: true, gsap: false, supabase: true };
 try {
   const bpPath = path.join(process.cwd(), 'blueprint.json');
   if (fs.existsSync(bpPath)) {
@@ -118,7 +119,7 @@ process.stdin.on('end', () => {
       if (/@Output\s*\(/.test(newContent))
         violations.push('Usa output() signal en vez de @Output() decorator');
 
-      // Import directo de Supabase en capa UI (skip si stack.supabase === false)
+      // Import directo de Supabase en capa UI
       if (
         STACK.supabase &&
         (normalizedPath.includes('features/') || normalizedPath.includes('shared/')) &&
@@ -126,9 +127,9 @@ process.stdin.on('end', () => {
       )
         violations.push('No importar @supabase/supabase-js en la capa UI. Usa un FacadeService.');
 
-      // @angular/animations prohibido (skip si stack.gsap === false)
-      if (STACK.gsap && newContent.includes('@angular/animations'))
-        violations.push('No usar @angular/animations. Usa GsapAnimationsService (GSAP).');
+      // @angular/animations prohibido siempre
+      if (newContent.includes('@angular/animations'))
+        violations.push('No usar @angular/animations. Usa GsapAnimationsService (con GSAP) o CSS transitions/View Transitions API (sin GSAP).');
 
       // OnPush check — solo para Write (archivo completo) en .component.ts
       if (
@@ -151,7 +152,7 @@ process.stdin.on('end', () => {
           '     Usa tokens semanticos: text-primary, text-muted, bg-surface, bg-base, var(--ds-brand).'
         );
 
-      // Dumb component con inject de Facade (shared/ no debe tener Facades)
+      // Dumb component con inject de Facade
       if (normalizedPath.includes('shared/') && normalizedPath.endsWith('.component.ts')) {
         if (/inject\s*\(\s*\w*Facade/.test(newContent))
           violations.push(
@@ -175,15 +176,13 @@ process.stdin.on('end', () => {
 
     // --- SCSS / CSS checks (solo en src/) ---
     if (normalizedPath.includes('src/') && (normalizedPath.endsWith('.scss') || normalizedPath.endsWith('.css'))) {
-      // @keyframes: BLOQUEADO en estilos de componente (src/app/).
-      // PERMITIDO en archivos del design system global (src/styles/) para loops de estado continuo
-      // como .indicator-live y .badge-pulse. Esos @keyframes ya viven en _variables.scss.
+      // @keyframes: BLOQUEADO en componentes solo si el proyecto usa GSAP
       const isComponentStyle = normalizedPath.includes('src/app/');
-      if (isComponentStyle && /@keyframes\s/.test(newContent))
+      if (STACK.gsap && isComponentStyle && /@keyframes\s/.test(newContent))
         violations.push(
-          'No usar @keyframes en estilos de componente.\n' +
-          '     Para animaciones de entrada: GsapAnimationsService (animateBentoGrid, animateHero, animateCounter).\n' +
-          '     Para loops de estado continuo (pulso, spin): usar .indicator-live o .badge-pulse del design system.'
+          'No usar @keyframes en estilos de componente (proyecto usa GSAP).\n' +
+          '     Para animaciones de entrada: GsapAnimationsService.\n' +
+          '     Para loops de estado: usar .indicator-live o .badge-pulse del design system.'
         );
 
       const hardcodedColorRe =
@@ -196,14 +195,12 @@ process.stdin.on('end', () => {
     if (normalizedPath.includes('supabase/migrations/')) {
       const fileName = path.basename(filePath);
 
-      // Validar naming convention
       if (toolName === 'Write' && !/^\d{14}_\w+\.sql$/.test(fileName))
         violations.push(
           'Nombre de migracion invalido. Formato: YYYYMMDDHHMMSS_dominio_tipo_descripcion.sql\n' +
           '     Ejemplo: 20250301120000_auth_create_profiles.sql'
         );
 
-      // Verificar que CREATE TABLE incluya RLS
       if (/CREATE\s+TABLE/i.test(newContent) && !/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(newContent))
         violations.push(
           'Toda tabla nueva DEBE tener RLS activado.\n' +
@@ -222,10 +219,33 @@ process.stdin.on('end', () => {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 4. CONTEXT INJECTION — Inyectar rules y skills relevantes
+    // 4. CONTEXT INJECTION — Inyectar contexto relevante (con dedup de sesión)
     // ═══════════════════════════════════════════════════════════════════════
-    // Si todas las validaciones pasaron, inyectar contexto relevante
-    // para que Claude tenga las reglas presentes al escribir.
+    // Cada categoría de archivo se inyecta UNA SOLA VEZ por sesión.
+    // Las reglas arquitectónicas ya se cargan vía path-scoped rules (.claude/rules/).
+    // Aquí solo se inyecta lo que las reglas no cubren: nombres de componentes
+    // existentes, clases de botones, refs a índices, stack-specific reminders.
+
+    // Determinar categoría de contexto para dedup
+    const ctxCategory = normalizedPath.includes('features/') ? 'features'
+      : normalizedPath.includes('shared/') ? 'shared'
+      : normalizedPath.includes('layout/') ? 'layout'
+      : normalizedPath.includes('core/services/') ? 'services'
+      : normalizedPath.includes('core/utils/') ? 'utils'
+      : normalizedPath.includes('core/directives/') ? 'directives'
+      : normalizedPath.includes('supabase/migrations/') ? 'migrations'
+      : normalizedPath.endsWith('.html') ? 'html'
+      : (normalizedPath.endsWith('.scss') || normalizedPath.endsWith('.css')) ? 'scss'
+      : null;
+
+    // Dedup: si ya inyectamos esta categoría en esta sesión, salir sin contexto
+    if (ctxCategory) {
+      const ctxFlag = path.join(os.tmpdir(), `koa-ctx-${ctxCategory}-${sessionId}.flag`);
+      if (fs.existsSync(ctxFlag)) {
+        process.exit(0);
+      }
+      fs.writeFileSync(ctxFlag, new Date().toISOString());
+    }
 
     const contextParts = [];
 
@@ -233,50 +253,34 @@ process.stdin.on('end', () => {
     if (normalizedPath.endsWith('.component.ts')) {
       if (normalizedPath.includes('features/')) {
         contextParts.push(
-          '[REGLA architecture.md] Este es un SMART component (features/).',
-          '  - Puede inyectar FacadeServices.',
-          '  - Coordina Dumb components de shared/ pasando signals.',
-          '  - OnPush obligatorio. Signals para estado, no BehaviorSubject.',
-          '[REGLA visual-system.md] Prioridad UI: 1) indices/COMPONENTS.md 2) PrimeNG 3) Custom.',
-          '  - Colores: solo tokens (text-primary, bg-surface, var(--ds-brand)).',
-          '  - Regla 3-2-1: max 3 elementos con var(--ds-brand) por viewport (2 interactivos, 1 decorativo).',
-          '  - Layout: usar .bento-grid con clases de proporcion. Solo 1 .card-accent por seccion.',
-          '  - KPIs: usar <app-kpi-card> (ya existe en shared/). No recrear composicion KPI manualmente.',
-          '  - Iconos: <app-icon name="kebab-case" [size]="20" /> SIEMPRE. PROHIBIDO emojis en UI.',
+          'SMART component (features/) — reglas completas en: architecture.md + visual-system.md.',
+          'Componentes disponibles en shared/ (no recrear):',
+          '  <app-kpi-card [value] label [trend] /> | <app-empty-state message /> | <app-alert-card title />',
+          '  <app-drawer [isOpen] title /> | <app-icon name="kebab-case" [size]="20" /> | <skeleton-block variant />',
+          'Clases de boton: btn-primary | btn-secondary | btn-ghost (definidas en tailwind.css).',
+          'Toast: inject(ToastService) → toast.success() / toast.error(). NUNCA inject(MessageService).',
           ...(STACK.gsap
-            ? ['  - Animaciones: GsapAnimationsService en ngAfterViewInit. No @angular/animations.']
-            : ['  - Animaciones: CSS transitions o View Transitions API (GSAP no incluido en este proyecto).']),
-          '  - Toasts: inject(ToastService) para feedback efimero. NUNCA inject(MessageService) directo.',
-          '  - Botones: class="btn-primary", "btn-secondary", "btn-ghost" (3 tiers en tailwind.css).',
-          '[SKILL angular-component] Usa input(), output(), @if/@for, host bindings, ChangeDetectionStrategy.OnPush.',
-          '[SKILL design-system] Consulta indices/STYLES.md para tokens disponibles.',
-          '[SKILL angular-signals] signal() para estado UI, computed() para derivados, effect() para side-effects.',
-          '[REGLA facades.md] Puede inyectar MULTIPLES Facades para composicion cross-domain. Logica pesada va en core/utils/ como funcion pura.',
-          '[INDICE] Revisa anti-patrones: indices/ANTI-PATTERNS.md (evita shortcuts que degradan el sistema).'
+            ? ['Animaciones: inject(GsapAnimationsService) en ngAfterViewInit.']
+            : ['Animaciones: CSS transitions (.animate-fade-in-up) o View Transitions API.']),
+          'Indices: COMPONENTS.md (que existe) | ANTI-PATTERNS.md (que evitar).',
+          'Skills bajo demanda: /angular-component | /angular-signals | /design-system.'
         );
       }
       if (normalizedPath.includes('shared/')) {
         contextParts.push(
-          '[REGLA architecture.md] Este es un DUMB component (shared/).',
-          '  - Solo input() y output(). SIN inyeccion de Facades ni Services.',
-          '  - Si recibe data async, debe tener un skeleton colocated: {nombre}-skeleton.component.ts al lado.',
-          '[REGLA visual-system.md] Colores: solo tokens semanticos. No hardcodear.',
-          '  - Cards: .card (base), .card-accent (1 por seccion), .card-tinted (KPIs).',
-          '  - Radios: var(--radius-lg) minimo en cards, var(--radius-full) en botones.',
-          '  - Iconos: <app-icon name="kebab-case" /> (shared/components/icon). PROHIBIDO emojis ni SVG inline.',
-          '  - KPIs: .kpi-value para el numero principal, .kpi-label para la etiqueta. NUNCA text-4xl plano.',
-          '  - Superficies: .surface-hero (banners/hero), .surface-glass (overlays flotantes).',
-          '  - Indicadores: .indicator-live (sistema activo/online), .badge-pulse (nuevos items/alertas).',
-          '[SKILL angular-component] Usa input(), output(), host bindings. No decoradores legacy.',
-          '[SKILL design-system] Checklist: OnPush, var(--*) colores, GSAP entrada, dark/light mode.',
-          '[INDICE] Revisa anti-patrones: indices/ANTI-PATTERNS.md (evita shortcuts que degradan el sistema).'
+          'DUMB component (shared/) — solo input() y output(). SIN inject() de Facades.',
+          'Si recibe data async: crear {nombre}-skeleton.component.ts colocated.',
+          'Clases semanticas (no Tailwind generico):',
+          '  .kpi-value / .kpi-label | .surface-hero | .surface-glass | .indicator-live | .badge-pulse',
+          '  .card / .card-accent (1 por seccion) / .card-tinted',
+          'Iconos: <app-icon name="kebab-case" /> SIEMPRE. PROHIBIDO emojis o SVG inline.',
+          'Indices: COMPONENTS.md (que existe) | ANTI-PATTERNS.md (que evitar).'
         );
       }
       if (normalizedPath.includes('layout/')) {
         contextParts.push(
-          '[REGLA architecture.md] Este es un componente de LAYOUT (shell de la app).',
-          '  - Puede inyectar services de core/ directamente (LayoutService, ThemeService, etc.).',
-          '[REGLA visual-system.md] Dark mode: ThemeService con [data-mode="dark"]. PrimeNG: darkModeSelector ".fake-dark-mode".'
+          'LAYOUT component — puede inyectar services de core/ directamente.',
+          'Dark mode: ThemeService con [data-mode="dark"]. PrimeNG: darkModeSelector ".fake-dark-mode".'
         );
       }
     }
@@ -284,25 +288,17 @@ process.stdin.on('end', () => {
     // --- Services y Facades ---
     if (normalizedPath.includes('core/services/') && normalizedPath.endsWith('.ts') && !normalizedPath.endsWith('.spec.ts')) {
       if (normalizedPath.includes('.facade.')) {
-        const dataSourceHint = STACK.supabase
-          ? '  - Media entre UI (features/) y APIs de datos (SupabaseService/HttpClient).'
-          : '  - Media entre UI (features/) y APIs de datos (HttpClient).';
         contextParts.push(
-          '[REGLA architecture.md] Este es un FACADE.',
-          dataSourceHint,
-          '  - Expone estado al template con toSignal().',
-          '  - Captura errores con catchError y expone signal de error.',
-          '  - Para feedback al usuario tras mutaciones, usa inject(ToastService): toast.success(), toast.error().',
-          '  - DEBE tener .spec.ts companero (Agentic TDD).',
-          '[SKILL angular-signals] Usa signal() para estado, computed() para derivados, toSignal() para RxJS->template.'
+          'FACADE — reglas completas en: facades.md + swr-pattern.md (auto-cargadas).',
+          'Estructura: signals privados (_datos, _isLoading, _error) + readonly publicos + metodos de accion.',
+          'SWR: flag _initialized para evitar re-fetch con skeleton. refreshSilently() post-mutacion.',
+          'Toast: inject(ToastService) para feedback. NUNCA inject(MessageService).',
+          'DEBE tener .spec.ts companero.'
         );
       } else if (normalizedPath.includes('.service.')) {
         contextParts.push(
-          '[REGLA architecture.md] Este es un CORE SERVICE.',
-          '  - La UI NUNCA lo inyecta directamente (solo via Facades).',
-          '  - Usa RxJS para flujos async internos.',
-          '  - DEBE tener .spec.ts companero (Agentic TDD).',
-          '[SKILL angular-signals] En services usar RxJS internamente. toSignal() solo en Facades.'
+          'CORE SERVICE — la UI NUNCA lo inyecta directamente (solo via Facades).',
+          'RxJS para flujos async internos. DEBE tener .spec.ts companero.'
         );
       }
     }
@@ -310,82 +306,68 @@ process.stdin.on('end', () => {
     // --- Migraciones SQL ---
     if (normalizedPath.includes('supabase/migrations/')) {
       contextParts.push(
-        '[REGLA database.md] Migracion SQL detectada.',
-        '  - Naming: YYYYMMDDHHMMSS_dominio_tipo_descripcion.sql',
-        '  - Scripts idempotentes: CREATE TABLE IF NOT EXISTS, CREATE INDEX IF NOT EXISTS.',
-        '  - SIEMPRE activar RLS: ALTER TABLE x ENABLE ROW LEVEL SECURITY;',
-        '  - Documentar tabla en indices/DATABASE.md con columnas clave y policies.',
-        '[SKILL supabase-data-model] Checklist RLS: policies SELECT, INSERT (WITH CHECK), UPDATE, DELETE.',
-        '  - Realtime: RxJS Observable -> toSignal() en Facade. Cancelar en ngOnDestroy.'
+        'MIGRACION SQL — reglas completas en: database.md (auto-cargada).',
+        'Naming: YYYYMMDDHHMMSS_dominio_tipo_descripcion.sql',
+        'Idempotente: CREATE TABLE IF NOT EXISTS. SIEMPRE: ALTER TABLE x ENABLE ROW LEVEL SECURITY;',
+        'Documenta la tabla nueva en indices/DATABASE.md.'
       );
     }
 
     // --- Templates HTML ---
     if (normalizedPath.includes('src/app/') && normalizedPath.endsWith('.html')) {
       contextParts.push(
-        '[REGLA architecture.md] Template Angular: usa @if/@for/@switch, no *ngIf/*ngFor.',
-        '  - Bindings: [class.x]="expr", [style.x]="expr". No [ngClass]/[ngStyle].',
-        '[REGLA visual-system.md] Colores: text-primary, text-muted, bg-surface, bg-base. No Tailwind hardcodeado.',
-        '  - Bento Grid: .bento-grid + [appBentoGridLayout]. Hijos: .bento-square/.bento-wide/.bento-tall/.bento-feature/.bento-hero.',
-        '  - Iconos: <app-icon name="kebab-case" [size]="16" /> SIEMPRE. PROHIBIDO emojis en la UI.',
-        '  - KPIs: <span class="kpi-value">24K</span> + <span class="kpi-label">USUARIOS</span>. No text-4xl plano.',
-        '  - Botones: class="btn-primary" (CTA), class="btn-secondary" (secundario), class="btn-ghost" (terciario). Definidos en tailwind.css.',
-        '  - Superficies: class="surface-hero" en banners/hero sections. class="surface-glass" en overlays flotantes.',
-        '  - Indicadores: class="indicator-live" para estado en tiempo real. class="badge-pulse" en badges de conteo.',
-        '[REGLA ai-readability.md] Botones de mutacion: data-llm-action="accion". Inputs criticos: data-llm-description="desc". Nav: data-llm-nav.',
-        '[SKILL angular-primeng] Imports standalone: import { Button, Select, Table } no modules. Lazy loading para +1000 registros.'
+        'Template Angular — reglas completas en: architecture.md + ai-readability.md (auto-cargadas).',
+        'Control flow: @if / @for / @switch. Bindings: [class.x] / [style.x].',
+        'Semántica IA: data-llm-action en botones de mutación | data-llm-description en inputs críticos.',
+        'Iconos: <app-icon name="..." /> SIEMPRE. Botones: btn-primary | btn-secondary | btn-ghost.',
+        ...(STACK.gsap
+          ? ['Bento: .bento-grid + [appBentoGridLayout]. Animaciones: GsapAnimationsService.']
+          : ['Bento: .bento-grid + [appBentoGridLayout]. Animaciones: .animate-fade-in-up.']),
+        'PrimeNG: imports standalone (Button, Select, Table — no modules).'
       );
     }
 
     // --- Estilos SCSS ---
     if (normalizedPath.includes('src/') && (normalizedPath.endsWith('.scss') || normalizedPath.endsWith('.css'))) {
       contextParts.push(
-        '[REGLA visual-system.md] Estilos: usar var(--*) tokens de _variables.scss. No hex hardcodeados.',
-        '  - Layouts: .page-centered, .page-narrow, .page-wide (no max-width ad-hoc).',
-        '  - Grids: .bento-grid con clases de proporcion (no grids custom).',
+        'Estilos — reglas completas en: visual-system.md (auto-cargada).',
+        'Tokens: var(--*) de _variables.scss. NO hex hardcodeados.',
+        'Layouts: .page-centered / .page-narrow / .page-wide. Grids: .bento-grid.',
         ...(STACK.gsap
-          ? ['  - Motion en componentes (src/app/): NO @keyframes. GSAP para entradas, View Transitions para rutas.']
-          : ['  - Motion: CSS transitions y View Transitions API (GSAP no incluido en este proyecto).']),
-        '  - Loops de estado continuo: usar .indicator-live o .badge-pulse — ya tienen @keyframes en el design system.',
-        '  - Clases semanticas disponibles: .kpi-value, .kpi-label, .surface-hero, .surface-glass, .indicator-live, .badge-pulse.',
-        '  - PrimeNG overrides: ya estan en _primeng-overrides.scss. No sobrescribir en componentes.',
-        '[SKILL design-system] Consulta indices/STYLES.md para la lista completa de tokens y layout helpers.'
+          ? ['Motion en src/app/: NO @keyframes. GSAP para entradas, View Transitions para rutas.']
+          : ['Motion: @keyframes permitido. Clases: .animate-fade-in-up / .animate-fade-in / .animate-stagger.']),
+        'Consulta indices/STYLES.md para lista completa de tokens y helpers.'
       );
     }
 
     // --- Pure Utils ---
     if (normalizedPath.includes('core/utils/') && normalizedPath.endsWith('.ts') && !normalizedPath.endsWith('.spec.ts')) {
       contextParts.push(
-        '[REGLA architecture.md] Este es un archivo de FUNCIONES PURAS (core/utils/).',
-        '  - Sin inject(), sin signal(), sin side effects. Solo Data In -> Data Out.',
-        '  - Naming: {dominio}.utils.ts (kebab-case). Export via barrel core/utils/index.ts.',
-        '  - DEBE tener .spec.ts companero — son las funciones mas faciles de testear.',
-        '  - Se usan desde computed() en Smart Components o Facades para logica cross-domain.'
+        'FUNCION PURA (core/utils/) — sin inject(), sin signal(), sin side effects.',
+        'Naming: {dominio}.utils.ts. Export via barrel core/utils/index.ts.',
+        'DEBE tener .spec.ts companero.'
       );
     }
 
     // --- Directivas ---
     if (normalizedPath.includes('core/directives/') && normalizedPath.endsWith('.ts')) {
       contextParts.push(
-        '[REGLA architecture.md] Directiva en core/directives/.',
-        '  - Documentar en indices/DIRECTIVES.md con selector, proposito e inputs.',
-        '[SKILL angular-component] Directivas: usar host bindings, inject() para DI, OnPush si es structural.'
+        'DIRECTIVA (core/directives/) — documentar en indices/DIRECTIVES.md.',
+        'Usar host bindings, inject() para DI.'
       );
     }
 
     // --- Emitir contexto si hay algo relevante ---
     if (contextParts.length > 0) {
-      // Si existe memoria de fallos del linter, sugerir revisarla.
+      // Si existe memoria de fallos del linter, mencionar
       try {
         const lessonsPath = path.join(process.cwd(), '.claude', 'temp', 'LESSONS_LEARNED.md');
         if (fs.existsSync(lessonsPath)) {
           contextParts.push(
-            '[MEMORIA] Existe .claude/temp/LESSONS_LEARNED.md: revisa patrones que ya fallaron en lint:arch antes de repetirlos.'
+            '[MEMORIA] .claude/temp/LESSONS_LEARNED.md existe — revisa patrones que ya fallaron antes de repetirlos.'
           );
         }
-      } catch (_) {
-        // ignore
-      }
+      } catch (_) { /* ignore */ }
 
       const context = contextParts.join('\n');
       const output = JSON.stringify({

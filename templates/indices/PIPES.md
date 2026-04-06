@@ -8,6 +8,7 @@
 |------|--------------------|-----------|--------|--------|
 | `RelativeTimePipe` | `relativeTime` | Convierte fecha a texto relativo ("hace 5 min", "ayer") | `locale` (default: `'es'`) | ✅ Estable |
 
+<!-- DETAIL:BEGIN -->
 ## Pipes Nativos de Angular (Recordatorio)
 
 > No reinventes estos — Angular ya los incluye:

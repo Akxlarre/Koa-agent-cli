@@ -3,54 +3,89 @@
  * compact-recovery.js — PostCompact Hook
  *
  * Se ejecuta automáticamente después de cada compactación de contexto.
- * Re-inyecta los índices del proyecto al contexto de Claude para que
- * no se pierda la memoria de lo que ya existe en el proyecto.
+ * Re-inyecta los índices del proyecto al contexto de Claude.
+ *
+ * Mejoras v2:
+ *   - Inyección SELECTIVA: solo los índices que el agente ya había leído
+ *     (más los 3 core siempre). Lee el discovery flag para decidir.
+ *   - Inyección PARCIAL: corta en <!-- DETAIL:BEGIN --> para inyectar
+ *     solo las tablas de Quick Reference, no los ejemplos de código.
  *
  * stdout → se agrega directamente al contexto de Claude.
  */
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const cwd = process.cwd();
+const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
 
-const indexFiles = [
-  'indices/COMPONENTS.md',
-  'indices/SERVICES.md',
-  'indices/DATABASE.md',
-  'indices/DIRECTIVES.md',
-  'indices/STYLES.md',
-  'indices/PIPES.md',
-];
+// Índices siempre inyectados (base de todo proyecto)
+const CORE_INDICES = new Set(['COMPONENTS', 'SERVICES', 'FACADES']);
 
+// Mapa completo de índices disponibles
+const ALL_INDEX_FILES = {
+  COMPONENTS: 'indices/COMPONENTS.md',
+  SERVICES: 'indices/SERVICES.md',
+  FACADES: 'indices/FACADES.md',
+  MODELS: 'indices/MODELS.md',
+  DATABASE: 'indices/DATABASE.md',
+  DIRECTIVES: 'indices/DIRECTIVES.md',
+  STYLES: 'indices/STYLES.md',
+  PIPES: 'indices/PIPES.md',
+  'ANTI-PATTERNS': 'indices/ANTI-PATTERNS.md',
+  STORES: 'indices/STORES.md',
+};
+
+// ─── Leer discovery flag: qué índices leyó el agente antes del compact ───────
+const touchedIndexNames = new Set(CORE_INDICES);
+try {
+  const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
+  if (fs.existsSync(flagPath)) {
+    const flagContent = fs.readFileSync(flagPath, 'utf-8');
+    for (const line of flagContent.split('\n')) {
+      const match = line.match(/indices\/([\w-]+)\.md/i);
+      if (match) touchedIndexNames.add(match[1].toUpperCase());
+    }
+  }
+} catch { /* fail-open — solo CORE */ }
+
+// ─── Construir output ────────────────────────────────────────────────────────
 let output = '';
 output += '══════════════════════════════════════════════════════════════\n';
 output += ' CONTEXTO RE-INYECTADO (post-compactacion por Koa Hooks)\n';
 output += '══════════════════════════════════════════════════════════════\n\n';
-output += 'El contexto fue compactado. Los indices del proyecto han sido\n';
-output += 'restaurados automaticamente para que no pierdas la memoria\n';
-output += 'de lo que ya existe en el proyecto.\n\n';
+output += 'Contexto compactado. Se restauran los indices que estabas usando\n';
+output += '(Quick Reference — sin ejemplos de codigo para ahorrar tokens).\n\n';
 
 let injectedCount = 0;
 
-for (const indexFile of indexFiles) {
-  const fullPath = path.join(cwd, indexFile);
-  if (fs.existsSync(fullPath)) {
-    const content = fs.readFileSync(fullPath, 'utf-8').trim();
-    if (content) {
-      output += `--- ${indexFile} ---\n`;
-      output += content + '\n\n';
-      injectedCount++;
-    }
-  }
+for (const [name, relativePath] of Object.entries(ALL_INDEX_FILES)) {
+  if (!touchedIndexNames.has(name)) continue;
+
+  const fullPath = path.join(cwd, relativePath);
+  if (!fs.existsSync(fullPath)) continue;
+
+  let content = fs.readFileSync(fullPath, 'utf-8').trim();
+  if (!content) continue;
+
+  // Cortar en DETAIL:BEGIN — inyectar solo la Quick Reference
+  const cutoff = content.indexOf(DETAIL_MARKER);
+  if (cutoff > -1) content = content.slice(0, cutoff).trim();
+
+  output += `--- ${relativePath} ---\n`;
+  output += content + '\n\n';
+  injectedCount++;
 }
 
 if (injectedCount === 0) {
   output += '(No se encontraron archivos de indices en el proyecto)\n';
 } else {
   output += '══════════════════════════════════════════════════════════════\n';
-  output += `${injectedCount} indices restaurados. Consulta estos datos antes de\n`;
-  output += 'crear componentes, servicios o migraciones nuevas.\n';
+  output += `${injectedCount} indices restaurados (Quick Reference).\n`;
+  output += 'Para ver ejemplos completos: lee el archivo de indice directamente.\n';
   output += '══════════════════════════════════════════════════════════════\n';
 }
 

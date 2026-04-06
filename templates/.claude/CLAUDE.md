@@ -33,23 +33,23 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 4. **VALIDAR** — Corre `npm run lint:arch` para una auditoría completa del proyecto.
 5. **SINCRONIZAR** — Actualiza `indices/*.md` con los componentes/servicios creados. El Stop hook te lo recordará si lo olvidas.
 
-## Reglas del proyecto
+## Reglas del proyecto (path-scoped — se cargan automáticamente)
 
-@.claude/rules/architecture.md
-@.claude/rules/models.md
-@.claude/rules/facades.md
-@.claude/rules/visual-system.md
-@.claude/rules/component-selection.md
-@.claude/rules/notifications.md
-@.claude/rules/swr-pattern.md
-@.claude/rules/testing-tdd.md
-@.claude/rules/ai-readability.md
-@.claude/rules/database.md
+Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las inyecta
+**solo cuando el archivo editado coincide con el path** — no se cargan todas al inicio.
 
-## Referencias
+| Archivos editados | Reglas activas |
+|---|---|
+| `src/app/**/*.ts` + `.html` | `architecture`, `facades`, `swr-pattern`, `testing-tdd`, `state-management` |
+| `src/app/core/models/**` + `core/facades/**` | `models`, `facades` |
+| `src/app/shared/**` + `features/**` | `component-selection` |
+| `src/app/**/*.html` + `shared/**` + `styles/**` | `visual-system`, `ai-readability` |
+| `src/app/features/**` + `layout/**` | `notifications` |
+| `supabase/**` + `core/services/**` | `database` |
 
-- Stack completo: @docs/TECH-STACK-RULES.md
-- Brand & UI: @docs/BRAND_GUIDELINES.md
-- Sistema de Hooks: @docs/HOOKS-SYSTEM.md
-- Visión del producto: @docs/PRODUCT-VISION.md
-- Guía de usuario: @docs/CLAUDE-USER-GUIDE.md
+## Referencias (leer bajo demanda — no cargadas automáticamente)
+
+- Stack completo: `docs/TECH-STACK-RULES.md`
+- Brand & UI: `docs/BRAND_GUIDELINES.md`
+- Sistema de Hooks: `docs/HOOKS-SYSTEM.md`
+- Visión del producto: `docs/PRODUCT-VISION.md`

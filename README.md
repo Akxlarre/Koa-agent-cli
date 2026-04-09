@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🧠 Claude Agent CLI</h1>
+  <h1>🧠 KOA Agent CLI</h1>
   <p><h3>El orquestador definitivo para el Arquitecto de Sistemas Agénticos (AI Workflow Engineer)</h3></p>
   
   <p>

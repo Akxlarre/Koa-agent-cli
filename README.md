@@ -1,6 +1,6 @@
 <div align="center">
   <h1>🧠 KOA Agent CLI</h1>
-  <p><h3>El orquestador definitivo para el Arquitecto de Sistemas Agénticos (AI Workflow Engineer)</h3></p>
+  <p><h3>Un orquestador para el Arquitecto de Sistemas Agénticos (AI Workflow Engineer)</h3></p>
   
   <p>
     <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20.0.0-success.svg?style=flat-square&logo=nodedotjs" alt="Node Version" /></a>

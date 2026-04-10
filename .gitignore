@@ -25,7 +25,7 @@ bazel-out/
 .mcp.json
 .claude/logs/
 .gemini/
-indices/
+
 
 # Research (no es documentacion del CLI)
 docs/ESTUDIO.md

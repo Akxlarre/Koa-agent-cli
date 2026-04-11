@@ -8,7 +8,9 @@
       "WebFetch(domain:nx.dev)",
       "WebFetch(domain:arxiv.org)",
       "Bash(node:*)",
-      "Bash(grep -l \"DETAIL:BEGIN\" templates/indices/*.md)"
+      "Bash(grep -l \"DETAIL:BEGIN\" templates/indices/*.md)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }

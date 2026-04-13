@@ -263,7 +263,9 @@ process.stdin.on('end', () => {
             ? ['Animaciones: inject(GsapAnimationsService) en ngAfterViewInit.']
             : ['Animaciones: CSS transitions (.animate-fade-in-up) o View Transitions API.']),
           'Indices: COMPONENTS.md (que existe) | ANTI-PATTERNS.md (que evitar).',
-          'Skills bajo demanda: /angular-component | /angular-signals | /design-system.'
+          '[CONTEXTO] context/domain.md — entidades y reglas de negocio del proyecto.',
+          'Skills bajo demanda: /angular-component | /angular-signals | /design-system.',
+          '[CONTEXTO] context/brief.md — objetivo de la sesión actual. context/domain.md — entidades del negocio.'
         );
       }
       if (normalizedPath.includes('shared/')) {

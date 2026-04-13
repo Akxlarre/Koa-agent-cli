@@ -59,7 +59,8 @@ lib/
 
 ## Flujo de trabajo (4 pasos)
 
-1. **DESCUBRIR** — Lee `indices/CLI-MODULES.md` y `indices/TEMPLATES-REGISTRY.md`
+1. **DESCUBRIR** — Lee `indices/CLI-MODULES.md`, `indices/TEMPLATES-REGISTRY.md`
+   y `context/domain.md` + `context/brief.md` si existen.
 2. **PLANIFICAR** — ¿Contexto A (generador) o Contexto B (payload)?
 3. **EJECUTAR** — Código. Los hooks validarán cada escritura.
 4. **SINCRONIZAR** — Actualiza el índice correspondiente.

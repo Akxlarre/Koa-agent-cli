@@ -27,7 +27,7 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 
 ## Flujo obligatorio (5 pasos)
 
-1. **DESCUBRIR** — Lee `indices/COMPONENTS.md`, `indices/SERVICES.md`, `indices/FACADES.md`, `indices/MODELS.md`, `indices/DIRECTIVES.md`, `indices/STYLES.md`, `indices/DATABASE.md` antes de escribir código. **El Discovery Gate te bloqueará si no lo haces.**
+1. **DESCUBRIR** — Lee los índices de `indices/` (COMPONENTS, SERVICES, FACADES, MODELS…) **y** `context/domain.md` + `context/brief.md` si existen. Los índices te dicen qué código hay; el contexto te dice qué es el negocio y qué se está construyendo hoy. **El Discovery Gate te bloqueará si no lees los índices.**
 2. **PLANIFICAR** — Define qué vas a tocar sin violar las reglas de arquitectura.
 3. **EJECUTAR** — Escribe el código. Reutiliza siempre lo existente primero. Los hooks validarán cada escritura en tiempo real.
 4. **VALIDAR** — Corre `npm run lint:arch` para una auditoría completa del proyecto.

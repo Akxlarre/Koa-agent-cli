@@ -12,6 +12,7 @@
 | `templates/gitignore.template` | `.gitignore` | .gitignore con entradas para Angular, Supabase, GSAP, Vitest, Playwright. |
 | `templates/docs/` | `docs/` | Guías de usuario: HOOKS-SYSTEM.md, TECH-STACK-RULES.md, BRAND_GUIDELINES.md, PRODUCT-VISION.md. |
 | `templates/indices/` | `indices/` | 8 índices vacíos con estructura lista para completar (COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, PIPES, STYLES, DATABASE). |
+| `templates/context/` | `context/` | Memoria semántica privada del agente: domain.md, brief.md, constraints.md, decisions/. Gitignored en el proyecto generado. |
 | `templates/supabase/` | `supabase/` | Config de Supabase local (config.toml). |
 
 ## Harness agéntico (siempre copiado)

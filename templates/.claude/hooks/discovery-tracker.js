@@ -25,8 +25,8 @@ process.stdin.on('end', () => {
     const filePath = (input.tool_input?.file_path || '').replace(/\\/g, '/');
     const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
 
-    // Detectar lectura de cualquier archivo en indices/
-    if (filePath.includes('indices/')) {
+    // Detectar lectura de índices estructurales o contexto semántico
+    if (filePath.includes('indices/') || filePath.includes('context/')) {
       const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
       const timestamp = new Date().toISOString();
       const entry = `${timestamp} | READ | ${filePath}\n`;

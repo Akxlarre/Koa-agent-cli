@@ -28,6 +28,9 @@ bazel-out/
 .gemini/
 indices/
 
+# Contexto privado del agente (dominio, sesión, decisiones)
+context/
+
 # Playwright E2E
 /test-results/
 /playwright-report/

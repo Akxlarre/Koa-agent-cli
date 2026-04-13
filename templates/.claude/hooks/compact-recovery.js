@@ -89,4 +89,41 @@ if (injectedCount === 0) {
   output += '══════════════════════════════════════════════════════════════\n';
 }
 
+
+// ─── Context files (domain + brief) ─────────────────────────────────────────────────────
+// Inyectar contexto semantico privado si existe y tiene contenido util
+const CONTEXT_FILES = [
+  { label: 'context/domain.md', path: 'context/domain.md' },
+  { label: 'context/brief.md',  path: 'context/brief.md'  },
+];
+
+let contextAdded = false;
+for (const cf of CONTEXT_FILES) {
+  const fullPath = path.join(cwd, cf.path);
+  if (!fs.existsSync(fullPath)) continue;
+
+  const raw = fs.readFileSync(fullPath, 'utf-8').trim();
+  // Saltar archivos que son solo plantilla (sin contenido real)
+  const stripped = raw.replace(/<!--[sS]*?-->/g, '').trim();
+  if (stripped.length < 80) continue;
+
+  if (!contextAdded) {
+    output += '─── Contexto del proyecto (context/) ───
+
+';
+    contextAdded = true;
+  }
+  output += '--- ' + cf.label + ' ---
+';
+  output += raw + '
+
+';
+}
+
+if (contextAdded) {
+  output += '─── Fin contexto del proyecto ───
+
+';
+}
+
 process.stdout.write(output);

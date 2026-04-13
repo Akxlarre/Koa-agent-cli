@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Registro de Facades
 
 > **Regla de Actualización (OBLIGATORIA):** El Agente DEBE registrar toda Facade nueva en esta tabla al crearla. Antes de crear una Facade, verificar aquí si ya existe una que cubra el dominio. Duplicar Facades para el mismo dominio es un error arquitectónico grave.

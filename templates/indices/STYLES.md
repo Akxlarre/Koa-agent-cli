@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Registro de Estilos & Design System
 
 > **Regla de Actualización:** El Agente debe consultar esta tabla ANTES de crear estilos nuevos. Si ya existe una clase o token que resuelve la necesidad, **reutilizar**. Añadir a esta tabla cada vez que se cree un archivo de estilos nuevo.

@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Registro de Modelos (DTO & UI)
 
 > **Regla de Actualización (OBLIGATORIA):** El Agente DEBE registrar todo modelo nuevo en la tabla correspondiente (`dto/` o `ui/`). Antes de crear un modelo, verificar aquí si ya existe uno que resuelva la necesidad. Ver reglas completas en `.claude/rules/models.md`.

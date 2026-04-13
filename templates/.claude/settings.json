@@ -16,6 +16,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/bash-guard.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/spec-diff-check.js"
           }
         ]
       }

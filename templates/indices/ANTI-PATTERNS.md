@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Anti-Patterns (NO HACER)
 
 > Este índice enumera atajos comunes que degradan el sistema.  

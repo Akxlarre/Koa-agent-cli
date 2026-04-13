@@ -119,7 +119,15 @@ process.stdin.on('end', () => {
       if (/@Output\s*\(/.test(newContent))
         violations.push('Usa output() signal en vez de @Output() decorator');
 
-      // Import directo de Supabase en capa UI
+      // ARCH-11: supabase.types.ts es auto-generado — no editar manualmente
+      if (/core\/models\/supabase\.types\.ts/.test(normalizedPath))
+        violations.push(
+          '[ARCH-11] supabase.types.ts es AUTO-GENERADO.\n' +
+          '     No lo edites manualmente: ejecuta npm run supabase:types para regenerarlo.\n' +
+          '     Las interfaces en dto/ deben EXTENDER de supabase.types.ts.'
+        );
+
+            // Import directo de Supabase en capa UI
       if (
         STACK.supabase &&
         (normalizedPath.includes('features/') || normalizedPath.includes('shared/')) &&
@@ -174,6 +182,28 @@ process.stdin.on('end', () => {
         );
     }
 
+
+    // --- A11Y checks (solo en templates HTML de src/app/) ---
+    if (normalizedPath.includes('src/app/') && normalizedPath.endsWith('.html')) {
+      // A11Y-01: <app-icon> sin aria-label standalone (self-closing sin texto hermano)
+      const iconTagRe = /<app-icon(?![^>]*aria-label)[^>]*\/>/g;
+      if (iconTagRe.test(newContent))
+        violations.push(
+          '[A11Y-01] <app-icon> sin aria-label detectado.\n' +
+          '     Si es icono de accion: aniade [attr.aria-label]="Descripcion".\n' +
+          '     Si hay texto hermano visible, usa ariaHidden="true".\n' +
+          '     Ver: .claude/rules/a11y-spec.md'
+        );
+
+      // A11Y-02: <p-table> sin aria-label ni caption
+      const ptableRe = /<p-table\b(?![^>]*aria-label)[^>]*>/;
+      if (ptableRe.test(newContent) && !newContent.includes('pTemplate="caption"'))
+        violations.push(
+          '[A11Y-02] <p-table> sin aria-label ni caption.\n' +
+          '     Aniade [attr.aria-label]="Nombre de la tabla" o usa pTemplate="caption".\n' +
+          '     Ver: .claude/rules/a11y-spec.md'
+        );
+    }
     // --- SCSS / CSS checks (solo en src/) ---
     if (normalizedPath.includes('src/') && (normalizedPath.endsWith('.scss') || normalizedPath.endsWith('.css'))) {
       // @keyframes: BLOQUEADO en componentes solo si el proyecto usa GSAP

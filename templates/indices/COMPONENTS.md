@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Registro de Componentes (Atomic Design)
 
 > **Regla de Actualización (CRÍTICA - SINGLE SOURCE OF TRUTH):** El Agente DEBE usar sus herramientas de sistema (escritura de archivos) para agregar incondicionalmente todos los nuevos componentes creados a estas tablas. 
@@ -6,32 +9,32 @@
 ## Átomos (Atoms)
 *Elementos UI básicos e indivisibles (botones, inputs, badges).*
 
-| Componente | Props principales | Ubicación | Estado |
-|------------|-------------------|-----------|--------|
-| `skeleton-block` | `variant` (`rect`, `circle`, `text`), `width`, `height` | `shared/components/skeleton-block/skeleton-block.component.ts` | ✅ Estable |
-| `app-icon` | `name` (requerido, kebab-case), `size` (default 16), `color`, `ariaHidden` | `shared/components/icon/icon.component.ts` | ✅ Estable |
+| Componente | API (inputs / outputs) | Descripción | Ubicación | Estado |
+|------------|------------------------|-------------|-----------|--------|
+| `skeleton-block` | `variant:('rect'\|'circle'\|'text')` `width?:string` `height?:string` | Bloque placeholder para estados de carga | `shared/components/skeleton-block/skeleton-block.component.ts` | ✅ Estable |
+| `app-icon` | `name:string` (req, kebab-case) `size?:number` (def 16) `color?:string` `ariaHidden?:boolean` | Wrapper Lucide — SIEMPRE con `[attr.aria-label]` si es icono de acción | `shared/components/icon/icon.component.ts` | ✅ Estable |
 
 ## Moléculas (Molecules)
 *Agrupación de átomos que forman una unidad funcional simple.*
 
-| Componente | Props principales | Ubicación | Estado |
-|------------|-------------------|-----------|--------|
-| `app-kpi-card` | `value` (req), `label` (req), `suffix`, `prefix`, `trend`, `trendLabel`, `accent` | `shared/components/kpi-card/kpi-card.component.ts` | ✅ Estable |
-| `app-kpi-card-skeleton` | — (skeleton colocated de app-kpi-card) | `shared/components/kpi-card/kpi-card-skeleton.component.ts` | ✅ Estable |
+| Componente | API (inputs / outputs) | Descripción | Ubicación | Estado |
+|------------|------------------------|-------------|-----------|--------|
+| `app-kpi-card` | `value:number` (req) `label:string` (req) `suffix?:string` `prefix?:string` `trend?:number` `trendLabel?:string` `accent?:boolean` | KPI numérico con animación counter y badge de tendencia | `shared/components/kpi-card/kpi-card.component.ts` | ✅ Estable |
+| `app-kpi-card-skeleton` | — | Skeleton colocated de app-kpi-card | `shared/components/kpi-card/kpi-card-skeleton.component.ts` | ✅ Estable |
 
 ## Moléculas — Feedback
 *Comunicación de estados del sistema al usuario.*
 
-| Componente | Props principales | Ubicación | Estado |
-|------------|-------------------|-----------|--------|
-| `app-empty-state` | `message` (req), `subtitle`, `icon`, `actionLabel`, `actionIcon`, `(action)` | `shared/components/empty-state/empty-state.component.ts` | ✅ Estable |
-| `app-alert-card` | `title` (req), `severity` ('error'\|'warning'\|'info'\|'success'), `actionLabel`, `dismissible`, `(action)`, `(dismissed)` | `shared/components/alert-card/alert-card.component.ts` | ✅ Estable |
+| Componente | API (inputs / outputs) | Descripción | Ubicación | Estado |
+|------------|------------------------|-------------|-----------|--------|
+| `app-empty-state` | `message:string` (req) `subtitle?:string` `icon?:string` `actionLabel?:string` `actionIcon?:string` → `action:OutputEmitterRef<void>` | Estado vacío con acción opcional | `shared/components/empty-state/empty-state.component.ts` | ✅ Estable |
+| `app-alert-card` | `title:string` (req) `severity?:('error'\|'warning'\|'info'\|'success')` `actionLabel?:string` `dismissible?:boolean` → `action:OutputEmitterRef<void>` `dismissed:OutputEmitterRef<void>` | Alerta contextual con acción y dismiss | `shared/components/alert-card/alert-card.component.ts` | ✅ Estable |
 
 ## Moléculas — Contenedores
 
-| Componente | Props principales | Ubicación | Estado |
-|------------|-------------------|-----------|--------|
-| `app-drawer` | `isOpen` (req), `title` (req), `icon`, `hasFooter`, `(closed)`. Body via `ng-content`, footer via `[drawer-footer]` | `shared/components/drawer/drawer.component.ts` | ✅ Estable |
+| Componente | API (inputs / outputs) | Descripción | Ubicación | Estado |
+|------------|------------------------|-------------|-----------|--------|
+| `app-drawer` | `isOpen:boolean` (req) `title:string` (req) `icon?:string` `hasFooter?:boolean` → `closed:OutputEmitterRef<void>`. Body via `ng-content`, footer via `[drawer-footer]` | Panel lateral deslizante con proyección de contenido | `shared/components/drawer/drawer.component.ts` | ✅ Estable |
 
 ## Organismos (Organisms)
 *Para tablas, formularios y modals usa PrimeNG — ver regla component-selection.md.*

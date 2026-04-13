@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Registro de Servicios
 
 > **Regla de Actualización (OBLIGATORIA):** El Agente DEBE usar sus herramientas de sistema (escritura de archivos) para registrar el servicio en la tabla correspondiente al crearlo. Solo si el entorno no los soporta, usa el bloque `<memory_update>` para el humano.

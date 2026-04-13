@@ -33,6 +33,15 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 4. **VALIDAR** — Corre `npm run lint:arch` para una auditoría completa del proyecto.
 5. **SINCRONIZAR** — Actualiza `indices/*.md` con los componentes/servicios creados. El Stop hook te lo recordará si lo olvidas.
 
+## Skills disponibles
+
+| Skill | Cuándo usar |
+|---|---|
+| `/plan` | SIEMPRE antes de una tarea no trivial (>2 archivos). Genera task-spec con artefactos afectados, reglas que aplican y criterio de done. |
+| `/angular-component` | Crear o refactorizar un componente Angular |
+| `/angular-signals` | Implementar estado reactivo con Signals |
+| `/sync-indices` | Sincronizar índices al cerrar sesión |
+
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 
 Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las inyecta

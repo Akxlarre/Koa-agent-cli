@@ -1,3 +1,6 @@
+<!-- spec-version: {{GENERATED_AT}} -->
+<!-- auto-refresh: indices:sync -->
+
 # Signal Stores (NgRx Signal Store)
 
 > Este archivo solo existe si el proyecto fue generado con `--with-ngrx-signals`.

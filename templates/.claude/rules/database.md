@@ -32,6 +32,36 @@ paths:
 - En la Facade → `toSignal()` para exponer al template
 - Cancelar subscripciones en `ngOnDestroy`
 
+## Tipos TypeScript desde Supabase (fuente de verdad)
+
+- Ejecuta `npm run supabase:types` después de cada migración (requiere `supabase start`)
+- El archivo `src/app/core/models/supabase.types.ts` es **AUTO-GENERADO** — no editar manualmente
+- Las interfaces en `core/models/dto/` deben **extender** de `supabase.types.ts`, no redefinir campos
+- El Architect Guard bloqueará ediciones manuales a `supabase.types.ts` (`ARCH-11`)
+
+```typescript
+// CORRECTO: extender desde tipos generados
+import type { Database } from './supabase.types';
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
+export interface ProfileDto extends ProfileRow {
+  // campos derivados adicionales aquí
+}
+```
+
+## Spec Header obligatorio en migraciones
+
+Toda migración nueva debe incluir un bloque spec al inicio del archivo:
+
+```sql
+-- spec:
+--   tables_added: [nombre_tabla]
+--   columns_added: [col1, col2, ...]
+--   breaking: false
+--   description: "Descripción breve"
+-- /spec
+```
+
 ## Patrón de query
 
 ```typescript

@@ -27,5 +27,8 @@ bazel-out/
 .gemini/
 
 
-# Research (no es documentacion del CLI)
-docs/ESTUDIO.md
+# Workshop — espacio de trabajo privado (planes, research, ADRs, visión)
+workshop/
+
+# Context — memoria semántica privada del agente (dominio, sesión, decisiones)
+context/

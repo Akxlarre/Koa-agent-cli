@@ -16,10 +16,16 @@ const MAX_ENTRIES = 20;
 const LESSONS_FILE = path.join(process.cwd(), '.claude', 'temp', 'LESSONS_LEARNED.md');
 const TEMP_DIR = path.join(process.cwd(), '.claude', 'temp');
 
-// Read stdin
+// Read stdin — SEC-04: cap at 10 MB to prevent memory exhaustion.
+const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let input = '';
+let inputSize = 0;
 process.stdin.setEncoding('utf-8');
-process.stdin.on('data', (chunk) => (input += chunk));
+process.stdin.on('data', (chunk) => {
+  inputSize += Buffer.byteLength(chunk, 'utf-8');
+  if (inputSize > MAX_STDIN_BYTES) { process.exit(0); }
+  input += chunk;
+});
 process.stdin.on('end', () => {
   try {
     const event = JSON.parse(input);

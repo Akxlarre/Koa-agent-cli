@@ -93,8 +93,10 @@ if (injectedCount === 0) {
 // ─── Context files (domain + brief) ─────────────────────────────────────────────────────
 // Inyectar contexto semantico privado si existe y tiene contenido util
 const CONTEXT_FILES = [
-  { label: 'context/domain.md', path: 'context/domain.md' },
-  { label: 'context/brief.md',  path: 'context/brief.md'  },
+  { label: 'context/domain.md',      path: 'context/domain.md'      },
+  { label: 'context/brief.md',       path: 'context/brief.md'       },
+  { label: 'context/constraints.md', path: 'context/constraints.md' },
+  { label: 'context/learnings.md',   path: 'context/learnings.md'   },
 ];
 
 let contextAdded = false;

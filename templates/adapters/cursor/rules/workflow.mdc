@@ -1,0 +1,38 @@
+---
+description: Mandatory session workflow — read AGENTS.md for full project guidelines
+alwaysApply: true
+---
+
+# {{PROJECT_NAME}} — Session Workflow
+
+Full guidelines (architecture, anti-patterns, visual system) are in `AGENTS.md` — read it at the start of every session.
+
+## Mandatory 5-Step Flow
+
+### 1. DISCOVER — before writing any code in `src/app/`
+
+Read these indices first:
+- `indices/COMPONENTS.md` — existing UI components
+- `indices/SERVICES.md` + `indices/FACADES.md` — existing services and facades
+- `indices/MODELS.md` — existing TypeScript interfaces
+- `indices/DIRECTIVES.md`, `indices/PIPES.md`, `indices/STORES.md`
+- `indices/DATABASE.md` — Supabase tables (if applicable)
+- `context/domain.md` + `context/brief.md` — business context and today's objective
+
+**Never create something that already exists. Reuse first, create second.**
+
+### 2. PLAN — state scope before coding
+
+List every file you will touch. If the task spans more than 2 files, write out your plan explicitly before starting.
+
+### 3. EXECUTE — follow all rules in AGENTS.md
+
+Reuse existing components, facades, and models. New components go in the canonical folder structure (`core/`, `features/`, `shared/`, `layout/`).
+
+### 4. VALIDATE
+
+Run `npm run lint:arch` after making changes to verify architectural compliance.
+
+### 5. SYNC — update indices at end of session
+
+Update `indices/*.md` with any new components, services, facades, models, or database changes you created.

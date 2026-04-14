@@ -7,6 +7,32 @@ import {
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { AuthFacade } from "@core/services/auth.facade";
+import { validateEmail } from "@core/utils";
+
+// SEC-T01: Client-side constraints — validated BEFORE calling the auth API
+// to prevent unnecessary network calls and provide instant feedback.
+const PASSWORD_MIN_LENGTH = 8;
+const DISPLAY_NAME_MAX_LENGTH = 100;
+
+// SEC-T05: Map raw Supabase/network error messages to user-safe strings.
+// Prevents leaking internal API details (table names, query hints, stack traces).
+function sanitizeAuthError(rawMessage: string): string {
+  const msg = (rawMessage ?? "").toLowerCase();
+  if (msg.includes("invalid login credentials") || msg.includes("invalid credentials"))
+    return "Correo o contraseña incorrectos.";
+  if (msg.includes("email not confirmed"))
+    return "Confirma tu correo antes de iniciar sesión.";
+  if (msg.includes("user already registered") || msg.includes("already been registered"))
+    return "Ya existe una cuenta con ese correo.";
+  if (msg.includes("password should be") || msg.includes("password is too short"))
+    return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+  if (msg.includes("rate limit") || msg.includes("too many requests"))
+    return "Demasiados intentos. Espera unos minutos antes de intentar de nuevo.";
+  if (msg.includes("network") || msg.includes("fetch"))
+    return "Error de conexión. Verifica tu internet e intenta de nuevo.";
+  // Generic fallback — never show raw server messages
+  return "Ocurrió un error. Intenta de nuevo o contacta a soporte.";
+}
 
 /**
  * LoginComponent — Página pública de inicio de sesión.
@@ -247,14 +273,22 @@ export class LoginComponent {
   async onSubmit(): Promise<void> {
     this.errorMsg.set("");
     this.successMsg.set("");
+
+    // SEC-T01: Client-side validation — fail fast before hitting the network.
+    const validationError = this.validate();
+    if (validationError) {
+      this.errorMsg.set(validationError);
+      return;
+    }
+
     this.loading.set(true);
 
     try {
       switch (this.mode()) {
         case "login": {
-          const { error } = await this.auth.login(this.email, this.password);
+          const { error } = await this.auth.login(this.email.trim(), this.password);
           if (error) {
-            this.errorMsg.set(error.message);
+            this.errorMsg.set(sanitizeAuthError(error.message)); // SEC-T05
           } else {
             this.router.navigate(["/app"]);
           }
@@ -262,11 +296,13 @@ export class LoginComponent {
         }
 
         case "register": {
-          const { error } = await this.auth.signUp(this.email, this.password, {
-            data: { display_name: this.displayName || undefined },
-          });
+          const { error } = await this.auth.signUp(
+            this.email.trim(),
+            this.password,
+            { data: { display_name: this.displayName.trim() || undefined } },
+          );
           if (error) {
-            this.errorMsg.set(error.message);
+            this.errorMsg.set(sanitizeAuthError(error.message)); // SEC-T05
           } else {
             this.successMsg.set(
               "Cuenta creada. Revisa tu correo para confirmar tu registro.",
@@ -277,9 +313,9 @@ export class LoginComponent {
         }
 
         case "reset": {
-          const { error } = await this.auth.resetPasswordForEmail(this.email);
+          const { error } = await this.auth.resetPasswordForEmail(this.email.trim());
           if (error) {
-            this.errorMsg.set(error.message);
+            this.errorMsg.set(sanitizeAuthError(error.message)); // SEC-T05
           } else {
             this.successMsg.set(
               "Se envió un enlace de recuperación a tu correo.",
@@ -293,5 +329,26 @@ export class LoginComponent {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** SEC-T01: Validates form fields before any network call. Returns error string or null. */
+  private validate(): string | null {
+    const email = this.email.trim();
+    if (!email) return "El correo es obligatorio.";
+    if (!validateEmail(email)) return "El correo no tiene un formato válido.";
+
+    if (this.mode() !== "reset") {
+      if (!this.password) return "La contraseña es obligatoria.";
+      if (this.password.length < PASSWORD_MIN_LENGTH)
+        return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+    }
+
+    if (this.mode() === "register") {
+      const name = this.displayName.trim();
+      if (name.length > DISPLAY_NAME_MAX_LENGTH)
+        return `El nombre no puede superar los ${DISPLAY_NAME_MAX_LENGTH} caracteres.`;
+    }
+
+    return null;
   }
 }

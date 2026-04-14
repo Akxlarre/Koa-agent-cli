@@ -18,9 +18,17 @@
 | `lib/preflight.js` | Verificación de requisitos del sistema. Termina con exit(1) si falta npm/npx. Warnings para git/docker. | `preflight()`, `checkCommand(cmd, args, opts)` | child_process, chalk, lib/config.js |
 | `lib/installer.js` | Instalación de dependencias npm condicionales por stack. Creación del proyecto Angular base con ng new. Gestiona sus propios spinners y lanza Error en fallo. | `createAngularProject(projectName, tempDir)`, `installDependencies(targetDir, stack)` | lib/runner.js, chalk, ora |
 | `lib/scaffolder.js` | Copia de templates al directorio destino. Patching de tsconfig, angular.json, index.html, app.config.ts. Escritura de blueprint.json. Sin npm. | `copyTemplates(templatesDir, targetDir, projectName)`, `injectBoilerplate(templatesDir, targetDir, stack)`, `writeBlueprintJson(targetDir, projectName, isFull, stack)` | fs, path, chalk, lib/config.js |
+| `lib/generator.js` | Generador de artefactos para proyectos KoA existentes. Subcomando `generate feature [nombre] [--type list\|detail\|form]`. Valida blueprint.json, resuelve variables de nomenclatura, escribe 5-7 archivos sin sobreescribir. | `runGenerate(args)` | fs, path, chalk, inquirer, lib/feature-templates.js |
+| `lib/feature-templates.js` | Plantillas de código para el generador de features. Sin lógica, solo strings con `{{domain}}`, `{{Domain}}`, `{{Domains}}`. | `FEATURE_TEMPLATES` (11 entradas: repository, facade, facade-detail, smart-page, smart-page-detail, smart-page-form, dumb-card, dumb-skeleton, repository-spec, facade-spec, facade-detail-spec) | — |
 | `lib/ui.js` | Salida visual: banner ASCII y mensaje de éxito con próximos pasos. Sin FS ni spawn. | `printBanner()`, `printSuccess(projectName, isFull, targetDir)` | chalk, lib/config.js |
 
-## Flags CLI
+## Subcomandos
+
+| Subcomando | Uso | Descripción |
+|------------|-----|-------------|
+| `generate feature [nombre] [--type list\|detail\|form]` | Dentro de un proyecto KoA existente | Genera archivos pre-conectados según el tipo: **list** (7 archivos: repository + facade + smart-page + dumb-card + skeleton + 2 specs), **detail** (5: repository + facade-detail + smart-page-detail + 2 specs), **form** (5: repository + facade + smart-page-form + 2 specs). Default: `list`. Si se omite `[nombre]`, muestra prompt interactivo con selector de tipo. |
+
+## Flags CLI (scaffolding inicial)
 
 | Flag | Default | Efecto |
 |------|---------|--------|

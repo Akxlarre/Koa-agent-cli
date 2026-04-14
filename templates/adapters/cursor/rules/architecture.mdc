@@ -1,0 +1,49 @@
+---
+description: Angular architecture and visual system rules — enforced on every edit
+globs: ["src/**/*.ts", "src/**/*.html", "src/**/*.scss"]
+alwaysApply: false
+---
+
+# Architecture Rules
+
+## Template Syntax
+
+| NEVER | ALWAYS |
+|---|---|
+| `*ngIf`, `*ngFor`, `ngSwitch` | `@if`, `@for`, `@switch` |
+| `@Input()`, `@Output()` | `input()`, `output()` |
+| `[ngClass]`, `[ngStyle]` | `[class.name]="expr()"`, `[style.prop]="expr()"` |
+
+## Facade Pattern (mandatory)
+
+- UI components (`features/`, `shared/`) **NEVER** inject `SupabaseService`, `HttpClient`, or any data client
+- **ALWAYS** use a `*FacadeService` from `core/` — it centralizes state via Signals and exposes data with `toSignal()`
+- Facades handle errors with `catchError` and expose an `error = signal<string | null>(null)`
+
+## Change Detection
+
+- `changeDetection: ChangeDetectionStrategy.OnPush` on **every** component — no exceptions
+
+## Smart vs Dumb Components
+
+- **Dumb (`shared/`)**: Only `input()` and `output()`. No service injection.
+- **Smart (`features/`)**: Inject Facades. Coordinate Dumb components.
+- Every async Dumb component has a colocated `{name}-skeleton.component.ts`
+
+## Visual System
+
+| NEVER | ALWAYS |
+|---|---|
+| `text-red-500`, `bg-blue-200`, `#hex` | `text-primary`, `text-muted`, `bg-base`, `bg-surface`, `var(--ds-brand)` |
+| emojis as UI icons | `<app-icon name="kebab-case" [size]="16" />` |
+| `@angular/animations`, `@keyframes` for views | `GsapAnimationsService` in `ngAfterViewInit` |
+
+## Anti-Patterns — Stop and Fix
+
+| # | Never | Instead |
+|---|---|---|
+| AP-001 | `[ngClass]="{'active': x}"` | `[class.active]="x()"` |
+| AP-002 | `@Input() value` | `input()` |
+| AP-003 | `inject(SupabaseService)` in features/shared | Use a `*FacadeService` |
+| AP-004 | `text-red-500`, `bg-[#hex]` | Semantic tokens |
+| AP-005 | `@angular/animations` import | `GsapAnimationsService` |

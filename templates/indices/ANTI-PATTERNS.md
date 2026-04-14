@@ -26,3 +26,9 @@
 - **NO** uses `@angular/animations`.
 - **Sí** usa GSAP vía `GsapAnimationsService` (y View Transitions para navegación).
 
+## AP-006 — `.db.from()` en un Facade (evitar)
+- **NO** llames `inject(SupabaseService).db.from('tabla')` dentro de un Facade.
+- El getter `.db` existe **solo para Repositories** (`core/repositories/`).
+- **Sí** crea un `*Repository` que encapsula la query y haz que el Facade lo inyecte.
+- Patrón canónico: `UI → Facade → Repository → SupabaseService.db`
+

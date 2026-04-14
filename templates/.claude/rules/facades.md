@@ -11,15 +11,27 @@ Este documento define la ley arquitectónica para la capa de Fachada (Facade) en
 El Facade es el corazón del "Flujo de Datos" y la única forma permitida para que la UI obtenga datos.
 
 ## 1. Definición y Propósito
-Un Facade es un Servicio de Angular (`@Injectable`) que actúa como el **único punto de entrada** para un "Dominio" o "Feature" de la base de datos (Ej: Alumnos, Instructores, Dashboard).
+Un Facade es un Servicio de Angular (`@Injectable`) que actúa como el **único punto de entrada** para un "Dominio" o "Feature" (Ej: Productos, Usuarios, Dashboard).
 
 Su responsabilidad doble y estricta es:
-1. **Dialogar con la infraestructura:** Es el único autorizado para llamar a `SupabaseService` (Insertar, Leer, Actualizar, Borrar) o clientes HTTP.
-2. **Gestionar el Estado:** Mantiene en memoria el estado reactivo sincrónico usando `Signals`.
+1. **Orquestar datos:** Inyecta Repositories (`core/repositories/`) para leer y escribir en Supabase. **NUNCA llama `.db.from()` directamente** — eso es responsabilidad exclusiva del Repository.
+2. **Gestionar el Estado:** Mantiene en memoria el estado reactivo sincrónico usando `Signals` (a través de `BaseFacade<T>`).
 
-## 2. Nomenclatura Estricta
-- **Nombre de archivo:** Si el archivo maneja datos de dominio y estado de dominio, **debe llevar obligatoriamente el sufijo `.facade.ts`** (Ej: `auth.facade.ts`, `instructores.facade.ts`).
-- **Los sufijos `.service.ts`** se reservan exclusivamente para lógica utilitaria transversal sin estado de dominio (Ej: `theme.service.ts`, `gsap-animations.service.ts`).
+```
+UI  →  Facade  →  Repository  →  SupabaseService.client
+```
+
+## 2. Nomenclatura y Ubicación
+
+| Tipo | Ruta canónica | Ejemplo |
+|---|---|---|
+| **Facade de dominio** | `core/facades/{domain}.facade.ts` | `productos.facade.ts` |
+| **AuthFacade** (excepción) | `core/services/auth.facade.ts` | Gestiona sesión, no datos de dominio |
+| **Service utilitario** | `core/services/{nombre}.service.ts` | `toast.service.ts`, `theme.service.ts` |
+
+- El sufijo `.facade.ts` es obligatorio para todo archivo que extiende `BaseFacade<T>`.
+- Los sufijos `.service.ts` se reservan para lógica utilitaria transversal sin estado de dominio.
+- `AuthFacade` vive en `core/services/` como excepción documentada: gestiona sesión de usuario con ciclo de vida propio (`whenReady`, `onAuthStateChange`), no extiende `BaseFacade`.
 
 ## 3. Prohibiciones Absolutas en Componentes (UI)
 Estas reglas definen el por qué existe el Facade:
@@ -29,38 +41,40 @@ Estas reglas definen el por qué existe el Facade:
 
 ## 4. Estructura Interna Obligatoria de un Facade
 
-Todo Facade debe tener tres secciones claramente divididas:
+**Todo Facade de dominio DEBE extender `BaseFacade<T>`** de `@core/facades/base.facade`.
+`BaseFacade` provee el estado reactivo (`data`, `isLoading`, `error`, `hasData`), el patrón SWR
+y el ciclo de vida (`initialize`, `refreshSilently`, `reset`, `dispose`) de forma consistente.
 
 ```typescript
+import { Injectable, inject, computed } from '@angular/core';
+import { BaseFacade } from '@core/facades/base.facade';
+import { SupabaseService } from '@core/services/supabase.service';
+import type { Producto } from '@core/models/producto.model';
+
 @Injectable({ providedIn: 'root' })
-export class EjemploFacade {
+export class ProductosFacade extends BaseFacade<Producto[]> {
   private supabase = inject(SupabaseService);
 
-  // 1. ESTADO REACTIVO (Privado)
-  // Nadie fuera del Facade sabe cómo se forma ni lo puede mutar.
-  private _datos = signal<DtoModel[]>([]);
-  private _isLoading = signal<boolean>(false);
-  private _error = signal<string | null>(null);
-
-  // 2. ESTADO EXPUESTO (Público, Solo lectura)
-  // Las UI consumen esto para renderizarse automáticamente.
-  public readonly datos = this._datos.asReadonly();
-  public readonly isLoading = this._isLoading.asReadonly();
-  public readonly error = this._error.asReadonly();
-
-  // (Opcional) Computed Signals para transformar datos para la UI
-  public readonly datosActivos = computed(() => this._datos().filter(d => d.activo));
-
-  // 3. MÉTODOS DE ACCIÓN (Mutadores)
-  // Accionan la Base de Datos y actualizan los signals privados.
-  async cargarDatos(): Promise<void> {
-    this._isLoading.set(true);
-    // ... llamada a supabase ...
-    this._datos.set(data);
-    this._isLoading.set(false);
+  // ── fetchData (contrato obligatorio) ──────────────────────────────────────
+  protected override async fetchData(): Promise<Producto[]> {
+    const { data, error } = await this.supabase.client
+      .from('productos').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
   }
+
+  // ── Computed signals de dominio (opcionales) ──────────────────────────────
+  readonly activos = computed(() => this.data()?.filter(p => p.activo) ?? []);
+
+  // ── Mutaciones (ver swr-pattern.md para el template completo) ─────────────
+  async crear(payload: Omit<Producto, 'id'>): Promise<boolean> { /* ... */ return true; }
+  async actualizar(id: string, patch: Partial<Producto>): Promise<boolean> { /* ... */ return true; }
+  async eliminar(id: string): Promise<boolean> { /* ... */ return true; }
 }
 ```
+
+**Excepción:** `AuthFacade` NO extiende `BaseFacade` porque gestiona sesión de usuario
+(ciclo de vida distinto: `onAuthStateChange`, `whenReady`, etc.), no datos de dominio.
 
 ## 5. El Flujo de Trabajo (Mente-Máquina)
 1. **Pregunta:** "Necesito traer datos de la Tabla X para mostrarlos o editarlos?"

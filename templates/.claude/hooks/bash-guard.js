@@ -12,25 +12,38 @@
  *   2 = bloquear el comando
  */
 
+// SEC-04: Limit stdin to 10 MB to prevent memory exhaustion.
+const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let data = '';
-process.stdin.on('data', chunk => (data += chunk));
+let dataSize = 0;
+process.stdin.on('data', chunk => {
+  dataSize += chunk.length;
+  if (dataSize > MAX_STDIN_BYTES) { process.exit(0); }
+  data += chunk;
+});
 process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
     const command = input.tool_input?.command || '';
 
+    // SEC-07: Normalize whitespace (tabs, multiple spaces) before matching
+    // to prevent bypass via tab characters or non-standard spacing.
+    const normalizedCmd = command.replace(/\t/g, ' ').replace(/  +/g, ' ');
+
     // ═══════════════════════════════════════════════════════════════════════
     // 1. Bloquear creación de archivos fuente via Bash
     // ═══════════════════════════════════════════════════════════════════════
+    // SEC-07: Use both original and normalized command. Patterns now also catch
+    // heredoc redirections (<<EOF) and process substitution variants.
     const fileCreationPatterns = [
-      /(?:cat|echo|printf)\s.*>\s*.*src\/app\/.*\.(?:ts|html|scss)/,
-      /tee\s.*src\/app\/.*\.(?:ts|html|scss)/,
+      /(?:cat|echo|printf|tee)\b[^|]*>\s*.*src\/app\/.*\.(?:ts|html|scss)/,
       />\s*.*src\/app\/.*\.(?:ts|html|scss)/,
-      /(?:cat|echo|printf)\s.*>\s*.*supabase\/migrations\/.*\.sql/,
+      /(?:cat|echo|printf|tee)\b[^|]*>\s*.*supabase\/migrations\/.*\.sql/,
+      />\s*.*supabase\/migrations\/.*\.sql/,
     ];
 
     for (const pattern of fileCreationPatterns) {
-      if (pattern.test(command)) {
+      if (pattern.test(command) || pattern.test(normalizedCmd)) {
         process.stderr.write(
           `\u{1F6AB} BASH GUARD: No crear archivos de codigo fuente mediante Bash.\n` +
           `Usa las herramientas Edit o Write para crear y modificar archivos .ts, .html, .scss y .sql.\n` +
@@ -43,14 +56,25 @@ process.stdin.on('end', () => {
     // ═══════════════════════════════════════════════════════════════════════
     // 2. Bloquear operaciones destructivas en directorios críticos
     // ═══════════════════════════════════════════════════════════════════════
+    // SEC-07: Patterns now match -rf, -fr, -r -f (any order) and double-dash
+    // separator (rm -rf -- src/app) to prevent flag-reordering bypasses.
     const destructivePatterns = [
-      { re: /rm\s+-r[f ]?\s+.*(?:src\/app|\.claude|indices|supabase)/, msg: 'Eliminacion recursiva de directorio critico' },
-      { re: /rm\s+-f?r?\s+.*(?:\.claude\/hooks|\.claude\/settings|architect\.js)/, msg: 'Eliminacion de archivos del sistema de guardrails' },
-      { re: />\s*(?:\.claude\/settings\.json|\.claude\/hooks\/)/, msg: 'Sobreescritura de configuracion de guardrails' },
+      {
+        re: /\brm\b.*-[a-zA-Z]*r[a-zA-Z]*\b.*(?:src\/app|\.claude|indices|supabase)/,
+        msg: 'Eliminacion recursiva de directorio critico',
+      },
+      {
+        re: /\brm\b.*(?:\.claude\/hooks|\.claude\/settings|architect\.js)/,
+        msg: 'Eliminacion de archivos del sistema de guardrails',
+      },
+      {
+        re: />\s*(?:\.claude\/settings(?:\.local)?\.json|\.claude\/hooks\/)/,
+        msg: 'Sobreescritura de configuracion de guardrails',
+      },
     ];
 
     for (const { re, msg } of destructivePatterns) {
-      if (re.test(command)) {
+      if (re.test(command) || re.test(normalizedCmd)) {
         process.stderr.write(
           `\u{1F6E1}\u{FE0F} BASH GUARD: Operacion destructiva bloqueada.\n` +
           `Razon: ${msg}\n` +

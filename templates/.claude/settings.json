@@ -74,6 +74,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/sync-check.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/context-guardian.js"
           }
         ]
       }

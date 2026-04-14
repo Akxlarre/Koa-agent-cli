@@ -4,6 +4,7 @@ import { vi } from "vitest";
 import type { User } from "@core/models/user.model";
 import { AuthFacade } from "./auth.facade";
 import { SupabaseService } from "./supabase.service";
+import { ProfilesRepository } from "@core/repositories/profiles.repository";
 
 describe("AuthFacade", () => {
   let service: AuthFacade;
@@ -14,38 +15,31 @@ describe("AuthFacade", () => {
     signUp: ReturnType<typeof vi.fn>;
     signOut: ReturnType<typeof vi.fn>;
     resetPasswordForEmail: ReturnType<typeof vi.fn>;
-    client: unknown;
+    onAuthStateChange: ReturnType<typeof vi.fn>;
   };
+  let profilesRepoSpy: { findById: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    const mockSupabaseClient = {
-      auth: {
-        onAuthStateChange: vi.fn().mockReturnValue({
-          data: { subscription: { unsubscribe: () => {} } },
-        }),
-      },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: null }),
-          }),
-        }),
-      }),
-    };
-
     supabaseSpy = {
       getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
       signIn: vi.fn().mockResolvedValue({ error: null }),
       signUp: vi.fn().mockResolvedValue({ data: null, error: null }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
       resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
-      client: mockSupabaseClient,
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+    };
+
+    profilesRepoSpy = {
+      findById: vi.fn().mockResolvedValue(null),
     };
 
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         { provide: SupabaseService, useValue: supabaseSpy },
+        { provide: ProfilesRepository, useValue: profilesRepoSpy },
       ],
     });
 

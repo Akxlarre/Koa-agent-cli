@@ -1,7 +1,6 @@
 # {{PROJECT_NAME}} — Koa Agent Blueprint v{{BLUEPRINT_VERSION}}
 
-> Si usas **Claude Code CLI**, las reglas completas están en `.claude/CLAUDE.md` y se cargan automáticamente.
-> Si usas **Claude.ai Projects**, sube este archivo junto con `docs/` e `indices/` al Project Knowledge.
-> Para AI tools distintos a Claude Code (Cursor, Copilot, Windsurf), ver `AGENTS.md` (reglas portables sin deps de Claude Code).
+> **Claude Code entry point** — full harness with hooks, skills, and memory.
+> For other AI tools (OpenCode, Cursor, Windsurf, Copilot), see `AGENTS.md` instead.
 
 @.claude/CLAUDE.md

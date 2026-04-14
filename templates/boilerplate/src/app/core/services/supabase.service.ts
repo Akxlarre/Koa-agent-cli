@@ -15,11 +15,27 @@ export class SupabaseService {
     );
   }
 
-  get client() {
+  /**
+   * Acceso al cliente Supabase para queries de base de datos.
+   * SOLO para uso en Repositories (core/repositories/).
+   * Los Facades nunca llaman .db directamente — inyectan un Repository.
+   */
+  get db(): SupabaseClient {
     return this.supabase;
   }
 
-  // Auth
+  /**
+   * Suscribe a los cambios de estado de autenticación.
+   * Solo para uso en AuthFacade — las Facades de dominio no necesitan este método.
+   */
+  onAuthStateChange(
+    callback: Parameters<SupabaseClient["auth"]["onAuthStateChange"]>[0],
+  ) {
+    return this.supabase.auth.onAuthStateChange(callback);
+  }
+
+  // ── Auth convenience methods ────────────────────────────────────────────
+
   async signUp(
     email: string,
     password: string,

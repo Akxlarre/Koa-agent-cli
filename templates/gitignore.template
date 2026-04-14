@@ -13,6 +13,9 @@ bazel-out/
 .env
 .env.*
 !.env.example
+# SEC-T03: environment.prod.ts si contiene claves reales hardcodeadas.
+# Usa variables de entorno en CI/CD en su lugar (ver src/environments/environment.prod.ts).
+# environment.prod.ts  ← descomentar si hardcodeas claves aquí
 
 # IDEs y Editores
 .idea/

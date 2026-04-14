@@ -3,6 +3,7 @@ import { Router } from "@angular/router";
 import type { User } from "@core/models/user.model";
 import { getInitialsFromDisplayName } from "@core/models/user.model";
 import { SupabaseService } from "./supabase.service";
+import { ProfilesRepository } from "@core/repositories/profiles.repository";
 
 /**
  * AuthFacade - Facade de autenticación con Supabase.
@@ -17,6 +18,7 @@ import { SupabaseService } from "./supabase.service";
 export class AuthFacade {
   private supabase = inject(SupabaseService);
   private router = inject(Router);
+  private profilesRepo = inject(ProfilesRepository);
 
   private _currentUser = signal<User | null>(null);
 
@@ -32,7 +34,7 @@ export class AuthFacade {
       resolveReady = resolve;
     });
 
-    this.supabase.client.auth.onAuthStateChange((event: any, session: any) => {
+    this.supabase.onAuthStateChange((event, session) => {
       if (
         (event === "SIGNED_IN" || event === "INITIAL_SESSION") &&
         session?.user
@@ -56,15 +58,11 @@ export class AuthFacade {
     email?: string;
     user_metadata?: Record<string, unknown>;
   }): Promise<void> {
-    const { data: profile } = await this.supabase.client
-      .from("profiles")
-      .select("display_name, avatar_url, role")
-      .eq("id", authUser.id)
-      .maybeSingle();
+    const profile = await this.profilesRepo.findById(authUser.id);
 
     const name =
-      (profile?.display_name as string) ??
-      (authUser.user_metadata?.["display_name"] as string) ??
+      profile?.display_name ??
+      (authUser.user_metadata?.["display_name"] as string | undefined) ??
       (authUser.email ? authUser.email.split("@")[0] : "Usuario");
 
     const user: User = {
@@ -111,12 +109,26 @@ export class AuthFacade {
     return { error: (error as Error) ?? null };
   }
 
-  logout(): void {
-    this.supabase.signOut();
-    this._currentUser.set(null);
-    this.router.navigate(["/"]);
+  /**
+   * Cierra la sesión en Supabase y limpia el estado local.
+   * SEC: await garantiza que el token sea revocado antes de redirigir.
+   * Si signOut() falla (red caída), el estado local se limpia igualmente
+   * y se redirige — el token expirará naturalmente en el servidor.
+   */
+  async logout(): Promise<void> {
+    try {
+      await this.supabase.signOut();
+    } finally {
+      this._currentUser.set(null);
+      this.router.navigate(["/"]);
+    }
   }
 
+  /**
+   * @internal Solo para tests unitarios y casos de edge documentados.
+   * No usar en componentes de producción — el estado se actualiza
+   * automáticamente vía onAuthStateChange().
+   */
   setUser(user: User | null): void {
     this._currentUser.set(user);
   }

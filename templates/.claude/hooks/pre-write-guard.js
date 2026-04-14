@@ -33,8 +33,18 @@ try {
   }
 } catch { /* fail-open */ }
 
+// SEC-04: Limit stdin to 10 MB to prevent memory exhaustion (DoS) from crafted hook inputs.
+const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let data = '';
-process.stdin.on('data', chunk => (data += chunk));
+let dataSize = 0;
+process.stdin.on('data', chunk => {
+  dataSize += chunk.length;
+  if (dataSize > MAX_STDIN_BYTES) {
+    process.stderr.write('pre-write-guard: stdin payload exceeds 10 MB limit — aborting (fail-open).\n');
+    process.exit(0);
+  }
+  data += chunk;
+});
 process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
@@ -87,6 +97,7 @@ process.stdin.on('end', () => {
           `  - indices/DIRECTIVES.md\n` +
           `  - indices/STYLES.md\n` +
           `  - indices/PIPES.md\n` +
+          `  - indices/LAYOUTS.md\n` +
           `Esto te ayudara a reutilizar lo que ya existe y no duplicar trabajo.\n` +
           `El bloqueo se levantara automaticamente cuando leas cualquier archivo de indices/.`
         );
@@ -180,6 +191,48 @@ process.stdin.on('end', () => {
           '     Usa ToastService (core/services/toast.service.ts) para toasts efimeros.\n' +
           '     Ver: .claude/rules/notifications.md'
         );
+
+      // ARCH-12: Repository boundary — Facades no acceden a la BD directamente
+      if (
+        STACK.supabase &&
+        normalizedPath.includes('.facade.') &&
+        (/\bclient\.from\s*\(/.test(newContent) || /\bdb\.from\s*\(/.test(newContent))
+      )
+        violations.push(
+          '[ARCH-12] No llamar .db.from() ni .client.from() directamente en un Facade.\n' +
+          '     Crea o reutiliza un Repository en core/repositories/ e inyectalo en el Facade.\n' +
+          '     Ejemplo: inject(ProductosRepository).findAll()\n' +
+          '     Ver: .claude/rules/facades.md'
+        );
+
+      // LLM-01: Botones submit sin data-llm-action (solo en features/)
+      // Los formularios son puntos de mutación críticos — el agente debe saber qué acción realizan.
+      if (normalizedPath.includes('features/')) {
+        const submitBtnMatches = newContent.match(/<button[^>]*type="submit"[^>]*>/g) || [];
+        const submitBtnsWithoutLlm = submitBtnMatches.filter(b => !b.includes('data-llm-action'));
+        if (submitBtnsWithoutLlm.length > 0)
+          violations.push(
+            '[LLM-01] Boton type="submit" sin data-llm-action detectado.\n' +
+            '     Los botones de mutacion necesitan semántica explicita para agentes IA.\n' +
+            '     Ejemplo: <button type="submit" data-llm-action="crear-producto">\n' +
+            '     Ver: .claude/rules/ai-readability.md'
+          );
+      }
+
+      // LLM-02: Botones destructivos sin data-llm-action (features/ y shared/)
+      // Botones con aria-label que indica eliminacion/borrado.
+      if (normalizedPath.includes('features/') || normalizedPath.includes('shared/')) {
+        const destructiveBtnRe = /<button[^>]*aria-label="[^"]*(?:eliminar|delete|borrar|remove|remov)[^"]*"[^>]*>/gi;
+        const destructiveBtns = newContent.match(destructiveBtnRe) || [];
+        const destructiveBtnsWithoutLlm = destructiveBtns.filter(b => !b.includes('data-llm-action'));
+        if (destructiveBtnsWithoutLlm.length > 0)
+          violations.push(
+            '[LLM-02] Boton destructivo sin data-llm-action detectado.\n' +
+            '     Los botones de eliminacion/borrado necesitan semantica explicita para agentes IA.\n' +
+            '     Ejemplo: <button aria-label="Eliminar producto" data-llm-action="delete-producto">\n' +
+            '     Ver: .claude/rules/ai-readability.md'
+          );
+      }
     }
 
 
@@ -221,6 +274,21 @@ process.stdin.on('end', () => {
         violations.push('No usar colores Tailwind hardcodeados en SCSS. Usa var(--ds-*) tokens.');
     }
 
+    // --- SEC-T03: Secrets in environment files ---
+    if (normalizedPath.includes('src/environments/')) {
+      // Detect real Supabase JWT (eyJ...) or project URL hardcoded in environment files.
+      // Placeholders like "your-anon-key-here" are fine; real JWTs are not.
+      const hasHardcodedJwt = /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/.test(newContent);
+      const hasRealSupabaseUrl = /https:\/\/[a-z]{20}\.supabase\.co/.test(newContent);
+      if (hasHardcodedJwt || hasRealSupabaseUrl)
+        violations.push(
+          '[SEC] Credencial Supabase detectada en environment file.\n' +
+          '     NUNCA hardcodear JWTs ni URLs de proyecto en archivos commiteados.\n' +
+          '     Usa variables de entorno en CI/CD e inyectalas en el build.\n' +
+          '     Ver: src/environments/environment.prod.ts (instrucciones de configuracion)'
+        );
+    }
+
     // --- SQL migration checks ---
     if (normalizedPath.includes('supabase/migrations/')) {
       const fileName = path.basename(filePath);
@@ -260,6 +328,8 @@ process.stdin.on('end', () => {
     const ctxCategory = normalizedPath.includes('features/') ? 'features'
       : normalizedPath.includes('shared/') ? 'shared'
       : normalizedPath.includes('layout/') ? 'layout'
+      : normalizedPath.includes('core/repositories/') ? 'repositories'
+      : normalizedPath.includes('core/facades/') ? 'facades'
       : normalizedPath.includes('core/services/') ? 'services'
       : normalizedPath.includes('core/utils/') ? 'utils'
       : normalizedPath.includes('core/directives/') ? 'directives'
@@ -292,7 +362,8 @@ process.stdin.on('end', () => {
           ...(STACK.gsap
             ? ['Animaciones: inject(GsapAnimationsService) en ngAfterViewInit.']
             : ['Animaciones: CSS transitions (.animate-fade-in-up) o View Transitions API.']),
-          'Indices: COMPONENTS.md (que existe) | ANTI-PATTERNS.md (que evitar).',
+          'Layout: consulta LAYOUTS.md → identifica el arquetipo (dashboard/list/detail/form/auth/analytics/settings/onboarding) antes de estructurar la vista.',
+          'Indices: COMPONENTS.md (que existe) | ANTI-PATTERNS.md (que evitar) | LAYOUTS.md (arquetipo de página).',
           '[CONTEXTO] context/domain.md — entidades y reglas de negocio del proyecto.',
           'Skills bajo demanda: /angular-component | /angular-signals | /design-system.',
           '[CONTEXTO] context/brief.md — objetivo de la sesión actual. context/domain.md — entidades del negocio.'
@@ -317,15 +388,37 @@ process.stdin.on('end', () => {
       }
     }
 
-    // --- Services y Facades ---
+    // --- Repositories ---
+    if (normalizedPath.includes('core/repositories/') && normalizedPath.endsWith('.ts') && !normalizedPath.endsWith('.spec.ts')) {
+      contextParts.push(
+        'REPOSITORY (core/repositories/) — UNICO lugar donde se llama .db.from().',
+        'Un metodo por query. Retorna datos tipados o null. NUNCA retorna el objeto Supabase raw.',
+        'Naming: {dominio}.repository.ts. Interface del row colocada en el mismo archivo.',
+        'Los Facades inyectan el Repository. La UI NUNCA lo inyecta directamente.',
+        'DEBE tener .spec.ts companero (mockear SupabaseService con { db: clientMock }).'
+      );
+    }
+
+    // --- Facades de dominio (core/facades/) ---
+    if (normalizedPath.includes('core/facades/') && normalizedPath.endsWith('.ts') && !normalizedPath.endsWith('.spec.ts')) {
+      contextParts.push(
+        'FACADE DE DOMINIO (core/facades/) — reglas completas en: facades.md + swr-pattern.md (auto-cargadas).',
+        'OBLIGATORIO extender BaseFacade<T> de @core/facades/base.facade.',
+        'Inyectar Repositories (core/repositories/) para queries. NUNCA llamar .db.from() directamente.',
+        'Mutaciones: patron optimistic-first (prev = _data(), optimistic update, catch → _data.set(prev)).',
+        'Toast: inject(ToastService) para feedback. NUNCA inject(MessageService).',
+        'DEBE tener .spec.ts companero.'
+      );
+    }
+
+    // --- Core Services (core/services/) ---
     if (normalizedPath.includes('core/services/') && normalizedPath.endsWith('.ts') && !normalizedPath.endsWith('.spec.ts')) {
       if (normalizedPath.includes('.facade.')) {
+        // AuthFacade — excepción documentada: no extiende BaseFacade, gestiona sesión
         contextParts.push(
-          'FACADE — reglas completas en: facades.md + swr-pattern.md (auto-cargadas).',
-          'Estructura: signals privados (_datos, _isLoading, _error) + readonly publicos + metodos de accion.',
-          'SWR: flag _initialized para evitar re-fetch con skeleton. refreshSilently() post-mutacion.',
-          'Toast: inject(ToastService) para feedback. NUNCA inject(MessageService).',
-          'DEBE tener .spec.ts companero.'
+          'AUTH FACADE (core/services/) — excepcion: gestiona sesion de usuario, no datos de dominio.',
+          'No extiende BaseFacade. Usa onAuthStateChange() de SupabaseService.',
+          'Los Facades de dominio van en core/facades/, no aqui.'
         );
       } else if (normalizedPath.includes('.service.')) {
         contextParts.push(

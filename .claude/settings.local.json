@@ -10,7 +10,14 @@
       "Bash(node:*)",
       "Bash(grep -l \"DETAIL:BEGIN\" templates/indices/*.md)",
       "Bash(git add:*)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "Bash(cp docs/opinion.md workshop/research/gemini-evaluation-v7.md)",
+      "Bash(cp docs/tareas.md workshop/plans/v7-implementation.md)",
+      "Bash(cp docs/KOA-STORYTELLING.md workshop/vision/storytelling.md)",
+      "Bash(cp docs/promptdescubrimiento.md workshop/research/prompt-documento-completo.md)",
+      "Bash(cp docs/PLAN-CORRECCIONES-ARQUITECTONICAS.md workshop/decisions/correcciones-v6.2.md)",
+      "Bash(mv patch-guard.js patch-guard.cjs)",
+      "Bash(rm patch-guard.cjs)"
     ]
   }
 }

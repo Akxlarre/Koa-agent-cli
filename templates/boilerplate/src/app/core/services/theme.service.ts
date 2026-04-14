@@ -188,7 +188,12 @@ export class ThemeService {
 
     private loadFromStorage(key: string): string | null {
         if (!isPlatformBrowser(this.platformId)) return null;
-        return localStorage.getItem(key);
+        const value = localStorage.getItem(key);
+        // SEC: whitelist — nunca confiar ciegamente en valores de localStorage.
+        // Si alguien inyecta un valor arbitrario (vía XSS previo u otro script),
+        // el fallback 'null' hace que el tema vuelva a 'light' de forma segura.
+        const VALID_MODES: ReadonlySet<string> = new Set(['light', 'dark', 'system']);
+        return value !== null && VALID_MODES.has(value) ? value : null;
     }
 
     private saveToStorage(key: string, value: string): void {

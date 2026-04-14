@@ -11,23 +11,41 @@ paths:
 ```text
 src/
 ├── app/
-│   ├── core/         # Facades, Guards, Interceptors, Modelos, Utils
-│   ├── features/     # Smart Components (páginas enrutables)
-│   ├── shared/       # Dumb Components (UI presentacional)
-│   └── layout/       # Sidebar, Topbar, Shell
+│   ├── core/
+│   │   ├── facades/       # BaseFacade + Facades de dominio (*FacadeService)
+│   │   ├── repositories/  # Acceso tipado a Supabase — ÚNICO lugar con .client.from()
+│   │   ├── services/      # Servicios transversales (auth, toast, theme, layout…)
+│   │   ├── models/        # Interfaces de dominio y DTOs
+│   │   ├── utils/         # Funciones puras sin inyección
+│   │   ├── guards/        # Route guards
+│   │   ├── interceptors/  # HTTP interceptors
+│   │   └── directives/    # Directivas de core
+│   ├── features/          # Smart Components (páginas enrutables)
+│   ├── shared/            # Dumb Components (UI presentacional)
+│   └── layout/            # Sidebar, Topbar, Shell
 ├── styles/
-│   ├── tokens/       # SCSS variables — NUNCA hardcodear en componentes
-│   └── vendors/      # PrimeNG overrides
+│   ├── tokens/            # SCSS variables — NUNCA hardcodear en componentes
+│   └── vendors/           # PrimeNG overrides
 supabase/
-└── migrations/       # SQL idempotentes — NUNCA alterar BD manualmente
+└── migrations/            # SQL idempotentes — NUNCA alterar BD manualmente
 ```
+
+## Capas de acceso a datos (de arriba a abajo)
+
+```
+UI (features/ shared/)  →  Facade (core/facades/)  →  Repository (core/repositories/)  →  SupabaseService
+```
+
+- La UI **NUNCA** inyecta `SupabaseService` ni Repositories directamente.
+- Los **Facades** son la única puerta de entrada para la UI. Gestionan estado vía Signals.
+- Los **Repositories** son la única capa que llama `.client.from()`. Un método por query. Retornan tipos, no objetos Supabase raw.
+- `SupabaseService` expone `.db` **solo para los Repositories** (queries de tabla) y `onAuthStateChange()` para `AuthFacade` (auth events). No existe `.client` público.
 
 ## Patrón Facade y Núcleo Funcional (Functional Core)
 
-- La UI **NUNCA** inyecta `SupabaseService`, `HttpClient`, ni clientes REST directamente.
-- **SIEMPRE** usar un `*FacadeService` que centraliza estado vía Signals.
-- El Facade expone data al template con `toSignal()`.
-- **NÚCLEO FUNCIONAL (Functional Core):** No acumules lógica compleja, matemática pesada o transformaciones de datos algorítmicas dentro de la Facade ni en los componentes. Extrae esa inteligencia a **funciones puras** de TypeScript (Data Out, Data In) en `core/utils/`. Esto permite testear la lógica del negocio instantáneamente sin levantar inyecciones de Angular.
+- **SIEMPRE** extender `BaseFacade<T>` de `@core/facades/base.facade` para Facades de dominio.
+- **NUNCA** llamar `.client.from()` en un Facade — usar un Repository.
+- **NÚCLEO FUNCIONAL (Functional Core):** Extrae la lógica compleja y transformaciones de datos a **funciones puras** en `core/utils/`. Sin `inject()`, sin `signal()`. Testeable instantáneamente sin Angular.
 
 ## Funciones Puras (`core/utils/`)
 

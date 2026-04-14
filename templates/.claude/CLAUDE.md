@@ -13,6 +13,7 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Compact Recovery** — Si el contexto se compacta, los índices se re-inyectan automáticamente (PostCompact).
 - **Failure Tracker** — Los errores de tools se registran en `.claude/temp/LESSONS_LEARNED.md` con dedup y rotación automática (max 20).
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
+- **Context Guardian** — Al terminar de responder, audita la frescura del contexto semántico: avisa si `context/brief.md` tiene más de 7 días sin actualizar o si `context/learnings.md` lleva más de 14 días sin crecer.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
 
 Detalle completo: @docs/HOOKS-SYSTEM.md
@@ -53,7 +54,7 @@ Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las i
 | `src/app/core/models/**` + `core/facades/**` | `models`, `facades` |
 | `src/app/shared/**` + `features/**` | `component-selection` |
 | `src/app/**/*.html` + `shared/**` + `styles/**` | `visual-system`, `ai-readability` |
-| `src/app/features/**` + `layout/**` | `notifications` |
+| `src/app/features/**` + `layout/**` | `notifications`, `layout-blueprints` |
 | `supabase/**` + `core/services/**` | `database` |
 
 ## Referencias (leer bajo demanda — no cargadas automáticamente)

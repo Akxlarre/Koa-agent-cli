@@ -13,13 +13,16 @@ describe("SupabaseService", () => {
     expect(service).toBeTruthy();
   });
 
-  it("client getter should return a SupabaseClient instance", () => {
-    expect(service.client).toBeTruthy();
+  it("db getter should return a SupabaseClient instance", () => {
+    expect(service.db).toBeTruthy();
   });
 
-  it("client should expose the auth API", () => {
-    expect(service.client.auth).toBeTruthy();
-    expect(typeof service.client.auth.signInWithPassword).toBe("function");
+  it("db should expose the from() query builder", () => {
+    expect(typeof service.db.from).toBe("function");
+  });
+
+  it("onAuthStateChange() should be a function", () => {
+    expect(typeof service.onAuthStateChange).toBe("function");
   });
 
   it("getUser() should return a Promise", () => {

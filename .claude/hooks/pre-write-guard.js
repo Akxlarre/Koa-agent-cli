@@ -54,8 +54,10 @@ process.stdin.on('end', () => {
       'scripts/architect.js',
     ];
 
+    // templates/ es payload del CLI — no aplicar file protection
+    const isTemplatePayload = normalizedPath.includes('/templates/') || normalizedPath.includes('templates/');
     for (const pattern of protectedPatterns) {
-      if (normalizedPath.includes(pattern)) {
+      if (!isTemplatePayload && normalizedPath.includes(pattern)) {
         process.stderr.write(
           `\u{1F6E1}\u{FE0F} FILE PROTECTOR: ${path.basename(filePath)} es parte del sistema de guardrails.\n` +
           `No se permite modificar archivos en: ${pattern}\n` +

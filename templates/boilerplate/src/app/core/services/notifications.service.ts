@@ -7,7 +7,9 @@ export type NotificationFilter = 'all' | 'unread' | NotificationType;
   providedIn: 'root',
 })
 export class NotificationsService {
-  // TODO: Reemplazar estos datos de ejemplo con la fuente real del proyecto
+  // ⚠ MOCK DATA — reemplazar con fuente real antes de producción.
+  // Para forzar un error de build si se olvida, añade esto a scripts/lint-arch-wrapper.js:
+  //   check: grep "MOCK DATA" src/app/core/services/notifications.service.ts && exit 1
   private _notifications = signal<Notification[]>([
     {
       id: '1',

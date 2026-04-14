@@ -13,8 +13,15 @@
 const fs = require('fs');
 const path = require('path');
 
+// SEC-04: Limit stdin to 10 MB to prevent memory exhaustion.
+const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let data = '';
-process.stdin.on('data', chunk => (data += chunk));
+let dataSize = 0;
+process.stdin.on('data', chunk => {
+  dataSize += chunk.length;
+  if (dataSize > MAX_STDIN_BYTES) { process.exit(0); }
+  data += chunk;
+});
 process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);

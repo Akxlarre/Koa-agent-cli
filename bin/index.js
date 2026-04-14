@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import fs from 'fs';
 import path from 'path';
+import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 
 import { resolveStack, validateProjectName, BLUEPRINT_VERSION } from '../lib/config.js';
@@ -12,12 +13,20 @@ import { preflight } from '../lib/preflight.js';
 import { printBanner, printSuccess } from '../lib/ui.js';
 import { copyTemplates, injectBoilerplate, writeBlueprintJson } from '../lib/scaffolder.js';
 import { createAngularProject, installDependencies } from '../lib/installer.js';
+import { runGenerate } from '../lib/generator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const TEMPLATES_DIR = path.resolve(__dirname, '../templates');
 
 async function main() {
+    // ── Subcomando `generate` — se ejecuta dentro de un proyecto KoA existente.
+    // No necesita preflight ni resolveStack (no instala nada, no crea proyectos).
+    if (process.argv[2] === 'generate') {
+        await runGenerate(process.argv.slice(3));
+        return;
+    }
+
     const stack = resolveStack();
     await preflight();
     printBanner();
@@ -66,7 +75,23 @@ async function main() {
                 },
                 filter: (input) => String(input ?? '').trim(),
             },
+            {
+                type: 'checkbox',
+                name: 'aiTools',
+                message: '¿Qué otros AI tools usarás? (Claude Code ya está incluido)',
+                choices: [
+                    { name: 'Cursor  (.cursor/rules/*.mdc)', value: 'cursor' },
+                    { name: 'Windsurf (.windsurf/rules/*.md)', value: 'windsurf' },
+                ],
+                default: [],
+            },
         ]);
+    }
+
+    // Merge AI tool selections from prompt into stack (flags take precedence via resolveStack, prompt adds on top)
+    if (answers.aiTools?.length) {
+        if (answers.aiTools.includes('cursor'))   stack.cursor   = true;
+        if (answers.aiTools.includes('windsurf')) stack.windsurf = true;
     }
 
     const isFull = answers.action?.includes('Full Scaffold');
@@ -88,7 +113,9 @@ async function main() {
             process.exit(1);
         }
 
-        const tmpName = `.koa-tmp-${answers.projectName}-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+        // SEC-05: Use cryptographically secure random bytes instead of Math.random()
+        // to prevent TOCTOU race conditions on shared/CI systems.
+        const tmpName = `.koa-tmp-${answers.projectName}-${randomBytes(8).toString('hex')}`;
         tempDir = path.join(process.cwd(), tmpName);
         targetDir = tempDir;
 
@@ -108,7 +135,7 @@ async function main() {
     }).start();
 
     try {
-        copyTemplates(TEMPLATES_DIR, targetDir, projectName);
+        copyTemplates(TEMPLATES_DIR, targetDir, projectName, stack);
         spinnerBlueprint.succeed(chalk.green('Blueprint inyectado'));
 
         if (isFull) {

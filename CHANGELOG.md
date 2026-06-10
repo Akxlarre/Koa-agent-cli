@@ -19,6 +19,8 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 - **`.claude/tests/`**: tests unitarios de hooks en el proyecto generado (`npm run claude:test-hooks`)
 - **Boilerplate**: `BaseFacade` con SWR built-in + `profiles.repository` de ejemplo + componente `error-state` + `role.guard` + migración inicial `auth_create_profiles.sql` con RLS
 - `validateBlueprintJson()` — preflight valida el schema de `blueprint.json` en re-runs
+- **Confirmación de sobrescritura en modo inject**: si la inyección va a pisar archivos existentes (CLAUDE.md, .gitignore, docs/…), el CLI lista las colisiones y pide confirmación. `--force` la omite
+- Budgets realistas en `angular.json` generado (initial: 1mb warning / 2mb error) — el boilerplate pesa ~780 kB y los defaults de ng new generaban warning permanente
 
 ### Fixed
 - **`ng new` roto en Full Scaffold**: se invocaba `ng new <tmpDir> --name <proyecto>`; el posicional pisaba a `--name` y el prefijo `.koa-tmp-` fallaba la validación de schema de Angular CLI. Ahora: `ng new <proyecto> --directory <tmpDir> --defaults`
@@ -26,6 +28,9 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 - **vitest pineado a `^3`**: con `vitest@latest` (v4) el scaffold instalaba, pero cualquier `npm install` posterior del usuario fallaba con ERESOLVE (`@angular/build@20` declara peerOptional `vitest@^3.1.1`)
 - **gsap ahora se instala siempre**: el boilerplate (directivas animate-in/card-hover/press-feedback, theme.service, kpi-card, layout) depende de gsap, pero solo se instalaba con `--with-gsap` — el scaffold por defecto no compilaba. El flag pasa a controlar solo la estrategia de animación de rutas (GSAP-first vs `withViewTransitions()`)
 - **Boilerplate no compilaba**: `dashboard.component.ts` usaba `currentUser()?.displayName` (la propiedad del modelo `User` es `name`); callback de `onAuthStateChange` tipado como `Promise<void>` en supabase-js v2 reciente; import sin uso de `SkeletonBlockComponent`
+- **`GsapAnimationsService` duplicado**: existía en `core/services/` (1088 líneas) y `core/services/ui/` (1370, superconjunto). Consolidado en `core/services/gsap-animations.service.ts` con el contenido completo
+- **`parseJsonc()` rompía strings con `//`**: el regex de comentarios recortaba URLs (`"https://…"`) dentro de strings del tsconfig. Reescrito como parser carácter a carácter
+- **Precedencia de flags inconsistente**: `--no-gsap` no podía anular `gsap: true` de koa-config.json. Ahora la precedencia es uniforme: flag CLI explícito > koa-config.json > default
 
 ### Migración desde 6.1
 1. Re-ejecutar el modo "Solo inyectar" sobre el proyecto para actualizar `.claude/` (hooks, reglas, skills nuevos)

@@ -180,6 +180,8 @@ npx create-koa-agent
 # → Choose "Inject Only"
 ```
 
+If the injection would overwrite existing files (`CLAUDE.md`, `.gitignore`, `docs/`…), the CLI lists them and asks for confirmation first. Pass `--force` to skip the prompt.
+
 ---
 
 ## Feature Generator

@@ -7,11 +7,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
     validateProjectName,
     parseMajor,
     parseJsonc,
     validateBlueprintJson,
+    resolveStack,
     BLUEPRINT_VERSION,
     ANGULAR_CLI_VERSION,
 } from '../lib/config.js';
@@ -53,6 +57,44 @@ test('parseJsonc elimina comentarios de bloque y de línea', () => {
         "b": [2, 3]
     }`;
     assert.deepEqual(parseJsonc(jsonc), { a: 1, b: [2, 3] });
+});
+
+test('parseJsonc NO elimina // dentro de strings (URLs)', () => {
+    const jsonc = `{
+        "url": "https://example.com/path", // comentario real
+        "glob": "src/**/*.ts" /* otro */
+    }`;
+    assert.deepEqual(parseJsonc(jsonc), {
+        url: 'https://example.com/path',
+        glob: 'src/**/*.ts',
+    });
+});
+
+test('parseJsonc respeta comillas escapadas dentro de strings', () => {
+    assert.deepEqual(parseJsonc('{ "a": "di\\"jo // esto" }'), { a: 'di"jo // esto' });
+});
+
+test('resolveStack: flag CLI explícito gana sobre koa-config.json', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-test-'));
+    fs.writeFileSync(
+        path.join(tmpDir, 'koa-config.json'),
+        JSON.stringify({ stack: { gsap: true, e2e: true, supabase: false } }),
+    );
+    const origArgv = process.argv;
+    const origCwd = process.cwd();
+    try {
+        process.chdir(tmpDir);
+        process.argv = ['node', 'bin/index.js', '--no-gsap'];
+        const stack = resolveStack();
+        assert.equal(stack.gsap, false, '--no-gsap debe anular gsap:true del archivo');
+        assert.equal(stack.e2e, true, 'e2e:true del archivo se respeta sin flag');
+        assert.equal(stack.supabase, false, 'supabase:false del archivo se respeta sin flag');
+        assert.equal(stack.primeng, true, 'default true sin flag ni archivo');
+    } finally {
+        process.argv = origArgv;
+        process.chdir(origCwd);
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
 });
 
 test('validateBlueprintJson acepta un blueprint canónico', () => {

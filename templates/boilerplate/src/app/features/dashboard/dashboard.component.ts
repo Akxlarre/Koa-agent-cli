@@ -10,7 +10,6 @@ import {
   viewChildren,
 } from "@angular/core";
 import { DatePipe } from "@angular/common";
-import { RouterLink } from "@angular/router";
 import { AuthFacade } from "@core/services/auth.facade";
 import { GsapAnimationsService } from "@core/services/gsap-animations.service";
 import { BentoGridLayoutDirective } from "@core/directives/bento-grid-layout.directive";
@@ -57,7 +56,6 @@ import { KpiCardSkeletonComponent } from "@shared/components/kpi-card/kpi-card-s
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
-    RouterLink,
     BentoGridLayoutDirective,
     CardHoverDirective,
     AnimateInDirective,

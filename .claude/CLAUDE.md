@@ -37,7 +37,7 @@ Este repo tiene DOS contextos que jamás deben confundirse:
 
 ```
 bin/
-└── index.js              # Entry point: flags, inquirer, orquestación, subcomando generate (~160 líneas)
+└── index.js              # Entry point: flags, inquirer, orquestación, subcomando generate (~180 líneas)
 lib/
 ├── config.js             # resolveStack, validateProjectName, parseJsonc, BLUEPRINT_VERSION, ANGULAR_CLI_VERSION
 ├── runner.js             # run() spawn wrapper, NPM, NPX constantes

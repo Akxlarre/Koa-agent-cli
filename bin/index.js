@@ -10,8 +10,8 @@ import { fileURLToPath } from 'url';
 
 import { resolveStack, validateProjectName, BLUEPRINT_VERSION } from '../lib/config.js';
 import { preflight } from '../lib/preflight.js';
-import { printBanner, printSuccess } from '../lib/ui.js';
-import { copyTemplates, injectBoilerplate, writeBlueprintJson } from '../lib/scaffolder.js';
+import { printBanner, printSuccess, printCollisionWarning } from '../lib/ui.js';
+import { copyTemplates, injectBoilerplate, writeBlueprintJson, listCollisions } from '../lib/scaffolder.js';
 import { createAngularProject, installDependencies } from '../lib/installer.js';
 import { runGenerate } from '../lib/generator.js';
 
@@ -125,6 +125,24 @@ async function main() {
         } catch {
             try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
             process.exit(1);
+        }
+    }
+
+    // Modo inject sobre un proyecto existente: confirmar antes de pisar
+    // archivos del usuario (CLAUDE.md, .gitignore, docs/…). --force lo omite.
+    if (!isFull && !process.argv.includes('--force')) {
+        const collisions = listCollisions(TEMPLATES_DIR, targetDir);
+        if (collisions.length > 0) {
+            printCollisionWarning(collisions);
+            if (!process.env.TEST_MODE) {
+                const { proceed } = await inquirer.prompt([
+                    { type: 'confirm', name: 'proceed', message: '¿Sobrescribir y continuar?', default: false },
+                ]);
+                if (!proceed) {
+                    console.log(chalk.gray('Operación cancelada. Usa --force para omitir esta confirmación.'));
+                    process.exit(0);
+                }
+            }
         }
     }
 

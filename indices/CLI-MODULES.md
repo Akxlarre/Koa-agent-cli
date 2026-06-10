@@ -7,7 +7,7 @@
 
 | Archivo | Responsabilidad | Tamaño actual |
 |---------|----------------|---------------|
-| `bin/index.js` | Entry point: resuelve stack, ejecuta preflight, muestra inquirer prompts, orquesta el flujo de scaffolding. Detecta el subcomando `generate` y delega a lib/generator.js. Sin lógica de negocio propia. | ~160 líneas |
+| `bin/index.js` | Entry point: resuelve stack, ejecuta preflight, muestra inquirer prompts (incl. confirmación de sobrescritura en inject), orquesta el flujo de scaffolding. Detecta el subcomando `generate` y delega a lib/generator.js. Sin lógica de negocio propia. | ~180 líneas |
 
 ## lib/ — Módulos especializados
 
@@ -17,10 +17,10 @@
 | `lib/runner.js` | Wrapper `spawn` asíncrono para comandos externos. Plataforma-aware (Windows .cmd). | `run(cmd, args, opts)`, `NPM`, `NPX` | child_process |
 | `lib/preflight.js` | Verificación de requisitos del sistema. Termina con exit(1) si falta npm/npx. Warnings para git/docker. | `preflight()`, `checkCommand(cmd, args, opts)` | child_process, chalk, lib/config.js |
 | `lib/installer.js` | Instalación de dependencias npm condicionales por stack. Creación del proyecto Angular base con `ng new <nombre> --directory <tmp> --defaults` (Angular CLI pineado a `ANGULAR_CLI_VERSION`; paquetes del ecosistema pineados al mismo major; vitest@^3 por peerOptional de @angular/build). Gestiona sus propios spinners y lanza Error en fallo. | `createAngularProject(projectName, tempDir)`, `installDependencies(targetDir, stack)` | lib/runner.js, lib/config.js, chalk, ora |
-| `lib/scaffolder.js` | Copia de templates al directorio destino. Patching de tsconfig, angular.json, index.html, app.config.ts. Escritura de blueprint.json. Sin npm. | `copyTemplates(templatesDir, targetDir, projectName, stack)`, `injectBoilerplate(templatesDir, targetDir, stack)`, `writeBlueprintJson(targetDir, projectName, isFull, stack)` | fs, path, chalk, lib/config.js |
+| `lib/scaffolder.js` | Copia de templates al directorio destino. Detección de colisiones para el modo inject. Patching de tsconfig, angular.json (incl. budgets 1mb/2mb), index.html, app.config.ts. Escritura de blueprint.json. Sin npm. | `copyTemplates(templatesDir, targetDir, projectName, stack)`, `listCollisions(templatesDir, targetDir)`, `injectBoilerplate(templatesDir, targetDir, stack)`, `writeBlueprintJson(targetDir, projectName, isFull, stack)` | fs, path, chalk, lib/config.js |
 | `lib/generator.js` | Generador de artefactos para proyectos KoA existentes. Subcomando `generate feature [nombre] [--type list\|detail\|form]`. Valida blueprint.json, resuelve variables de nomenclatura, escribe 5-7 archivos sin sobreescribir. | `runGenerate(args)` | fs, path, chalk, inquirer, lib/feature-templates.js |
 | `lib/feature-templates.js` | Plantillas de código para el generador de features. Sin lógica, solo strings con `{{domain}}`, `{{Domain}}`, `{{Domains}}`. | `FEATURE_TEMPLATES` (11 entradas: repository, facade, facade-detail, smart-page, smart-page-detail, smart-page-form, dumb-card, dumb-skeleton, repository-spec, facade-spec, facade-detail-spec) | — |
-| `lib/ui.js` | Salida visual: banner ASCII y mensaje de éxito con próximos pasos. Sin FS ni spawn. | `printBanner()`, `printSuccess(projectName, isFull, targetDir)` | chalk, lib/config.js |
+| `lib/ui.js` | Salida visual: banner ASCII, advertencia de sobrescritura y mensaje de éxito con próximos pasos. Sin FS ni spawn. | `printBanner()`, `printCollisionWarning(collisions)`, `printSuccess(projectName, isFull, targetDir)` | chalk, lib/config.js |
 
 ## Subcomandos
 
@@ -30,15 +30,19 @@
 
 ## Flags CLI (scaffolding inicial)
 
+> Precedencia uniforme: **flag CLI explícito > koa-config.json > default**.
+> Un flag presente siempre gana sobre el archivo (ej: `--no-gsap` anula `gsap: true` del config).
+
 | Flag | Default | Efecto |
 |------|---------|--------|
 | `--no-supabase` | supabase=true | Excluye Supabase del stack |
 | `--no-primeng` | primeng=true | Excluye PrimeNG del stack |
-| `--with-gsap` | gsap=false | Animación de rutas GSAP-first: omite `withViewTransitions()` en app.config.ts. El paquete `gsap` se instala siempre (el boilerplate depende de él). |
+| `--with-gsap` / `--no-gsap` | gsap=false | Animación de rutas GSAP-first: omite `withViewTransitions()` en app.config.ts. El paquete `gsap` se instala siempre (el boilerplate depende de él). |
 | `--with-ngrx-signals` | ngrxSignals=false | Incluye NgRx Signal Store |
 | `--with-e2e` | e2e=false | Incluye Playwright E2E |
 | `--with-cursor` | cursor=false | Genera `.cursor/rules/*.mdc` (también seleccionable en el prompt) |
 | `--with-windsurf` | windsurf=false | Genera `.windsurf/rules/project.md` (también seleccionable en el prompt) |
+| `--force` | — | Modo inject: omite la confirmación de sobrescritura de archivos existentes |
 
 ## Variables de entorno
 

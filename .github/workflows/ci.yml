@@ -1,0 +1,84 @@
+# CI — tests unitarios del CLI + smoke test de scaffolding real.
+# El smoke test ejecuta el flujo completo (ng new + npm install + templates)
+# y habría atrapado regresiones como el breakage de `ng new --name`.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    name: Tests unitarios (lib/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  smoke-inject:
+    name: Smoke — modo inject-only
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Inyectar harness en directorio vacío
+        run: |
+          mkdir -p "$RUNNER_TEMP/inject"
+          cd "$RUNNER_TEMP/inject"
+          TEST_MODE=inject node "$GITHUB_WORKSPACE/bin/index.js"
+      - name: Verificar payload inyectado
+        run: |
+          cd "$RUNNER_TEMP/inject"
+          test -f blueprint.json
+          grep -q '"mode": "inject-only"' blueprint.json
+          test -f .claude/settings.json
+          test -f .claude/hooks/pre-write-guard.js
+          test -f AGENTS.md
+          test -f indices/COMPONENTS.md
+          # Las variables de template deben quedar resueltas
+          ! grep -rl '{{PROJECT_NAME}}' CLAUDE.md AGENTS.md .claude/CLAUDE.md
+
+  smoke-full-scaffold:
+    name: Smoke — Full Scaffold (ng new + deps + payload)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Scaffold completo en directorio temporal
+        run: |
+          mkdir -p "$RUNNER_TEMP/scaffold"
+          cd "$RUNNER_TEMP/scaffold"
+          TEST_MODE=1 TEST_PROJECT_NAME=smoke-app node "$GITHUB_WORKSPACE/bin/index.js"
+      - name: Verificar proyecto generado
+        run: |
+          cd "$RUNNER_TEMP/scaffold/smoke-app"
+          test -f blueprint.json
+          grep -q '"mode": "full-scaffold"' blueprint.json
+          grep -q '"name": "smoke-app"' angular.json
+          test -f .claude/settings.json
+          test -f .claude/hooks/pre-write-guard.js
+          test -f src/app/core/facades/base.facade.ts
+          test -f vitest.config.ts
+          test -f postcss.config.json
+          grep -q 'claude:review' package.json
+          grep -q '@core/\*' tsconfig.json
+          # El directorio temporal .koa-tmp-* no debe quedar huérfano
+          ! ls -d ../.koa-tmp-* 2>/dev/null
+      - name: Compilar proyecto generado
+        run: |
+          cd "$RUNNER_TEMP/scaffold/smoke-app"
+          npm run build

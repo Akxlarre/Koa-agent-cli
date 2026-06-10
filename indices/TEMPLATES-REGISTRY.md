@@ -25,12 +25,13 @@
 | Ruta en templates/.claude/ | Destino | Propósito |
 |---|---|---|
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (8 hooks activos). |
+| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (10 comandos de hook activos). |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 8 hooks de guardrails (ver tabla de hooks abajo). |
-| `templates/.claude/rules/` | `.claude/rules/` | 12 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 7 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 9 hooks de guardrails (ver tabla de hooks abajo). |
+| `templates/.claude/rules/` | `.claude/rules/` | 13 reglas arquitectónicas path-scoped. |
+| `templates/.claude/skills/` | `.claude/skills/` | 8 skills (plan, angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
+| `templates/.claude/tests/` | `.claude/tests/` | Tests unitarios de los hooks (bash-guard, pre-write-guard). Se corren con `npm run claude:test-hooks`. |
 
 ## Adapters de AI tools (condicional)
 
@@ -68,6 +69,7 @@
 | `discovery-tracker.js` | PostToolUse (Read) | Crea flag cuando se leen indices/ — levanta el Discovery Gate | — |
 | `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
 | `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de archivos .ts/.html/.scss via Bash | — |
+| `spec-diff-check.js` | PreToolUse (Bash, `git commit`) | Bloquea el commit si componentes/facades nuevos de la sesión no están registrados en COMPONENTS.md / FACADES.md | write-tracker JSON |
 | `compact-recovery.js` | PostCompact | Re-inyecta índices tras compactación de contexto | discovery-tracker flag |
 | `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos modificados en session-writes.json | — |
 | `sync-check.js` | Stop | Verifica si los índices necesitan actualización al cerrar sesión | write-tracker JSON |
@@ -90,3 +92,4 @@
 | `notifications.md` | `features/**`, `layout/**` | ToastService, nunca MessageService directo |
 | `database.md` | `supabase/**`, `core/services/**` | Migrations SQL, RLS obligatorio |
 | `layout-blueprints.md` | `src/app/features/**` | 8 arquetipos de página: hero, grid, componentes por tipo |
+| `a11y-spec.md` | `src/app/**/*.html` | Contratos mínimos de accesibilidad validados por el Architect Guard |

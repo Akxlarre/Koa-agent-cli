@@ -6,7 +6,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?style=flat-square&logo=nodedotjs)](https://nodejs.org)
 [![Angular](https://img.shields.io/badge/Angular-v20-dd0031?style=flat-square&logo=angular)](https://angular.dev)
-[![Blueprint](https://img.shields.io/badge/Blueprint-v6.1.0-6366f1?style=flat-square)](./CHANGELOG.md)
+[![Blueprint](https://img.shields.io/badge/Blueprint-v6.4.0-6366f1?style=flat-square)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](./CONTRIBUTING.md)
 
@@ -26,12 +26,12 @@ The result is a project where the agent knows the architecture, can't bypass the
 
 ```bash
 # Once published:
-npx create-koa-agent my-app
+npx create-koa-agent
 cd my-app
 ng serve
 ```
 
-The CLI will prompt you to choose between a **Full Scaffold** (Angular app + boilerplate) or **Inject Only** (add the harness to an existing project).
+The CLI will prompt you to choose between a **Full Scaffold** (Angular app + boilerplate) or **Inject Only** (add the harness to an existing project), then ask for the project name.
 
 ---
 
@@ -50,14 +50,17 @@ my-app/
 │
 ├── .claude/               # The agentic harness
 │   ├── CLAUDE.md          # Agent directive: stack, rules, workflow
-│   ├── hooks/             # 8 real-time guardrails (pre-write, discovery, etc.)
-│   ├── rules/             # 11 path-scoped architectural rules
-│   └── skills/            # 7 reusable agent skills (/angular-component, etc.)
+│   ├── hooks/             # 9 real-time guardrails (pre-write, discovery, etc.)
+│   ├── rules/             # 13 path-scoped architectural rules
+│   ├── skills/            # 8 reusable agent skills (/plan, /angular-component, etc.)
+│   └── tests/             # Unit tests for the hooks themselves
+│
+├── context/               # Agent semantic memory (domain, brief, ADRs) — gitignored
 │
 ├── indices/               # Living indexes — the agent's memory
 │   ├── COMPONENTS.md      # Every component in the project
 │   ├── SERVICES.md        # Every service + facade
-│   └── ...6 more indexes
+│   └── ...8 more indexes
 │
 ├── scripts/
 │   ├── architect.js       # AST-based architecture linter
@@ -84,9 +87,11 @@ This is the core differentiator. The `.claude/` directory is not documentation �
 | `discovery-tracker` | After any file read | Tracks when indexes are read; unlocks the Discovery Gate |
 | `failure-tracker` | On tool failure | Logs errors to `LESSONS_LEARNED.md` with dedup and rotation |
 | `bash-guard` | Before Bash commands | Blocks file creation via shell (forces Edit/Write tools) |
+| `spec-diff-check` | Before `git commit` | Blocks the commit if new components/facades aren't registered in the indexes |
 | `compact-recovery` | On context compact | Re-injects indexes so the agent doesn't lose memory mid-session |
 | `write-tracker` | After file writes | Records modified files for the Sync Check |
 | `sync-check` | On agent stop | Compares file timestamps vs. indexes; reminds agent to update docs |
+| `context-guardian` | On agent stop | Audits `context/` freshness (stale brief.md / learnings.md warnings) |
 | `post-edit` | After file writes | Runs Prettier automatically |
 
 ### Discovery Gate in action
@@ -122,21 +127,24 @@ Every write is validated in real time. The guard blocks patterns like:
 
 | Technology | Version | Purpose |
 |---|---|---|
-| Angular | v20 | Framework (standalone components) |
+| Angular | v20 (pinned) | Framework (standalone components) |
 | Tailwind CSS | v4 | Utility CSS |
-| PrimeNG | Latest | UI component library |
-| Supabase | Latest | Backend (auth, DB, storage) |
-| Vitest | Latest | Unit testing (replaces Karma) |
+| PrimeNG | v20 (pinned to Angular major) | UI component library |
+| Supabase | v2 | Backend (auth, DB, storage) |
+| GSAP | v3 | Animation engine for the design system |
+| Vitest | v3 (pinned for @angular/build) | Unit testing (replaces Karma) |
 | Lucide Angular | Latest | Icon library |
 
 ### Opt-in Flags
 
 ```bash
-npx create-koa-agent my-app --with-gsap          # GSAP animations
-npx create-koa-agent my-app --with-ngrx-signals  # NgRx Signal Store
-npx create-koa-agent my-app --with-e2e           # Playwright E2E tests
-npx create-koa-agent my-app --no-supabase        # Skip Supabase
-npx create-koa-agent my-app --no-primeng         # Skip PrimeNG
+npx create-koa-agent --with-gsap          # GSAP-first route animations (skips View Transitions)
+npx create-koa-agent --with-ngrx-signals  # NgRx Signal Store
+npx create-koa-agent --with-e2e           # Playwright E2E tests
+npx create-koa-agent --with-cursor        # Cursor rules (.cursor/rules/*.mdc)
+npx create-koa-agent --with-windsurf      # Windsurf rules (.windsurf/rules/project.md)
+npx create-koa-agent --no-supabase        # Skip Supabase
+npx create-koa-agent --no-primeng         # Skip PrimeNG
 ```
 
 Or use a `koa-config.json` file in your working directory for persistent defaults:
@@ -171,6 +179,27 @@ cd my-existing-angular-app
 npx create-koa-agent
 # → Choose "Inject Only"
 ```
+
+---
+
+## Feature Generator
+
+Inside a generated project, the CLI doubles as a feature generator. Each archetype ships pre-wired: repository + facade (extending `BaseFacade` with built-in SWR) + page component + Vitest specs.
+
+```bash
+npx create-koa-agent generate feature productos                # list page (7 files)
+npx create-koa-agent generate feature productos --type detail  # detail page (5 files)
+npx create-koa-agent generate feature productos --type form    # form page (5 files)
+npx create-koa-agent generate feature                          # interactive prompt
+```
+
+| Type | Files | Page layout |
+|------|-------|-------------|
+| `list` | 7 | Bento grid with dumb card + skeleton components |
+| `detail` | 5 | Single record view (2/3 grid + 1/3 aside) |
+| `form` | 5 | Centered form (`.page-narrow`) |
+
+The generator refuses to overwrite existing files and prints the exact route entry to add to `app.routes.ts`.
 
 ---
 
@@ -229,18 +258,21 @@ node bin/index.js
 
 ```
 koa-agent-cli/
-├── bin/index.js       # Entry point: flags, prompts, orchestration
+├── bin/index.js              # Entry point: flags, prompts, orchestration, generate subcommand
 ├── lib/
-│   ├── config.js      # Stack resolution + input validation
-│   ├── runner.js      # Async spawn wrapper (npm/npx)
-│   ├── preflight.js   # System requirements check
-│   ├── installer.js   # Angular project creation + npm installs
-│   ├── scaffolder.js  # Template copy + file patching
-│   └── ui.js          # Terminal output (banner, success message)
-└── templates/         # Static payload copied into generated projects
-    ├── .claude/       # The harness (hooks, rules, skills)
-    ├── boilerplate/   # Angular source boilerplate
-    └── indices/       # Empty indexes (filled by the agent)
+│   ├── config.js             # Stack resolution + input validation + pinned versions
+│   ├── runner.js             # Async spawn wrapper (npm/npx)
+│   ├── preflight.js          # System requirements check
+│   ├── installer.js          # Angular project creation + npm installs
+│   ├── scaffolder.js         # Template copy + file patching
+│   ├── generator.js          # `generate feature` subcommand
+│   ├── feature-templates.js  # Code templates for the feature generator
+│   └── ui.js                 # Terminal output (banner, success message)
+├── tests/                    # Unit tests for lib/ (node:test)
+└── templates/                # Static payload copied into generated projects
+    ├── .claude/              # The harness (hooks, rules, skills)
+    ├── boilerplate/          # Angular source boilerplate
+    └── indices/              # Empty indexes (filled by the agent)
 ```
 
 ---

@@ -3,7 +3,7 @@
 > **Versión del documento:** 1.0
 > **Fecha:** 2026-03-23
 > **Autor del sistema:** Benjamín Rebolledo
-> **Versión actual del producto:** Blueprint v6.0.0 (v7.0 en planificación)
+> **Versión actual del producto:** Blueprint v6.4.0 (v7.0 en planificación)
 
 ---
 
@@ -419,7 +419,7 @@ STACK DEL CLI:
 - Tipo de módulo: ESM ("type": "module")
 - Dependencias CLI: inquirer ^13.3.0, chalk ^5.6.2, ora ^9.3.0
 - Binario: create-koa-agent (via npm link)
-- Blueprint version: 6.0.0
+- Blueprint version: 6.4.0
 
 STACK DEL PROYECTO GENERADO:
 - Angular: 20+ (latest via @angular/cli@latest)
@@ -870,6 +870,8 @@ El perfil de Benjamín (Angular + Supabase + MCP + agentes IA) tiene un encaje e
 | v5.0 | ~2026-03 | Introducción del sistema de hooks (6 hooks) |
 | v5.1 | ~2026-03-16 | Cimientos UI/UX v2 (Lucide, semántica, KPI cards) |
 | v6.0 | 2026-03-19 | 10 WIs: preflight, rollback, blueprint.json, auto-indexing, flags condicionales |
+| v6.1 | 2026-03-26 | Cache incremental de índices, hooks CommonJS forzado |
+| v6.4 | 2026-06-10 | SDD (/plan + spec-diff-check), context/ semántico, subcomando generate feature, adapters Cursor/Windsurf, fix ng new + pins de versiones |
 | v7.0 | Planificado | RAG, MCP Server, custom rules, facades delgadas |
 
 ### D. Estructura Completa de `templates/`

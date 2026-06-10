@@ -17,6 +17,8 @@ Sin lógica de negocio. Si supera ~150 líneas, extraer a lib/.
 | `lib/preflight.js` | Checks de sistema (Node, npm, git). Sin instalaciones. |
 | `lib/installer.js` | SOLO npm/npx. Importa `run` de runner.js. |
 | `lib/scaffolder.js` | SOLO filesystem (copiar, parchear). Sin npm. |
+| `lib/generator.js` | Subcomando `generate` en proyectos KoA: prompts, nomenclatura, escritura de features. Sin npm. |
+| `lib/feature-templates.js` | SOLO strings de plantillas (`{{domain}}`/`{{Domain}}`/`{{Domains}}`). Sin lógica, sin FS. |
 | `lib/ui.js` | SOLO chalk/console. Sin FS, sin spawn. |
 
 ## ESM — Reglas de importación
@@ -27,8 +29,10 @@ Sin lógica de negocio. Si supera ~150 líneas, extraer a lib/.
 
 ## Constantes globales
 
-- `BLUEPRINT_VERSION` vive en `lib/config.js` — importar, no redefinir
+- `BLUEPRINT_VERSION` y `ANGULAR_CLI_VERSION` viven en `lib/config.js` — importar, no redefinir
 - `NPM` y `NPX` viven en `lib/runner.js` — importar en módulos que los necesiten
+- Paquetes acoplados al major de Angular (primeng, @primeng/themes, @ngrx/signals,
+  @angular/animations) se pinean con `ANGULAR_CLI_VERSION` — nunca `@latest`
 
 ## No mezclar responsabilidades
 

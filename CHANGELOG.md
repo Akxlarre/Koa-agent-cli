@@ -6,6 +6,34 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.4.0] — 2026-06-10
+
+> Las versiones 6.2 y 6.3 fueron iteraciones internas sin release público; sus cambios quedaron consolidados en 6.4.0.
+
+### Added
+- **SDD (Spec-Driven Development)**: skill `/plan` genera task-specs en `.claude/temp/` antes de implementar; hook `spec-diff-check.js` (PreToolUse Bash) bloquea `git commit` si los componentes/facades nuevos de la sesión no están registrados en sus índices
+- **`context/` — memoria semántica del agente**: `domain.md`, `brief.md`, `constraints.md`, `learnings.md` y `decisions/` (gitignored); hook `context-guardian.js` (Stop) audita su frescura (brief >7d, learnings >14d)
+- **Subcomando `generate`**: `npx create-koa-agent generate feature <nombre> [--type list|detail|form]` genera 5-7 archivos pre-conectados (repository + facade + página + card/skeleton + specs Vitest) usando `lib/generator.js` + `lib/feature-templates.js`
+- **Adapters multi-AI**: `.github/copilot-instructions.md` (siempre), `.cursor/rules/*.mdc` (`--with-cursor`), `.windsurf/rules/project.md` (`--with-windsurf`) — también seleccionables en el prompt interactivo
+- **Regla `a11y-spec.md`**: contratos mínimos de accesibilidad en templates, validados por el Architect Guard
+- **`.claude/tests/`**: tests unitarios de hooks en el proyecto generado (`npm run claude:test-hooks`)
+- **Boilerplate**: `BaseFacade` con SWR built-in + `profiles.repository` de ejemplo + componente `error-state` + `role.guard` + migración inicial `auth_create_profiles.sql` con RLS
+- `validateBlueprintJson()` — preflight valida el schema de `blueprint.json` en re-runs
+
+### Fixed
+- **`ng new` roto en Full Scaffold**: se invocaba `ng new <tmpDir> --name <proyecto>`; el posicional pisaba a `--name` y el prefijo `.koa-tmp-` fallaba la validación de schema de Angular CLI. Ahora: `ng new <proyecto> --directory <tmpDir> --defaults`
+- **Drift de versiones en dependencias**: `@angular/cli@latest` (hoy v22) y paquetes sin pin (`@angular/animations`, `primeng`, `@ngrx/signals`) causaban ERESOLVE contra Angular 20. Todos pineados al major de `ANGULAR_CLI_VERSION` en `lib/config.js`
+- **vitest pineado a `^3`**: con `vitest@latest` (v4) el scaffold instalaba, pero cualquier `npm install` posterior del usuario fallaba con ERESOLVE (`@angular/build@20` declara peerOptional `vitest@^3.1.1`)
+- **gsap ahora se instala siempre**: el boilerplate (directivas animate-in/card-hover/press-feedback, theme.service, kpi-card, layout) depende de gsap, pero solo se instalaba con `--with-gsap` — el scaffold por defecto no compilaba. El flag pasa a controlar solo la estrategia de animación de rutas (GSAP-first vs `withViewTransitions()`)
+- **Boilerplate no compilaba**: `dashboard.component.ts` usaba `currentUser()?.displayName` (la propiedad del modelo `User` es `name`); callback de `onAuthStateChange` tipado como `Promise<void>` en supabase-js v2 reciente; import sin uso de `SkeletonBlockComponent`
+
+### Migración desde 6.1
+1. Re-ejecutar el modo "Solo inyectar" sobre el proyecto para actualizar `.claude/` (hooks, reglas, skills nuevos)
+2. Copiar `templates/context/` a `context/` si quieres la memoria semántica
+3. Agregar a `.gitignore`: `/context/` y `/workshop/`
+
+---
+
 ## [6.1.0] — 2026-03-26
 
 ### Changed

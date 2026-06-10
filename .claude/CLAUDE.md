@@ -10,7 +10,9 @@ pre-configurados con harness agéntico para Claude Code.
 
 Comandos:
 - `node bin/index.js` — ejecutar el CLI localmente
+- `node bin/index.js generate feature <nombre>` — generador de features (dentro de un proyecto KoA)
 - `TEST_MODE=inject node bin/index.js` — probar sin scaffolding completo
+- `npm test` — tests unitarios de lib/ (node:test)
 - `npm publish` — publicar en npm
 
 ## Dualidad crítica — LEER ANTES DE TOCAR CUALQUIER ARCHIVO
@@ -35,14 +37,16 @@ Este repo tiene DOS contextos que jamás deben confundirse:
 
 ```
 bin/
-└── index.js          # Entry point: flags, inquirer, orquestación (~115 líneas)
+└── index.js              # Entry point: flags, inquirer, orquestación, subcomando generate (~160 líneas)
 lib/
-├── config.js         # resolveStack, validateProjectName, parseJsonc, BLUEPRINT_VERSION
-├── runner.js         # run() spawn wrapper, NPM, NPX constantes
-├── preflight.js      # checkCommand, preflight() — verifica Node/npm/git/docker
-├── installer.js      # createAngularProject, installDependencies — npm y npx ops
-├── scaffolder.js     # copyTemplates, injectBoilerplate, writeBlueprintJson
-└── ui.js             # printBanner, printSuccess — solo chalk, sin FS
+├── config.js             # resolveStack, validateProjectName, parseJsonc, BLUEPRINT_VERSION, ANGULAR_CLI_VERSION
+├── runner.js             # run() spawn wrapper, NPM, NPX constantes
+├── preflight.js          # checkCommand, preflight() — verifica Node/npm/git/docker
+├── installer.js          # createAngularProject, installDependencies — npm y npx ops
+├── scaffolder.js         # copyTemplates, injectBoilerplate, writeBlueprintJson
+├── generator.js          # runGenerate — subcomando `generate feature` en proyectos KoA
+├── feature-templates.js  # FEATURE_TEMPLATES — strings de plantillas del generador
+└── ui.js                 # printBanner, printSuccess — solo chalk, sin FS
 ```
 
 ## Reglas de arquitectura (path-scoped — auto-cargadas)

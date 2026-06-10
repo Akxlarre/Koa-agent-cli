@@ -19,7 +19,6 @@ import { AnimateInDirective } from "@core/directives/animate-in.directive";
 import { IconComponent } from "@shared/components/icon/icon.component";
 import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component";
 import { KpiCardSkeletonComponent } from "@shared/components/kpi-card/kpi-card-skeleton.component";
-import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skeleton-block.component";
 
 /**
  * DashboardComponent — Página principal de la aplicación.
@@ -65,7 +64,6 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
     IconComponent,
     KpiCardComponent,
     KpiCardSkeletonComponent,
-    SkeletonBlockComponent,
   ],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════
@@ -313,7 +311,7 @@ export class DashboardComponent implements AfterViewInit {
   readonly today = new Date();
 
   readonly userName = computed(
-    () => this.auth.currentUser()?.displayName?.split(" ")[0] ?? "Equipo",
+    () => this.auth.currentUser()?.name?.split(" ")[0] ?? "Equipo",
   );
 
   // ── Datos de ejemplo — reemplazar con señales del DashboardFacade ─────────

@@ -46,10 +46,10 @@ async function main() {
 
     let answers;
     if (process.env.TEST_MODE === 'inject') {
-        answers = { action: 'Solo inyectar Memoria Claude en carpeta actual' };
+        answers = { action: 'Solo inyectar Memoria Koa Blueprint en carpeta actual' };
     } else if (process.env.TEST_MODE) {
         answers = {
-            action: 'Full Scaffold (Angular 20 + PrimeNG + Supabase)',
+            action: 'Full Scaffold (Angular + Tailwind + Supabase + Boilerplate AI)',
             projectName: process.env.TEST_PROJECT_NAME || 'test-project',
         };
     } else {

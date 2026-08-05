@@ -12,6 +12,7 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Bash Guard** — No puedes crear archivos `.ts/.html/.scss` via Bash. Usa Edit/Write.
 - **Compact Recovery** — Si el contexto se compacta, los índices se re-inyectan automáticamente (PostCompact).
 - **Failure Tracker** — Los errores de tools se registran en `.claude/temp/LESSONS_LEARNED.md` con dedup y rotación automática (max 20).
+- **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script.
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
 - **Context Guardian** — Al terminar de responder, audita la frescura del contexto semántico: avisa si `context/brief.md` tiene más de 7 días sin actualizar o si `context/learnings.md` lleva más de 14 días sin crecer.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
@@ -42,6 +43,7 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 | `/angular-component` | Crear o refactorizar un componente Angular |
 | `/angular-signals` | Implementar estado reactivo con Signals |
 | `/sync-indices` | Sincronizar índices al cerrar sesión |
+| `/harness-feedback` | Reportar fricción con el harness (hooks/rules/skills) al cerrar sesión — distinto de sync-indices |
 
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 

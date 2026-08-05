@@ -25,11 +25,11 @@
 | Ruta en templates/.claude/ | Destino | Propósito |
 |---|---|---|
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (8 hooks activos). |
+| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (9 hooks activos). |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 8 hooks de guardrails (ver tabla de hooks abajo). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 9 hooks de guardrails (ver tabla de hooks abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 12 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 7 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices). |
+| `templates/.claude/skills/` | `.claude/skills/` | 8 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices, harness-feedback). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
 
 ## Adapters de AI tools (condicional)
@@ -65,6 +65,7 @@
 | Hook | Evento Claude Code | Propósito | Dependencias |
 |---|---|---|---|
 | `pre-write-guard.js` | PreToolUse (Edit/Write) | 4 capas: File Protection, Discovery Gate, Architect Guard (ARCH-01→12 + LLM-01→02), Context Injection | discovery-tracker flag, blueprint.json |
+| `harness-gate.js` | PreToolUse (Edit/Write) | Generalization Gate + Placement Guard sobre el harness mismo (rules/, learnings.md, ANTI-PATTERNS.md, CLAUDE.md, scripts/) — ver HOOKS-SYSTEM.md §8 | — |
 | `discovery-tracker.js` | PostToolUse (Read) | Crea flag cuando se leen indices/ — levanta el Discovery Gate | — |
 | `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
 | `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de archivos .ts/.html/.scss via Bash | — |

@@ -16,9 +16,9 @@ El agente **tiene ojos**. Este skill define cómo usarlos sin desperdiciarlos.
 
 ## Principio rector
 
-> **QA geométrico ≠ mirada humana.** (spec 0030)
+> **QA geométrico ≠ mirada humana.**
 
-En la spec 0030 se cerró una página con **13/13 ACs verdes** y el owner la rechazó **dos veces**
+Un caso real: se cerró una página con **13/13 ACs verdes** y el owner la rechazó **dos veces**
 por cómo se veía. Los probes automáticos de este skill detectan **fallas**, no certifican
 **calidad**. La captura hay que **mirarla** y emitir un juicio en prosa. Un reporte que solo
 tiene checkboxes verdes es un reporte incompleto.
@@ -129,7 +129,7 @@ Confirmar que la URL resultante es el dashboard del rol esperado antes de seguir
 
 Una vez autenticado, ir a otra ruta de `/app/**` con `browser_navigate` fuerza un full page
 reload y puede **perder la sesión** por timing de hidratación de Supabase, devolviéndote a
-`/login`. Peleado en spec 0029.
+`/login`.
 
 Es **intermitente**, no determinista: depende del checkbox "Mantener sesión iniciada" (viene
 marcado por defecto) y del timing. En una verificación de este skill el `browser_navigate`
@@ -156,7 +156,7 @@ Mirar la captura y responder **en prosa**, no con checkboxes:
 - ¿El componente objetivo está ahí, con **datos reales** (no skeleton, no vacío)?
 - ¿Quién es el **protagonista** visual de la página? ¿Es el que debería serlo?
 - ¿Se siente **apretado**? Si sí → revisar **jerarquía y ancho de paneles ANTES** de tocar
-  tamaños de fuente (lección spec 0030).
+  tamaños de fuente.
 - ¿La jerarquía la dicta el **ancho**, o alguien intentó lograrla agrandando tipografías?
 
 ### Fase B — Probes automáticos
@@ -282,11 +282,11 @@ browser_evaluate({ function: `() => {
 ```
 
 **Falla si:** `documentScrolls === true` en desktop (el documento no debe scrollear),
-o `inlineContainViolation > 0` (el canon vive en `.bento-fill`, **prohibido** inline — spec 0028).
+o `inlineContainViolation > 0` (el canon vive en `.bento-fill`, **prohibido** inline — ver `visual-system.md`).
 
 Luego verificar el **switch por contenedor, no por viewport**: si la página tiene drawer/panel
 lateral, abrirlo y confirmar que las columnas **se apilan** aunque el viewport siga en lg
-(spec 0030 — usar `isDesktopLayout()`, nunca `lg:` de Tailwind).
+(usar `isDesktopLayout()`, nunca `lg:` de Tailwind).
 
 ### 6 — Overflow horizontal y hover recortado
 
@@ -408,4 +408,4 @@ Esta sección NO puede ser una lista de checkboxes.]
 ```
 
 **El veredicto ✅ no cierra el track.** Los ACs de UI los cierra el **visto bueno visual del
-owner** (spec 0030). Presentar las capturas y esperar.
+owner**. Presentar las capturas y esperar.

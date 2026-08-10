@@ -57,6 +57,8 @@
 | `templates/boilerplate/src/app/shared/components/error-state/error-state.component.ts` | `src/app/shared/components/error-state/error-state.component.ts` | Estado de error unificado para Facades. Envuelve `app-alert-card severity="error"` con output `(retry)`. Conectar a `facade.retryLoad()`. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/shared/components/error-state/error-state.component.spec.ts` | `src/app/shared/components/error-state/error-state.component.spec.ts` | Tests: creación, renderizado de message, título default, emit retry al clic. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/core/utils/request-guard.utils.ts` | `src/app/core/utils/request-guard.utils.ts` | `createRequestGuard()`: descarta respuestas de red fuera de orden en Facades con filtro variable. Ver `facades.md` §9. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/utils/layout-tier.utils.ts` | `src/app/core/utils/layout-tier.utils.ts` | Functional Core del patrón App-like: `widthToTier`, `sliceByBudget`, `visibleWithLoadMore`. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/models/layout.model.ts` | `src/app/core/models/layout.model.ts` | Tipo `LayoutTier` (`mobile \| tablet \| desktop`), resuelto por ancho de contenedor. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/` | `src/` | Código Angular inicial: layout, auth, dashboard, shared components | Siempre en Full Scaffold |
 | `templates/boilerplate/scripts/` | `scripts/` | indices-sync.js, lint-arch-wrapper.js, architect.js, set-env.js, assignments-sync.js, assignments-audit.js | Siempre en Full Scaffold |
 | `templates/boilerplate/vitest.config.ts` | `vitest.config.ts` | Config de Vitest (reemplaza Karma) | Siempre en Full Scaffold |

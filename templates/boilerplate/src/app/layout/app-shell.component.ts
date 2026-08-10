@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   inject,
   viewChild,
   ElementRef,
@@ -57,10 +58,16 @@ import { TopbarComponent } from "./topbar.component";
       <div class="grid min-w-0 grid-rows-[auto_1fr] overflow-hidden">
         <app-topbar />
 
+        <!--
+          container-type/name: LOAD-BEARING. Todo el bento grid responde a
+          @container layoutmain, no a @media. Si se quitan estas dos
+          propiedades, ninguna container query matchea y el grid colapsa a
+          su layout base (1 columna) en cualquier ancho de pantalla.
+        -->
         <main
           #contentEl
           class="overflow-y-auto p-6 transition-[view-transition-name:main-content]"
-          style="view-transition-name: main-content;"
+          style="view-transition-name: main-content; container-type: inline-size; container-name: layoutmain;"
           role="main"
           tabindex="-1"
         >
@@ -74,13 +81,21 @@ import { TopbarComponent } from "./topbar.component";
 export class AppShellComponent {
   protected readonly layout = inject(LayoutService);
   private readonly gsap = inject(GsapAnimationsService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly contentEl = viewChild<ElementRef<HTMLElement>>("contentEl");
 
   constructor() {
     afterNextRender(() => {
       const el = this.contentEl()?.nativeElement;
-      if (el) this.gsap.animatePageEnter(el);
+      if (!el) return;
+
+      this.gsap.animatePageEnter(el);
+
+      // Tier por CONTENEDOR: el ancho real de <main> alimenta LayoutService.tier
+      // para la densidad adaptativa (patrón App-like). Se registra una sola vez,
+      // acá en el shell — nunca en páginas individuales.
+      this.destroyRef.onDestroy(this.layout.observeMain(el));
     });
   }
 }

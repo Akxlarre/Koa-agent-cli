@@ -10,7 +10,6 @@ import {
   viewChildren,
 } from "@angular/core";
 import { DatePipe } from "@angular/common";
-import { RouterLink } from "@angular/router";
 import { AuthFacade } from "@core/services/auth.facade";
 import { GsapAnimationsService } from "@core/services/gsap-animations.service";
 import { BentoGridLayoutDirective } from "@core/directives/bento-grid-layout.directive";
@@ -18,7 +17,6 @@ import { CardHoverDirective } from "@core/directives/card-hover.directive";
 import { AnimateInDirective } from "@core/directives/animate-in.directive";
 import { IconComponent } from "@shared/components/icon/icon.component";
 import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component";
-import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skeleton-block.component";
 
 /**
  * DashboardComponent — Página principal de la aplicación.
@@ -57,13 +55,11 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
-    RouterLink,
     BentoGridLayoutDirective,
     CardHoverDirective,
     AnimateInDirective,
     IconComponent,
     KpiCardComponent,
-    SkeletonBlockComponent,
   ],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════
@@ -308,7 +304,7 @@ export class DashboardComponent implements AfterViewInit {
   readonly today = new Date();
 
   readonly userName = computed(
-    () => this.auth.currentUser()?.displayName?.split(" ")[0] ?? "Equipo",
+    () => this.auth.currentUser()?.name?.split(" ")[0] ?? "Equipo",
   );
 
   // ── Datos de ejemplo — reemplazar con señales del DashboardFacade ─────────

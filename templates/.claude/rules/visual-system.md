@@ -88,6 +88,93 @@ Combinar con `.card-tinted` para máximo contraste visual en KPIs.
 > `.section-eyebrow` (`text-sm`, natural, `text-secondary`): la primera etiqueta un dato, la
 > segunda da contexto legible antes de un título.
 
+## Patrón App-like (fill-screen Desktop / scroll Mobile)
+
+> Cuando se dice **"hazlo app-like"** significa **exactamente esto**, no una estética genérica de app.
+
+**Definición:** la página ocupa todo el alto disponible en Desktop (lg+) **sin que el documento
+scrollee** — como una app de escritorio nativa. El overflow se resuelve con **scroll interno**
+dentro de los paneles (tabla, lista, rail), no moviendo la página. En **Mobile** revierte a
+scroll nativo normal.
+
+### App-like son DOS pilares, no uno
+
+Aplicar solo el modificador CSS produce una página que "llena la pantalla" pero **recorta o
+scrollea mal**. App-like OBLIGA a los dos juntos:
+
+1. **Shell fill-screen (CSS):** modificador en el `.bento-grid` raíz + la celda que crece marcada
+   con `.bento-fill`.
+2. **Densidad adaptativa (TS):** el contenido se **presupuesta** para caber en el alto fijo —
+   nunca "se deja empujar".
+
+### Pilar 1 — Shell (clases canónicas)
+
+| Clase | Uso |
+|---|---|
+| `.bento-grid--fill-screen` | Hero + celda protagonista. |
+| `.bento-grid--fill-screen-2` | Hero + 2 zonas que llenan. |
+| `.bento-grid--fill-screen-kpi` | Hero + fila de KPIs separada + celda protagonista. |
+| `.bento-fill` | Celda que **crece y scrollea internamente**. Aplica `contain: size` solo en lg+. |
+| `.bento-grid--hero-fit` | La 1ª fila se ajusta a su contenido (hero slim sin hueco debajo). |
+| `.bento-grid--rows-fit` | TODAS las filas se ajustan. Solo para grids de puros `.bento-banner`. |
+
+- **PROHIBIDO** `contain` o `min-height` **inline** en la celda — el canon vive en `.bento-fill`.
+  Duplicarlo inline rompe el layout dual.
+- **`flex`, no `grid`,** para las columnas internas: solo flex propaga el alto para que cada
+  columna tenga su propio scroll.
+- Un componente que actúa como celda `.bento-fill` necesita
+  `:host { display:flex; flex-direction:column; min-height:0 }` y el padre le pasa
+  `class="bento-fill flex flex-col"`.
+- El descuento de topbar/gutters vive en `--app-shell-offset` (default `120px`) dentro de
+  `_bento-grid.scss`. Si cambiás la altura del topbar, ajustalo ahí — no hardcodees el `calc()`.
+
+### Pilar 2 — Densidad adaptativa (medir por CONTENEDOR)
+
+- `LayoutService.tier()` → signal `mobile | tablet | desktop` (umbrales 640/1024), alimentado por
+  `observeMain(<main>)` con ResizeObserver, registrado **una sola vez** en `AppShellComponent`.
+  Es **por contenedor**, no por viewport.
+- `core/utils/layout-tier.utils.ts` → `widthToTier`, `sliceByBudget` (recorta N items al
+  presupuesto de alto), `visibleWithLoadMore`, `LoadMoreState`.
+- El Smart Component resuelve el presupuesto y lo pasa al Dumb como input (ej. `maxVisible: number | null`).
+- **Estados vacíos y skeletons dentro de un `.bento-fill`** van SIEMPRE en un wrapper
+  `flex-1 flex items-center justify-center`: la celda puede medir 500px+, mucho más que la card
+  de altura natural, y sin eso quedan pegados arriba con un hueco vacío debajo.
+
+### Trampas ya resueltas (no reinventar)
+
+- **Switch de layout por CONTENEDOR, NO por `lg:` de Tailwind.** Usar
+  `isDesktopLayout() = maxVisible() === null` (= tier desktop). Con `lg:` las columnas no se
+  apilan cuando un drawer angosta `<main>`.
+- **`<main>` DEBE declarar `container-type: inline-size; container-name: layoutmain`.** Todo el
+  bento grid responde a `@container layoutmain`. Sin eso, ninguna query matchea y el grid colapsa
+  a 1 columna en cualquier ancho.
+- **Jerarquía por ancho, no por tamaño de fuente.** Si "se siente apretado", revisar qué panel es
+  el protagonista (tabla ancha `flex-1` + rail angosto `<aside w-80>`) **antes** de achicar tipografías.
+- **QA geométrico ≠ mirada humana.** Tests en verde no garantizan que se vea bien; validar
+  visualmente con el skill `verify`.
+- **Nunca backticks dentro de comentarios de un `template` literal** — rompen el build y
+  `ng serve` sirve un bundle stale en silencio.
+- **Nunca corchetes en un binding de clase** (`[class.flex-[2]]`) — rompen el binding.
+
+### Cuándo NO aplica (excepción, no regla)
+
+App-like es el default de toda página de contenido enrutable (excluye auth pre-shell e
+impresión). "No aplica" debe justificarse con al menos uno de estos criterios — nunca con "es un
+formulario" o "es una página de detalle" como motivo genérico:
+
+1. **Contenido genuinamente corto que nunca produce overflow.** El modificador no resuelve nada
+   porque no hay scroll que evitar.
+2. **El caso de uso real es mobile/tablet-first por el contexto físico de la tarea.** El patrón
+   optimiza sesiones de escritorio.
+3. **No es una vista de navegación normal.** Hojas imprimibles (`@media print`) o pantallas
+   previas al shell autenticado.
+
+**"Múltiples secciones secuenciales" NO es criterio de exclusión válido por sí solo** — es la
+señal de que la página necesita **reestructurarse en tabs**, para que cada sección se vuelva su
+propio `.bento-fill` sin perder funcionalidad. Los wizards con stepper tampoco quedan excluidos
+por defecto: usar un patrón full-height propio (`:host { display:flex }` +
+`@container layoutmain (min-width:1024px) { height: calc(100vh - Npx) }`).
+
 ## Skeletons y Estados de Carga (OBLIGATORIO)
 
 Patrón estricto de **Single-Component Skeleton**, para evitar componentes duplicados y Layout

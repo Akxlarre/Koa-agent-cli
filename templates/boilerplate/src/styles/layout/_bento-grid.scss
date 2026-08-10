@@ -50,30 +50,124 @@ $bp-lg: 1024px;
     grid-auto-flow: dense;
     gap: var(--bento-gap-mobile);
     padding: var(--bento-pad-mobile);
+    /* Altura por contenido: evita que el grid estire y las filas repartan espacio vacío */
+    height: fit-content;
+    align-self: start;
 
-    /* Container queries: permite que hijos respondan al tamaño del grid */
-    container-type: inline-size;
-    container-name: bento;
+    /* Premium UX: suaviza los saltos de tracks del grid cuando cambia el breakpoint */
+    transition:
+      grid-template-columns 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+      gap 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+      padding 0.45s cubic-bezier(0.25, 1, 0.5, 1);
 
-    @media (min-width: $bp-sm) {
+    /* Container queries: Eliminado de aquí para que escuche a su padre <main> */
+    /* container-type: inline-size; */
+    /* container-name: bento; */
+
+    @container layoutmain (min-width: #{$bp-sm}) {
       grid-template-columns: repeat(var(--bento-cols-sm), minmax(0, 1fr));
       gap: var(--bento-gap-sm);
       padding: var(--bento-pad-sm);
     }
 
-    @media (min-width: $bp-md) {
+    @container layoutmain (min-width: #{$bp-md}) {
       grid-template-columns: repeat(var(--bento-cols-md), minmax(0, 1fr));
       gap: var(--bento-gap-md);
       padding: var(--bento-pad-md);
     }
 
-    @media (min-width: $bp-lg) {
+    @container layoutmain (min-width: #{$bp-lg}) {
       grid-template-columns: repeat(var(--bento-cols-lg), minmax(0, 1fr));
       gap: var(--bento-gap-lg);
       padding: var(--bento-pad-lg);
     }
+
+    /* ── Modificadores App-like (fill-screen) ──────────────────────
+       En mobile permiten scroll nativo. En desktop (lg+) el grid ocupa el
+       alto disponible y el overflow se resuelve con scroll INTERNO en la
+       celda `.bento-fill`, no moviendo la página.
+
+       `--app-shell-offset` descuenta topbar + gutters del shell. Si cambias
+       la altura del topbar, ajústalo ahí y todos los modificadores lo heredan.
+       ────────────────────────────────────────────────────────────── */
+    --app-shell-offset: 120px;
+
+    /* Hero + celda protagonista. */
+    &.bento-grid--fill-screen {
+      @container layoutmain (min-width: #{$bp-lg}) {
+        height: calc(100vh - var(--app-shell-offset));
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+    }
+
+    /* Dashboards complejos: hero + 2 zonas que llenan. */
+    &.bento-grid--fill-screen-2 {
+      @container layoutmain (min-width: #{$bp-lg}) {
+        height: calc(100vh - var(--app-shell-offset));
+        grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+      }
+    }
+
+    /* Hero + fila de KPIs separada + celda protagonista.
+       Fila 1 = hero (full-width, agota la fila).
+       Fila 2 = KPIs (.bento-square × N — el auto-flow denso los ubica solos).
+       Fila 3 = .bento-fill (llena el resto).
+       No requiere data-row-start: el flujo natural del grid resuelve la posición. */
+    &.bento-grid--fill-screen-kpi {
+      @container layoutmain (min-width: #{$bp-lg}) {
+        height: calc(100vh - var(--app-shell-offset));
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+    }
+
+    /* La primera fila se ajusta a su contenido real en vez de heredar el piso
+       `--bento-row-min` (120px) que usan las filas auto-generadas para que los
+       .bento-square luzcan cuadrados. Sin esto, un hero slim de ~60-90px queda
+       estirado a 120px por el `align-items: stretch` del grid, dejando un hueco
+       visible debajo. Solo afecta la 1ª fila explícita. */
+    &.bento-grid--hero-fit {
+      grid-template-rows: auto;
+    }
+
+    /* TODAS las filas se ajustan a su contenido, sin el piso `--bento-row-min`.
+       Úsalo solo en grids compuestos enteramente por `.bento-banner` (sin
+       .bento-square/.bento-tall/.bento-feature), donde el piso de 120px no
+       cumple ningún propósito. Más fuerte que --hero-fit: no combinar. */
+    &.bento-grid--rows-fit {
+      grid-auto-rows: auto;
+    }
   }
 }
+
+/* ── MODO DUAL: celda protagonista de un grid fill-screen ──────────
+   `.bento-fill` marca la(s) celda(s) que en desktop deben LLENAR el resto
+   del alto. Solo emite CSS dentro del contenedor layoutmain ≥ lg y solo
+   bajo un grid `--fill-screen*`:
+
+     - `contain: size` oculta el tamaño intrínseco del contenido, para que la
+       fila minmax(0, 1fr) del grid dicte el alto (el contenido interno
+       scrollea con overflow-y-auto).
+     - Bajo lg NO aplica nada → la celda mide su contenido natural y la página
+       scrollea nativamente.
+
+   PROHIBIDO poner `contain: size` o `min-height` de layout como estilo inline
+   en componentes: esta clase es la única fuente del modo dual.
+   NO se aplica vía `> *` a propósito: el hero (fila auto) no debe recibir
+   `contain: size` o su fila colapsaría.
+   ──────────────────────────────────────────────────────────────── */
+@container layoutmain (min-width: #{$bp-lg}) {
+  .bento-grid--fill-screen > .bento-fill,
+  .bento-grid--fill-screen-2 > .bento-fill,
+  .bento-grid--fill-screen-kpi > .bento-fill {
+    contain: size;
+    min-height: 0;
+  }
+}
+
+/* Un componente Angular que actúa como celda .bento-fill necesita propagar el
+   alto: `:host { display: flex; flex-direction: column; min-height: 0 }` y el
+   padre le pasa `class="bento-fill flex flex-col"`. Usar flex, NO grid: solo
+   flex propaga el alto para que cada columna tenga su propio scroll. */
 
 /* ── 3. PROPORTION MIXIN ──────────────────────────────────────
    
@@ -98,14 +192,14 @@ $bp-lg: 1024px;
    └──────────────────────────────────────────────────┘
    ─────────────────────────────────────────────────── */
 
-@mixin bento-cell($sm, $md, $lg, $rows: 1) {
-  grid-column: span var(--bento-cols-mobile);
+@mixin bento-cell($sm, $md, $lg, $rows: 1, $mob: var(--bento-cols-mobile)) {
+  grid-column: span $mob;
 
   @if $rows >1 {
     grid-row: span $rows;
   }
 
-  @media (min-width: $bp-sm) {
+  @container layoutmain (min-width: #{$bp-sm}) {
     grid-column: span $sm;
 
     @if $rows >1 {
@@ -113,11 +207,11 @@ $bp-lg: 1024px;
     }
   }
 
-  @media (min-width: $bp-md) {
+  @container layoutmain (min-width: #{$bp-md}) {
     grid-column: span $md;
   }
 
-  @media (min-width: $bp-lg) {
+  @container layoutmain (min-width: #{$bp-lg}) {
     grid-column: span $lg;
   }
 }
@@ -133,7 +227,7 @@ $bp-lg: 1024px;
   /* Square: celda cuadrada estándar */
   .bento-square,
   .bento-1x1 {
-    @include bento-cell(2, 2, 3);
+    @include bento-cell(2, 2, 3, 1, 1);
   }
 
   /* Wide: proporción 2:1 horizontal */
@@ -185,43 +279,90 @@ $bp-lg: 1024px;
 
 @layer bento.placement {
 
-  @media (min-width: $bp-md) {
+  /* Modificador: 4 celdas iguales en una fila (ej. KPIs Alumnos). Debe ir después de proportions para sobrescribir span de .bento-square. */
+  .bento-grid.bento-grid--four-equal {
+    --bento-cols-mobile: 2;
+    --bento-cols-sm: 2;
+    --bento-cols-md: 4;
+    --bento-cols-lg: 4;
+    /* Sin padding propio: el contenedor padre (page-content) ya provee el gutter */
+    --bento-pad-mobile: 0;
+    --bento-pad-sm: 0;
+    --bento-pad-md: 0;
+    --bento-pad-lg: 0;
+
+    &>.bento-square {
+      grid-column: span 1;
+    }
+
+    @container layoutmain (min-width: #{$bp-sm}) {
+      &>.bento-square {
+        grid-column: span 1;
+      }
+    }
+
+    @container layoutmain (min-width: #{$bp-md}) {
+      &>.bento-square {
+        grid-column: span 1;
+      }
+    }
+
+    @container layoutmain (min-width: #{$bp-lg}) {
+      &>.bento-square {
+        grid-column: span 1;
+      }
+    }
+  }
+
+  @container layoutmain (min-width: #{$bp-md}) {
     @for $i from 1 through 8 {
-      [data-col-span-md="#{$i}"] {
+      [data-col-span-md='#{$i}'] {
         grid-column: span $i;
       }
     }
 
     @for $i from 1 through 7 {
-      [data-col-start-md="#{$i}"] {
+      [data-col-start-md='#{$i}'] {
         grid-column-start: $i;
       }
     }
 
     @for $i from 1 through 4 {
-      [data-row-span-md="#{$i}"] {
+      [data-row-span-md='#{$i}'] {
         grid-row: span $i;
       }
     }
   }
 
-  @media (min-width: $bp-lg) {
+  @container layoutmain (min-width: #{$bp-lg}) {
     @for $i from 1 through 12 {
-      [data-col-span="#{$i}"] {
+      [data-col-span='#{$i}'] {
         grid-column: span $i;
       }
     }
 
     @for $i from 1 through 11 {
-      [data-col-start="#{$i}"] {
+      [data-col-start='#{$i}'] {
         grid-column-start: $i;
       }
     }
 
     @for $i from 1 through 4 {
-      [data-row-span="#{$i}"] {
+      [data-row-span='#{$i}'] {
         grid-row: span $i;
       }
+    }
+
+    /* Dashboard: Actividad (izq) + Alertas (der) — forzar 50/50 y misma altura en desktop.
+       Selector directo para que no sea pisado por auto-placement ni por otras reglas. */
+    .bento-grid>.bento-activity-lg {
+      grid-column: 1 / span 6;
+      grid-row: span 2;
+    }
+
+    .bento-grid>.bento-alerts-lg {
+      grid-column: 7 / span 6;
+      grid-row: span 2;
     }
   }
 }
@@ -233,7 +374,6 @@ $bp-lg: 1024px;
    ─────────────────────────────────────────────────────────── */
 
 @layer bento.components {
-
   .bento-card {
     position: relative;
     overflow: hidden;
@@ -248,6 +388,8 @@ $bp-lg: 1024px;
     /* Previene blowout del contenido */
     min-height: 0;
     min-width: 0;
+    /* Soften breakpoint snaps during continuous container resizing */
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
   }
 
   /* Variante sin padding — para imágenes full-bleed */
@@ -289,7 +431,6 @@ $bp-lg: 1024px;
    ─────────────────────────────────────────────────────────── */
 
 @layer bento.components {
-
   .bento-media {
     position: relative;
     width: 100%;
@@ -343,5 +484,25 @@ $bp-lg: 1024px;
   .bento-grid * {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* ── VARIANTE WIZARD (altura fija, para drawers/panels) ─────────────
+   Hace que el grid llene el 100% del contenedor sin scroll externo.
+   Celdas en una sola fila a partir de md (768px).
+   Usar junto a container-name: layoutmain en el padre.
+   ─────────────────────────────────────────────────────────────────── */
+@layer bento.placement {
+  .bento-grid--wizard {
+    height: 100%;
+    align-self: stretch;
+    grid-template-rows: 1fr;
+    grid-auto-rows: 1fr;
+
+    @container layoutmain (min-width: #{$bp-md}) {
+      >* {
+        grid-row: 1;
+      }
+    }
   }
 }

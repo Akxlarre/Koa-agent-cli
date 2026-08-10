@@ -87,7 +87,7 @@ Los datos numéricos siguen una jerarquía tipográfica explícita:
 
 ```
 ┌──────────────────────────────┐
-│  .kpi-label                  │   ← xs, uppercase, text-muted
+│  .micro-label                │   ← xs, uppercase, text-muted
 │  USUARIOS ACTIVOS            │
 │                              │
 │  .kpi-value                  │   ← 4xl, bold, tight, tabular-nums

@@ -10,6 +10,10 @@
 
 /* Motion — View Transitions API (page navigation) */
 @use "./styles/motion/view-transitions";
+// Fallback CSS puro (.animate-fade-in-up / .animate-fade-in / .animate-stagger).
+// Lo referencian visual-system.md y pre-write-guard, así que tiene que existir
+// en el bundle. Es global, no estilo de componente: exento de ARCH-07.
+@use "./styles/animations";
 
 /* Typography — Bricolage Grotesque
    Loaded via <link preconnect> in index.html (NOT @import — avoids render-blocking).

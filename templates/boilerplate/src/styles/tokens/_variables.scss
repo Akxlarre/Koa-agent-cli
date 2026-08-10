@@ -62,6 +62,9 @@
   --space-16: 64px;
 
   /* Escala tipográfica */
+  --text-2xs: 0.625rem;
+  /* 10px — badges de conteo y micro-etiquetas. Sin line-height propio a
+     propósito: hereda el del contenedor. */
   --text-xs: 0.75rem;
   /* 12px */
   --text-sm: 0.875rem;
@@ -569,6 +572,28 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* .badge-count — Badge numérico superpuesto (notificaciones, carrito, etc.).
+   Existe para que nadie tenga que recomponer a mano el cluster
+   `rounded-full + micro-texto + px-` cada vez: eso es lo que ARCH-15 bloquea.
+   Se posiciona desde el contenedor; la clase solo define la forma. */
+.badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1rem;
+  min-width: 1rem;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--state-error);
+  color: var(--color-primary-text);
+  font-family: var(--font-body);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-bold);
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
 }
 
 /* .item-title — Título de fila / card / ítem de lista.

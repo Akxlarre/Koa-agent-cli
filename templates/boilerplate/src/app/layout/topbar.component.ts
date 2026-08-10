@@ -71,7 +71,7 @@ import { BadgeModule } from "primeng/badge";
           />
           @if (notifications.unreadCount() > 0) {
             <span
-              class="pointer-events-none absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-error px-1 text-center text-[10px] font-bold text-brand-text"
+              class="badge-count absolute right-1 top-1"
               aria-hidden="true"
             >
               {{ notifications.unreadCount() }}

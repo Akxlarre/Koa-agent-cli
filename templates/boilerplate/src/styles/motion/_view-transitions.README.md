@@ -33,7 +33,7 @@ Esto provee un cambio suave de 220ms sin complejidad adicional.
 | Pieza | Archivo | Función |
 |---|---|---|
 | CSS keyframes | `styles/motion/_view-transitions.scss` | `vt-page-out`, `vt-page-in` |
-| `view-transition-name` | `app-shell.component.ts` → `.shell-content` | Identifica el área animable |
+| `view-transition-name` | `app-shell.component.ts` → `<main>` | Identifica el área animable |
 | `withViewTransitions()` | `app.config.ts` | Activa la API para navegación |
 
 ## Tokens

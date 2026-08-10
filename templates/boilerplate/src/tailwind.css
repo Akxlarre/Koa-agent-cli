@@ -22,6 +22,9 @@
    design system. Ejemplo: class="text-brand bg-surface p-4"  */
 
 @theme {
+  /* Genera la utilidad `text-2xs` (10px) a partir del token de la escala. */
+  --text-2xs: var(--text-2xs);
+
   /* ── Colores de marca ── */
   --color-brand: var(--ds-brand);
   --color-brand-hover: var(--color-primary-hover);

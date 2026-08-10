@@ -13,7 +13,7 @@
    
    Requiere:
      - `withViewTransitions()` en app.config.ts
-     - `view-transition-name: main-content` en .shell-content
+     - `view-transition-name: main-content` en el `<main>` del app-shell
    ============================================================ */
 
 /* ── 1. ROOT — Sidebar y topbar estáticos ─────────────────── */

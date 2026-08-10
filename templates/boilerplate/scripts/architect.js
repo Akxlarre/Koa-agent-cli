@@ -34,6 +34,11 @@ import { parseThemeTokens, findDeadTokenClasses, findForbiddenThemeAliases } fro
 import { kebabToPascal, collectUsedIcons, parseRegisteredIcons } from './lib/icon-registry.js';
 import { findIconOnlyButtonsWithoutLabel } from './lib/a11y-guardrails.js';
 import { findReservedTailwindClassCollisions } from './lib/tailwind-bare-utilities.js';
+import {
+    isPillWhitelisted, isTypographyWhitelisted,
+    findAdhocPills, findButtonSizeOverrides, findArbitraryTextSizes, findAdhocTypography,
+    buildBaseline, compareWithBaseline,
+} from './lib/class-discipline.js';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -74,6 +79,26 @@ const RULES = {
         name: 'DS class collides with bare Tailwind utility',
         doc: '.claude/rules/visual-system.md',
         fix: 'Renombra la clase del design system: Tailwind genera su propia regla homónima en @layer utilities y se SUMA a la tuya (no la reemplaza).',
+    },
+    'ARCH-15': {
+        name: 'Ad-hoc pill/badge',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Usa el componente de badge del proyecto en vez de recomponer rounded-full + micro-texto + px- a mano.',
+    },
+    'ARCH-16': {
+        name: 'Size utilities over btn-*',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'No pises el tamaño de un .btn-* con px-/py-/text-*/rounded-*. Si hace falta otra medida, es una variante del DS.',
+    },
+    'ARCH-17': {
+        name: 'Arbitrary font size',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Reemplaza text-[NNpx] por un token de la escala tipográfica.',
+    },
+    'ARCH-19': {
+        name: 'Ad-hoc typography cluster',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Usa .micro-label / .item-title / .section-eyebrow / .kpi-value en vez de recomponer el cluster de utilities.',
     },
     'A11Y-03': {
         name: 'Icon-only button without accessible name',
@@ -162,6 +187,72 @@ try {
 // app.config.ts. Un icono usado y no registrado revienta en runtime, no compila mal.
 const iconsUsed = new Set();
 const iconDynamicFiles = new Set();
+
+// ─── ARCH-15/16/17/19: disciplina de clases del DS, con ratchet ───────────────
+// El baseline registra la deuda tolerada por archivo. Solo se reporta una
+// REGRESIÓN (un archivo supera su cuota); así el proyecto solo puede mejorar.
+// Tras limpiar deuda, re-baselinear con `npm run lint:arch -- --update-ds-baseline`.
+const DS_BASELINE_PATH = path.join(process.cwd(), 'scripts', 'lib', 'class-discipline.baseline.json');
+const UPDATE_DS_BASELINE = process.argv.includes('--update-ds-baseline');
+const dsCounts = {
+    'ARCH-15': new Map(),
+    'ARCH-16': new Map(),
+    'ARCH-17': new Map(),
+    'ARCH-19': new Map(),
+};
+
+function trackClassDiscipline(filePath, content) {
+    const rel = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+    const add = (rule, count, sample) => {
+        if (count === 0) return;
+        dsCounts[rule].set(rel, { count, sample });
+    };
+
+    if (!isPillWhitelisted(rel)) {
+        const pills = findAdhocPills(content);
+        add('ARCH-15', pills.length, pills[0]);
+    }
+
+    const overrides = findButtonSizeOverrides(content);
+    add('ARCH-16', overrides.length,
+        overrides[0] ? `${overrides[0].attr} (→ ${overrides[0].offenders.join(', ')})` : undefined);
+
+    const sizes = findArbitraryTextSizes(content);
+    add('ARCH-17', sizes.length, [...new Set(sizes)].join(', '));
+
+    if (!isTypographyWhitelisted(rel)) {
+        const clusters = findAdhocTypography(content);
+        add('ARCH-19', clusters.length, [...new Set(clusters)].join(', '));
+    }
+}
+
+function checkClassDiscipline() {
+    if (UPDATE_DS_BASELINE) {
+        fs.writeFileSync(DS_BASELINE_PATH, JSON.stringify(buildBaseline(dsCounts), null, 2) + '\n');
+        console.log(cyan, `   ℹ Baseline de disciplina DS regenerado: ${DS_BASELINE_PATH}`);
+        return;
+    }
+
+    let baseline = null;
+    try {
+        baseline = JSON.parse(fs.readFileSync(DS_BASELINE_PATH, 'utf-8'));
+    } catch {
+        // Sin baseline, tolerancia cero: cualquier hallazgo es regresión.
+        baseline = { rules: {} };
+    }
+
+    const { regressions, currentTotal, baselineTotal, improved } = compareWithBaseline(dsCounts, baseline);
+
+    for (const r of regressions) {
+        reportError(r.rule, r.file,
+            `Disciplina de clases del DS: ${r.was} tolerado(s) → ${r.now} ahora${r.sample ? `. Ej: ${r.sample}` : ''}`);
+    }
+
+    if (improved && baselineTotal > 0) {
+        console.log(cyan,
+            `   ℹ El backlog de disciplina DS bajó (${baselineTotal} → ${currentTotal}). Corre 'npm run lint:arch -- --update-ds-baseline' para fijar la mejora.`);
+    }
+}
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
 
@@ -408,6 +499,7 @@ function analyzeTemplate(filePath) {
 function analyzeTemplateContent(content, filePath) {
 
     reportDeadTokenClasses(filePath, content);
+    trackClassDiscipline(filePath, content);
 
     // ICON-01: acumular iconos usados. Los `[name]` dinámicos no son
     // verificables estáticamente, así que se cuentan aparte y solo se informa.
@@ -518,6 +610,9 @@ for (const dir of targetDirs) {
 }
 
 // ─── Checks globales (una sola vez, no por archivo) ──────────────────────────
+
+// ARCH-15/16/17/19: ratchet de disciplina DS.
+checkClassDiscipline();
 
 // ARCH-22: una clase del DS que se llama igual que una utilidad "pelada" de
 // Tailwind. Tailwind genera SU regla homónima en @layer utilities y se SUMA a

@@ -40,6 +40,10 @@ process.stdin.on('end', () => {
       />\s*.*src\/app\/.*\.(?:ts|html|scss)/,
       /(?:cat|echo|printf|tee)\b[^|]*>\s*.*supabase\/migrations\/.*\.sql/,
       />\s*.*supabase\/migrations\/.*\.sql/,
+      // `touch` crea el archivo sin redirección — es la vía más directa de
+      // saltarse el guard, así que se bloquea explícitamente.
+      /\btouch\b[^|]*src\/app\/.*\.(?:ts|html|scss)/,
+      /\btouch\b[^|]*supabase\/migrations\/.*\.sql/,
     ];
 
     for (const pattern of fileCreationPatterns) {

@@ -41,17 +41,26 @@ El color de marca `var(--ds-brand)` debe aparecer en **máximo 3 elementos por v
 - Fondos de sección completos con el brand color (usar `.surface-hero` en su lugar)
 - Más de 1 elemento puramente decorativo de marca por viewport
 
-## Tipografía de Datos — KPI (OBLIGATORIO)
+## Vocabulario tipográfico (OBLIGATORIO)
 
-En componentes con datos numéricos (KPIs, métricas, estadísticas):
-- **OBLIGATORIO** `.kpi-value` para el número principal (reemplaza `text-4xl font-bold`)
-- **OBLIGATORIO** `.kpi-label` para la etiqueta descriptiva (reemplaza `text-xs uppercase`)
-- Combinar con `.card-tinted` para máximo contraste visual
+Cuatro clases cubren el 90% de la tipografía de la app. **Usarlas siempre en lugar de recomponer
+utilities de Tailwind** — cada recomposición a mano es un punto de divergencia. En un proyecto
+real esta regla nació después de encontrar 221 micro-labels escritos a mano en 25 variantes
+distintas, con 14 archivos mezclando varias entre sí.
+
+| Clase | Qué es | Reemplaza a |
+|---|---|---|
+| `.kpi-value` | Número KPI principal | `text-4xl font-bold` |
+| `.micro-label` | **Micro-label uppercase** — label de KPI, cabecera de grupo, título de columna, etiqueta de campo en lectura | `text-xs uppercase tracking-* font-* text-text-muted` |
+| `.item-title` | Título de fila / card / ítem de lista | `text-sm font-semibold text-text-primary` |
+| `.section-eyebrow` | Línea de contexto **legible** antes de un título (sin uppercase) | `text-sm text-text-secondary` |
+
+Combinar con `.card-tinted` para máximo contraste visual en KPIs.
 
 ```html
 <!-- CORRECTO -->
 <div class="card-tinted">
-  <span class="kpi-label">Usuarios activos</span>
+  <span class="micro-label">Usuarios activos</span>
   <span class="kpi-value">24.8K</span>
 </div>
 
@@ -61,6 +70,54 @@ En componentes con datos numéricos (KPIs, métricas, estadísticas):
   <p class="text-4xl font-bold">24.8K</p>
 </div>
 ```
+
+> **`.kpi-label` es un alias deprecado de `.micro-label`.** Sigue funcionando; no usarla en
+> código nuevo.
+>
+> **`.micro-label` no tiene restricción de alcance** — es para cualquier micro-label en
+> mayúsculas, no solo para KPIs. Restringirla a datos numéricos es precisamente lo que empuja a
+> la gente a recomponer la clase a mano cuando la necesita en otro contexto.
+>
+> ⚠️ **No nombrar una clase del DS igual que una utility "bare" de Tailwind.** Esta clase se
+> llamó `.overline` hasta que se detectó la colisión: `overline` es también una utilidad nativa
+> de Tailwind (`text-decoration-line: overline`), así que Tailwind generaba su propia regla en
+> `@layer utilities` que **se sumaba** (no reemplazaba) al estilo del DS, dibujando una línea
+> física encima del texto. Renombrar fue la única forma de eliminarla de raíz.
+>
+> La distinción que **sí** importa es `.micro-label` (uppercase, micro, `text-muted`) vs
+> `.section-eyebrow` (`text-sm`, natural, `text-secondary`): la primera etiqueta un dato, la
+> segunda da contexto legible antes de un título.
+
+## Skeletons y Estados de Carga (OBLIGATORIO)
+
+Patrón estricto de **Single-Component Skeleton**, para evitar componentes duplicados y Layout
+Shift (CLS).
+
+- **PROHIBIDO** crear componentes separados tipo `*-skeleton.component.ts`. Si el skeleton vive
+  aparte, se desincroniza en silencio cuando el componente real cambia de estructura — y el
+  layout shift vuelve sin que nadie lo note.
+- **OBLIGATORIO** resolver el skeleton dentro del mismo componente: todo componente que cargue
+  datos acepta un input `loading` y renderiza el placeholder con `@if (loading())`.
+- **OBLIGATORIO** usar `<app-skeleton-block>` para los placeholders — usa
+  `GsapAnimationsService.createShimmer()` automáticamente. No usar `@keyframes` CSS para brillos.
+- Marcar el contenedor con `[attr.aria-busy]` mientras carga.
+
+```html
+<!-- CORRECTO — dentro del propio componente -->
+<div class="card card-tinted" [attr.aria-busy]="loading() ? 'true' : null">
+  @if (loading()) {
+    <app-skeleton-block variant="text" width="55%" height="12px" />
+  } @else {
+    <span class="micro-label">{{ label() }}</span>
+  }
+</div>
+```
+
+> ⚠️ **Trampa conocida:** si el componente anima algo con `viewChild.required()`, pasar a
+> skeleton interno lo rompe — durante la carga ese elemento no existe en el DOM y
+> `viewChild.required()` lanza. Usar `viewChild()` sin `required` y disparar la animación desde
+> un `effect()` que espere a que el elemento aparezca. Ver `kpi-card.component.ts` como
+> referencia.
 
 ## Superficies Activas (OBLIGATORIO)
 

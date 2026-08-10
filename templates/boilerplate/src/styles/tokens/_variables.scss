@@ -542,6 +542,21 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* .micro-label — Micro-label uppercase.
+   Label de KPI, cabecera de grupo, título de columna, etiqueta de campo en lectura.
+   NO tiene restricción de alcance: sirve para cualquier micro-label en mayúsculas.
+   Reemplaza a: text-xs uppercase tracking-* font-* text-text-muted */
+.micro-label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* DEPRECADO — alias de .micro-label. No usar en código nuevo. */
 .kpi-label {
   font-family: var(--font-body);
   font-size: var(--text-xs);
@@ -550,6 +565,28 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* .item-title — Título de fila / card / ítem de lista.
+   Reemplaza a: text-sm font-semibold text-text-primary */
+.item-title {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-snug);
+  color: var(--text-primary);
+}
+
+/* .section-eyebrow — Línea de contexto LEGIBLE antes de un título (sin uppercase).
+   La distinción con .micro-label importa: micro-label etiqueta un dato,
+   section-eyebrow da contexto legible.
+   Reemplaza a: text-sm text-text-secondary */
+.section-eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-regular);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
 }
 
 /* ── Jerarquía de Superficies ────────────────────────────────

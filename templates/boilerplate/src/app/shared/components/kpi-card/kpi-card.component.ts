@@ -2,19 +2,20 @@ import {
   Component,
   ChangeDetectionStrategy,
   ElementRef,
-  afterNextRender,
   computed,
+  effect,
   inject,
   input,
   viewChild,
 } from '@angular/core';
 import { GsapAnimationsService } from '@core/services/gsap-animations.service';
 import { IconComponent } from '../icon/icon.component';
+import { SkeletonBlockComponent } from '../skeleton-block/skeleton-block.component';
 
 /**
  * KpiCardComponent — Molécula de métrica (KPI).
  *
- * Dumb component que combina .kpi-value + .kpi-label + trend indicator + animateCounter().
+ * Dumb component que combina .kpi-value + .micro-label + trend indicator + animateCounter().
  * Úsalo dentro de un bento-grid para construir dashboards de nivel premium.
  *
  * La animación del contador va de 0 al valor final en 1.2s (power2.out).
@@ -54,14 +55,23 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-kpi-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent],
+  imports: [IconComponent, SkeletonBlockComponent],
   template: `
     <div
       class="card card-tinted flex flex-col gap-2 h-full"
       [class.card-accent]="accent()"
+      [attr.aria-busy]="loading() ? 'true' : null"
+      [attr.aria-label]="loading() ? 'Cargando métrica' : null"
     >
+      @if (loading()) {
+        <!-- Skeleton interno — misma estructura que el estado cargado, sin layout shift.
+             NO extraer a un *-skeleton.component.ts: ver visual-system.md. -->
+        <app-skeleton-block variant="text" width="55%" height="12px" />
+        <app-skeleton-block width="70%" height="44px" />
+        <app-skeleton-block variant="text" width="40%" height="14px" />
+      } @else {
       <!-- Etiqueta descriptiva -->
-      <span class="kpi-label">{{ label() }}</span>
+      <span class="micro-label">{{ label() }}</span>
 
       <!-- Valor principal — animado por GSAP al montar -->
       <p class="kpi-value flex items-baseline gap-0.5">
@@ -94,6 +104,7 @@ import { IconComponent } from '../icon/icon.component';
           }
         </div>
       }
+      }
     </div>
   `,
 })
@@ -101,7 +112,7 @@ export class KpiCardComponent {
   /** Valor numérico principal. Se anima desde 0 al montar. */
   readonly value = input.required<number>();
 
-  /** Etiqueta descriptiva del KPI (ej: "Usuarios activos"). Se muestra en .kpi-label. */
+  /** Etiqueta descriptiva del KPI (ej: "Usuarios activos"). Se muestra en .micro-label. */
   readonly label = input.required<string>();
 
   /** Sufijo del valor (ej: '%', 'K', ' hrs'). Aparece fuera del contador animado. */
@@ -125,6 +136,12 @@ export class KpiCardComponent {
    * Solo 1 card-accent por sección bento. Default: false.
    */
   readonly accent = input<boolean>(false);
+
+  /**
+   * true mientras el Facade carga. Renderiza el skeleton interno en lugar del contenido.
+   * Patrón Single-Component Skeleton: NUNCA crear un `*-skeleton.component.ts` aparte.
+   */
+  readonly loading = input<boolean>(false);
 
   // ── Señales derivadas del trend ───────────────────────────────────────────
 
@@ -152,15 +169,22 @@ export class KpiCardComponent {
 
   // ── GSAP counter ──────────────────────────────────────────────────────────
 
-  private readonly valueEl = viewChild.required<ElementRef<HTMLElement>>('valueEl');
+  // viewChild NO required: mientras loading() es true el span no existe en el DOM.
+  private readonly valueEl = viewChild<ElementRef<HTMLElement>>('valueEl');
   private readonly gsap = inject(GsapAnimationsService);
 
+  /** Evita re-animar el contador en cada cambio de detección. */
+  private hasAnimated = false;
+
   constructor() {
-    // afterNextRender: garantiza que el elemento está en el DOM antes de animar.
+    // El effect se re-ejecuta cuando el span aparece al pasar de loading→cargado.
     // GsapAnimationsService.animateCounter() respeta prefers-reduced-motion.
-    afterNextRender(() => {
+    effect(() => {
+      const el = this.valueEl();
+      if (!el || this.hasAnimated) return;
+      this.hasAnimated = true;
       this.gsap.animateCounter(
-        this.valueEl().nativeElement,
+        el.nativeElement,
         this.value(),
         // El suffix se omite aquí porque se renderiza fuera del span animado.
         // Esto evita duplicar el sufijo durante la animación.

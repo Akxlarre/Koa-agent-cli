@@ -18,7 +18,6 @@ import { CardHoverDirective } from "@core/directives/card-hover.directive";
 import { AnimateInDirective } from "@core/directives/animate-in.directive";
 import { IconComponent } from "@shared/components/icon/icon.component";
 import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component";
-import { KpiCardSkeletonComponent } from "@shared/components/kpi-card/kpi-card-skeleton.component";
 import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skeleton-block.component";
 
 /**
@@ -64,7 +63,6 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
     AnimateInDirective,
     IconComponent,
     KpiCardComponent,
-    KpiCardSkeletonComponent,
     SkeletonBlockComponent,
   ],
   template: `
@@ -139,25 +137,22 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
       </div>
 
       <!-- ── KPIs — 4 métricas en celdas square ──────────────────────
-           app-kpi-card encapsula: .kpi-value + .kpi-label + trend + animateCounter()
+           app-kpi-card encapsula: .kpi-value + .micro-label + trend + animateCounter()
            Solo 1 card-accent por sección bento → va en la primera KPI.
       ──────────────────────────────────────────────────────────── -->
       @for (kpi of kpis(); track kpi.id) {
         <div class="bento-square" appCardHover>
-          @if (loading()) {
-            <app-kpi-card-skeleton />
-          } @else {
-            <app-kpi-card
-              [label]="kpi.label"
-              [value]="kpi.value"
-              [suffix]="kpi.suffix ?? ''"
-              [prefix]="kpi.prefix ?? ''"
-              [trend]="kpi.trend"
-              [trendLabel]="kpi.trendLabel ?? ''"
-              [accent]="kpi.accent ?? false"
-              appAnimateIn
-            />
-          }
+          <app-kpi-card
+            [label]="kpi.label"
+            [value]="kpi.value"
+            [suffix]="kpi.suffix ?? ''"
+            [prefix]="kpi.prefix ?? ''"
+            [trend]="kpi.trend"
+            [trendLabel]="kpi.trendLabel ?? ''"
+            [accent]="kpi.accent ?? false"
+            [loading]="loading()"
+            appAnimateIn
+          />
         </div>
       }
 

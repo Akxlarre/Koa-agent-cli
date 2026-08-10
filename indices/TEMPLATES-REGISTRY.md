@@ -25,12 +25,15 @@
 | Ruta en templates/.claude/ | Destino | Propósito |
 |---|---|---|
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (8 hooks activos). |
+| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (12 hooks cableados). |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 8 hooks de guardrails (ver tabla de hooks abajo). |
+| `templates/.claude/author.local.json.example` | `.claude/author.local.json.example` | Plantilla del código de autor (una letra) para la capa multi-dev del SDD. Se copia a `author.local.json`, que va gitignored. |
+| `templates/.claude/commands/` | `.claude/commands/` | 11 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/assign-*` (3). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 12 hooks de guardrails, incl. `sdd/` (ver tabla de hooks abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 12 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 7 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices). |
+| `templates/.claude/skills/` | `.claude/skills/` | 12 skills (ver tabla de skills abajo). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
+| `templates/.claude/tests/` | `.claude/tests/` | Contract tests de los hooks (`npm run claude:test-hooks`). 23 tests. |
 
 ## Adapters de AI tools (condicional)
 
@@ -53,8 +56,9 @@
 | `templates/boilerplate/src/app/core/repositories/profiles.repository.spec.ts` | `src/app/core/repositories/profiles.repository.spec.ts` | Tests de ProfilesRepository: query chain, findById encontrado/null/error. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/shared/components/error-state/error-state.component.ts` | `src/app/shared/components/error-state/error-state.component.ts` | Estado de error unificado para Facades. Envuelve `app-alert-card severity="error"` con output `(retry)`. Conectar a `facade.retryLoad()`. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/shared/components/error-state/error-state.component.spec.ts` | `src/app/shared/components/error-state/error-state.component.spec.ts` | Tests: creación, renderizado de message, título default, emit retry al clic. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/utils/request-guard.utils.ts` | `src/app/core/utils/request-guard.utils.ts` | `createRequestGuard()`: descarta respuestas de red fuera de orden en Facades con filtro variable. Ver `facades.md` §9. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/` | `src/` | Código Angular inicial: layout, auth, dashboard, shared components | Siempre en Full Scaffold |
-| `templates/boilerplate/scripts/` | `scripts/` | indices-sync.js, lint-arch-wrapper.js, architect.js, set-env.js | Siempre en Full Scaffold |
+| `templates/boilerplate/scripts/` | `scripts/` | indices-sync.js, lint-arch-wrapper.js, architect.js, set-env.js, assignments-sync.js, assignments-audit.js | Siempre en Full Scaffold |
 | `templates/boilerplate/vitest.config.ts` | `vitest.config.ts` | Config de Vitest (reemplaza Karma) | Siempre en Full Scaffold |
 | `templates/boilerplate/postcss.config.json` | `postcss.config.json` | PostCSS para Tailwind v4 (.json obligatorio — Angular ignora .js/.mjs) | Siempre en Full Scaffold |
 | `templates/boilerplate-e2e/` | `e2e/` + `playwright.config.ts` | Tests E2E con Playwright | `--with-e2e` |
@@ -72,7 +76,30 @@
 | `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos modificados en session-writes.json | — |
 | `sync-check.js` | Stop | Verifica si los índices necesitan actualización al cerrar sesión | write-tracker JSON |
 | `context-guardian.js` | Stop | Audita frescura de context/: brief.md >7d y learnings.md >14d sin actualizar | — |
+| `harness-gate.js` | PreToolUse (Edit/Write) | Gobierna ediciones a superficies de guía (`.claude/rules/`, `indices/ANTI-PATTERNS.md`, `context/learnings.md`, `CLAUDE.md`) y a scripts de capacidad: exige principios reutilizables, no parches de un track | — |
+| `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escrituras en código de producto si no hay spec activa con plan. **Fail-open**: sin carpeta `specs/` no bloquea nada | `specs/.active` |
+| `sdd/plan-injector.js` | PreToolUse (Edit/Write) | Inyecta la spec + plan activos como contexto en cada edición | `specs/.active` |
+| `sdd/hotfix-autoclose.js` | Stop | Cierra automáticamente los tracks `hotfix-*` al terminar la sesión | `specs/.active` |
+| `context-enrichment-guard.js` | — (**OPT-IN**, no cableado) | Day 0 Context Guard: bloquea escribir código si `context/domain.md` o `indices/DATABASE.md` siguen vacíos. No viene activo porque bloquearía un proyecto recién generado | `context/domain.md` |
 | `post-edit.js` (scripts/) | PostToolUse (Edit/Write) | Corre Prettier automáticamente tras cada escritura | — |
+
+## Skills en templates/.claude/skills/
+
+| Skill | Propósito |
+|---|---|
+| `angular-component` | Crear/refactorizar componentes standalone v20+ |
+| `angular-signals` | Estado reactivo con Signals |
+| `angular-forms` | Formularios (Signal Forms / Reactive Forms) |
+| `angular-primeng` | Uso correcto de componentes PrimeNG |
+| `design-system` | Tokens, Frosted Cards, Bento Grid, dark mode |
+| `supabase-data-model` | Tablas, migraciones, RLS |
+| `sync-indices` | Sincronizar índices al cerrar sesión |
+| `sdd` | **Spec-Driven Development**: ciclo spec → plan → tasks → acceptance + capa de Asignaciones. Stack-agnóstico |
+| `verify` | Verificación visual real vía Playwright MCP (login, consola, red, detección de mocks) |
+| `form-ux` | Patrones de UX en formularios |
+| `grill_me` | Interroga una propuesta antes de volverla spec (Critic Loop) |
+| `harness-feedback` | Capturar fricción del harness para mejorarlo |
+| `writing-great-skills` | Meta-skill: cómo escribir skills |
 
 ## Reglas en templates/.claude/rules/
 

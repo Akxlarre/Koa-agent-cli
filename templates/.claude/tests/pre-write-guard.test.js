@@ -9,9 +9,25 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { execSync, spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const HOOK = path.resolve(__dirname, '..', 'hooks', 'pre-write-guard.js');
+
+// El Discovery Gate corre ANTES que el Architect Guard y bloquea toda escritura
+// mientras no exista el flag de discovery de la sesión. Sin levantarlo, cada test
+// del Architect Guard recibiría el mensaje del Discovery Gate en vez del esperado.
+// Usamos una sesión fija por corrida y creamos su flag una sola vez.
+const TEST_SESSION_ID = 'koa-test-session';
+
+function seedDiscoveryFlag() {
+  const flagPath = path.join(os.tmpdir(), `koa-discovery-${TEST_SESSION_ID}.flag`);
+  fs.writeFileSync(flagPath, 'indices/COMPONENTS.md\n');
+  return flagPath;
+}
+
+seedDiscoveryFlag();
 
 /**
  * Ejecuta el hook con un TOOL_INPUT simulado.
@@ -22,7 +38,7 @@ function runHook(input) {
   const result = spawnSync('node', [HOOK], {
     input: JSON.stringify(input),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: 'test-session-' + Date.now() }
+    env: { ...process.env, CLAUDE_SESSION_ID: TEST_SESSION_ID }
   });
   return {
     exitCode: result.status,
@@ -119,7 +135,7 @@ describe('ARCHITECT GUARD — A11Y', () => {
   });
 
   test('permite <app-icon> con aria-label', () => {
-    const r = runHook(makeInput(htmlPath, '<app-icon name="trash" [attr.aria-label]="'Eliminar'" />'));
+    const r = runHook(makeInput(htmlPath, `<app-icon name="trash" [attr.aria-label]="'Eliminar'" />`));
     // No debe bloquear por A11Y-01
     assert.ok(r.exitCode !== 2 || !r.stderr.includes('A11Y-01'));
   });

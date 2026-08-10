@@ -31,8 +31,8 @@ describe("KpiCardComponent", () => {
     expect(component).toBeTruthy();
   });
 
-  it("should render .kpi-label with the label text", () => {
-    const el = fixture.nativeElement.querySelector(".kpi-label");
+  it("should render .micro-label with the label text", () => {
+    const el = fixture.nativeElement.querySelector(".micro-label");
     expect(el?.textContent?.trim()).toBe("Usuarios activos");
   });
 

@@ -164,3 +164,94 @@ El Facade es el **único lugar** donde se permite transformar un DTO de base de 
 - Crear un UI Model sería duplicar exactamente la misma estructura sin valor agregado
 
 > **Regla de oro:** No crees modelos de UI por burocracia. El objetivo es claridad, no capas artificiales.
+
+## 8. Reactividad: el `effect()` vive en el Smart Component, NO en el Facade
+
+**PROHIBIDO** poner `effect()` dentro de un Facade para auto-recargar datos cuando cambia un
+filtro global. La reactividad es responsabilidad del Smart Component, que tiene ciclo de vida
+acotado:
+
+```typescript
+// ✅ CORRECTO — en el Smart Component (features/)
+export class ProductosComponent {
+  private facade = inject(ProductosFacade);
+  private scope = inject(ScopeFacade);
+
+  constructor() {
+    // Se re-ejecuta cada vez que cambia el scope activo
+    effect(() => {
+      const _ = this.scope.selectedId(); // tracking
+      this.facade.initialize();
+    });
+  }
+}
+
+// ❌ INCORRECTO — effect() dentro del Facade
+@Injectable({ providedIn: 'root' })
+export class ProductosFacade extends BaseFacade<Producto[]> {
+  constructor() {
+    super();
+    effect(() => this.initialize()); // ← singleton, nunca se destruye, imposible de testear
+  }
+}
+```
+
+## 9. Guard contra respuestas fuera de orden (`requestId`)
+
+Como el `effect()` del Smart Component puede disparar cargas varias veces seguidas (el usuario
+cambiando de filtro rápido, o un `refreshSilently()` post-mutación solapándose con una carga en
+curso), una respuesta de red vieja puede llegar **después** de una más nueva y pisar el estado
+con datos que ya no corresponden al filtro vigente — sin ningún error visible.
+
+Todo Facade cuyo `fetchData()` dependa de un filtro que el usuario puede cambiar debe protegerse
+con `createRequestGuard()` (`@core/utils/request-guard.utils`):
+
+```typescript
+import { createRequestGuard } from '@core/utils/request-guard.utils';
+
+@Injectable({ providedIn: 'root' })
+export class ProductosFacade extends BaseFacade<Producto[]> {
+  private supabase = inject(SupabaseService);
+  // Un guard por cada método que aplique resultados a signals.
+  private readonly guard = createRequestGuard();
+
+  protected override async fetchData(): Promise<Producto[]> {
+    const token = this.guard.next();          // token de ESTA llamada, antes del await
+    const { data, error } = await this.supabase.client.from('productos').select();
+    if (error) throw error;                    // el error de la fetch vigente nunca se enmascara
+
+    // Si ya se disparó una fetch más reciente mientras esta esperaba, descartar.
+    if (!this.guard.isCurrent(token)) return this.data() ?? [];
+
+    return data ?? [];
+  }
+}
+```
+
+- El `next()` se pide **al inicio** del método, antes del `await` de red — así protege por igual
+  la carga inicial, la re-entrada SWR y el refresh post-mutación.
+- El chequeo `isCurrent()` va **justo antes** de aplicar el resultado, nunca antes del
+  `throw error`.
+- Un Facade con varios métodos de fetch independientes usa **un guard por método**, no uno
+  compartido.
+
+## 10. Facades con scope de tenant
+
+Cuando el proyecto es multi-tenant (multi-sede, multi-hogar, multi-organización), cada Facade
+declara explícitamente si filtra por el tenant activo o tiene su propio scope. Documentá esa
+decisión en `indices/FACADES.md` con una tabla:
+
+| Facade | Scope | Campo a filtrar |
+|---|---|---|
+| `ProductosFacade` | tenant | `productos.tenant_id` |
+| `NotificacionesFacade` | usuario | `recipient_id` del usuario autenticado |
+| `AuthFacade` | ninguno | opera sobre el usuario actual |
+
+- El `id` del tenant activo vive en **un solo** Facade de scope (ej. `ScopeFacade`), nunca
+  duplicado en cada Facade de dominio.
+- **PROHIBIDO** redefinir la interfaz del tenant localmente dentro de un Facade: vive en
+  `@core/models/`.
+- Un Facade con scope de tenant **siempre** necesita el guard de la sección 9: cambiar de tenant
+  es precisamente el caso que produce respuestas fuera de orden.
+- El filtro por tenant en el cliente **no reemplaza RLS**. La política de Row Level Security en
+  Supabase es la frontera de seguridad real; el filtro del Facade es solo UX. Ver `database.md`.

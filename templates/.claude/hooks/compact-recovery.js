@@ -106,26 +106,19 @@ for (const cf of CONTEXT_FILES) {
 
   const raw = fs.readFileSync(fullPath, 'utf-8').trim();
   // Saltar archivos que son solo plantilla (sin contenido real)
-  const stripped = raw.replace(/<!--[sS]*?-->/g, '').trim();
+  const stripped = raw.replace(/<!--[\s\S]*?-->/g, '').trim();
   if (stripped.length < 80) continue;
 
   if (!contextAdded) {
-    output += '─── Contexto del proyecto (context/) ───
-
-';
+    output += '─── Contexto del proyecto (context/) ───\n\n';
     contextAdded = true;
   }
-  output += '--- ' + cf.label + ' ---
-';
-  output += raw + '
-
-';
+  output += '--- ' + cf.label + ' ---\n';
+  output += raw + '\n\n';
 }
 
 if (contextAdded) {
-  output += '─── Fin contexto del proyecto ───
-
-';
+  output += '─── Fin contexto del proyecto ───\n\n';
 }
 
 process.stdout.write(output);

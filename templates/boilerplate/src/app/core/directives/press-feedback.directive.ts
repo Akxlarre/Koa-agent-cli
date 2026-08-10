@@ -40,7 +40,12 @@ export class PressFeedbackDirective {
           ? this.gsap.addPressFeedback(this.el.nativeElement)
           : this.gsap.addInteractiveFeedback(this.el.nativeElement);
 
-      this.destroyRef.onDestroy(() => cleanup());
+      // Defensivo: si el servicio está mockeado sin honrar el contrato
+      // (los métodos add* devuelven una función de cleanup), destruir la vista
+      // lanzaría "cleanup is not a function" y tumbaría el test entero.
+      if (typeof cleanup === 'function') {
+        this.destroyRef.onDestroy(cleanup);
+      }
     });
   }
 }

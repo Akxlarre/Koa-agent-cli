@@ -15,7 +15,7 @@ describe("AlertCardComponent", () => {
   let fixture: ComponentFixture<AlertCardComponent>;
   let component: AlertCardComponent;
 
-  const gsapMock = { addPressFeedback: vi.fn() };
+  const gsapMock = { addPressFeedback: vi.fn(() => () => {}) };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({

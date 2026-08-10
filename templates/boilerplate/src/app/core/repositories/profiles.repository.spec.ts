@@ -23,16 +23,24 @@ describe('ProfilesRepository', () => {
   let repo: ProfilesRepository;
   let clientMock: ReturnType<typeof buildClientMock>;
 
+  /**
+   * Configura el TestBed con un mock de cliente y devuelve el repo.
+   *
+   * `TestBed.overrideProvider()` NO sirve una vez que el módulo fue instanciado
+   * (y `TestBed.inject()` lo instancia), así que los tests que necesitan otro
+   * mock resetean el módulo y lo reconfiguran desde cero con este helper.
+   */
+  function configureWith(db: unknown): ProfilesRepository {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{ provide: SupabaseService, useValue: { db } }],
+    });
+    return TestBed.inject(ProfilesRepository);
+  }
+
   beforeEach(() => {
     clientMock = buildClientMock({ data: null });
-
-    TestBed.configureTestingModule({
-      providers: [
-        { provide: SupabaseService, useValue: { db: clientMock } },
-      ],
-    });
-
-    repo = TestBed.inject(ProfilesRepository);
+    repo = configureWith(clientMock);
   });
 
   it('should be created', () => {
@@ -60,8 +68,7 @@ describe('ProfilesRepository', () => {
     it('should return the profile data when found', async () => {
       const mockProfile = { display_name: 'Ada Lovelace', avatar_url: null, role: 'member' };
       clientMock = buildClientMock({ data: mockProfile });
-      TestBed.overrideProvider(SupabaseService, { useValue: { db: clientMock } });
-      repo = TestBed.inject(ProfilesRepository);
+      repo = configureWith(clientMock);
 
       const result = await repo.findById('user-123');
       expect(result).toEqual(mockProfile);
@@ -82,8 +89,7 @@ describe('ProfilesRepository', () => {
           }),
         }),
       };
-      TestBed.overrideProvider(SupabaseService, { useValue: { db: brokenClient } });
-      repo = TestBed.inject(ProfilesRepository);
+      repo = configureWith(brokenClient);
 
       const result = await repo.findById('user-123');
       expect(result).toBeNull();

@@ -1,7 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { vi } from 'vitest';
+import {
+  LucideAngularModule,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  X,
+} from 'lucide-angular';
 import { ErrorStateComponent } from './error-state.component';
+
+// ErrorState envuelve <app-alert-card severity="error">, que renderiza el icono
+// 'alert-circle'. Sin registrar los iconos, lucide lanza "icon has not been
+// provided by any available icon providers" y tumba el render.
+const ICONS = LucideAngularModule.pick({
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  X,
+});
 
 // Host stub para testear inputs y outputs
 @Component({
@@ -25,7 +44,7 @@ class HostComponent {
 
 describe('ErrorStateComponent', () => {
   it('should be created', () => {
-    TestBed.configureTestingModule({ imports: [ErrorStateComponent] });
+    TestBed.configureTestingModule({ imports: [ErrorStateComponent, ICONS] });
     const fixture = TestBed.createComponent(ErrorStateComponent);
     fixture.componentRef.setInput('message', 'Error de prueba');
     fixture.detectChanges();
@@ -33,7 +52,7 @@ describe('ErrorStateComponent', () => {
   });
 
   it('should render the message', () => {
-    TestBed.configureTestingModule({ imports: [ErrorStateComponent] });
+    TestBed.configureTestingModule({ imports: [ErrorStateComponent, ICONS] });
     const fixture = TestBed.createComponent(ErrorStateComponent);
     fixture.componentRef.setInput('message', 'Fallo de red');
     fixture.detectChanges();
@@ -41,7 +60,7 @@ describe('ErrorStateComponent', () => {
   });
 
   it('should use default title when not provided', () => {
-    TestBed.configureTestingModule({ imports: [ErrorStateComponent] });
+    TestBed.configureTestingModule({ imports: [ErrorStateComponent, ICONS] });
     const fixture = TestBed.createComponent(ErrorStateComponent);
     fixture.componentRef.setInput('message', 'Error');
     fixture.detectChanges();
@@ -49,7 +68,7 @@ describe('ErrorStateComponent', () => {
   });
 
   it('should emit retry when action is triggered', () => {
-    TestBed.configureTestingModule({ imports: [HostComponent] });
+    TestBed.configureTestingModule({ imports: [HostComponent, ICONS] });
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
 

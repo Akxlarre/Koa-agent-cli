@@ -8,7 +8,7 @@ describe("EmptyStateComponent", () => {
   let fixture: ComponentFixture<EmptyStateComponent>;
   let component: EmptyStateComponent;
 
-  const gsapMock = { addPressFeedback: vi.fn() };
+  const gsapMock = { addPressFeedback: vi.fn(() => () => {}) };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({

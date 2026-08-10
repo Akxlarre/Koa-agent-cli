@@ -196,4 +196,33 @@ $bp-lg: 1024px !default;
         max-width: 360px;
         margin: 0;
     }
+
+    /* ── 10. FULLSCREEN BUFFER ──────────────────────────────────
+       En modo pantalla completa (F11 / PWA) desaparece el chrome del
+       navegador y el shell queda pegado al borde superior de la pantalla.
+       Se recupera ese "aire" desde adentro del sidebar y el topbar, para
+       no romper la continuidad de sus fondos con un margen externo.
+       ───────────────────────────────────────────────────────── */
+    @media (display-mode: fullscreen) {
+
+        /* Sidebar: incrementa su padding superior interno */
+        app-sidebar nav {
+            padding-top: calc(var(--space-4) + var(--space-3)) !important;
+
+            @media (min-width: $bp-lg) {
+                padding-top: calc(var(--space-4) + var(--space-4)) !important;
+            }
+        }
+
+        /* Topbar: incrementa su altura total y añade padding superior */
+        app-topbar header {
+            height: calc(56px + var(--space-3)) !important;
+            padding-top: var(--space-3) !important;
+
+            @media (min-width: $bp-lg) {
+                height: calc(56px + var(--space-4)) !important;
+                padding-top: var(--space-4) !important;
+            }
+        }
+    }
 }

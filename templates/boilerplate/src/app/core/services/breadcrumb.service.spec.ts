@@ -41,8 +41,10 @@ describe("BreadcrumbService", () => {
     expect(service.breadcrumb().items.length).toBe(0);
   });
 
-  it("breadcrumb items should contain the matched menu label for '/settings'", async () => {
-    await router.navigateByUrl("/settings");
+  it("breadcrumb items should contain the matched menu label for '/app/settings'", async () => {
+    // Las rutas del menú viven bajo /app (ver MenuConfigService): navegar a
+    // '/settings' no matchea ninguna entrada y el breadcrumb sale vacío.
+    await router.navigateByUrl("/app/settings");
     const items = service.breadcrumb().items;
     expect(items.length).toBe(1);
     expect(items[0].label).toBe("Configuración");

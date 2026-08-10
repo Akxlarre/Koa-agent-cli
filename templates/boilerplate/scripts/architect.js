@@ -30,6 +30,11 @@ import { createRequire } from 'module';
 
 // TypeScript es una dependencia de Angular. Usamos createRequire para importar
 // el paquete CJS de TypeScript desde un contexto ESM de forma segura.
+import { parseThemeTokens, findDeadTokenClasses, findForbiddenThemeAliases } from './lib/theme-tokens.js';
+import { kebabToPascal, collectUsedIcons, parseRegisteredIcons } from './lib/icon-registry.js';
+import { findIconOnlyButtonsWithoutLabel } from './lib/a11y-guardrails.js';
+import { findReservedTailwindClassCollisions } from './lib/tailwind-bare-utilities.js';
+
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 
@@ -55,6 +60,31 @@ try {
 } catch { /* fail-open: usar defaults */ }
 
 const RULES = {
+    'ARCH-11': {
+        name: 'Dead token classes',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'La clase no existe en @theme (src/tailwind.css) — Tailwind no genera CSS para ella. Usa un token real o agrégalo al @theme.',
+    },
+    'ARCH-18': {
+        name: 'Forbidden bare aliases in @theme',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Un alias "pelado" en @theme colisiona con utilidades nativas de Tailwind. Renombra el token.',
+    },
+    'ARCH-22': {
+        name: 'DS class collides with bare Tailwind utility',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Renombra la clase del design system: Tailwind genera su propia regla homónima en @layer utilities y se SUMA a la tuya (no la reemplaza).',
+    },
+    'A11Y-03': {
+        name: 'Icon-only button without accessible name',
+        doc: '.claude/rules/a11y-spec.md',
+        fix: 'Un botón cuyo único contenido es un icono necesita aria-label (o texto visible con sr-only).',
+    },
+    'ICON-01': {
+        name: 'Icon used but not registered',
+        doc: '.claude/skills/design-system/SKILL.md',
+        fix: 'Agrega el icono al LucideAngularModule.pick({...}) de app.config.ts — si falta, lucide lanza en RUNTIME.',
+    },
     'ARCH-01': {
         name: 'No Supabase in UI',
         doc: 'docs/TECH-STACK-RULES.md#arch-01',
@@ -116,6 +146,22 @@ const targetDirs = [
 
 let errors = 0;
 let warnings = 0;
+
+// ─── @theme (ARCH-11 / ARCH-18) ───────────────────────────────────────────────
+// Vocabulario de clases válidas derivado de src/tailwind.css. Si no se puede
+// leer, los checks que dependen de él se saltan (fail-open).
+let THEME = null;
+try {
+    THEME = parseThemeTokens(path.join(process.cwd(), 'src', 'tailwind.css'));
+} catch {
+    THEME = null;
+}
+
+// ─── Iconos (ICON-01) ─────────────────────────────────────────────────────────
+// Se acumulan durante el barrido y se cruzan al final contra el pick() de
+// app.config.ts. Un icono usado y no registrado revienta en runtime, no compila mal.
+const iconsUsed = new Set();
+const iconDynamicFiles = new Set();
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
 
@@ -328,10 +374,50 @@ function analyzeTypeScript(filePath) {
     }
 }
 
+function reportDeadTokenClasses(filePath, content) {
+    if (!THEME) return;
+    const dead = findDeadTokenClasses(content, THEME);
+    if (dead.length === 0) return;
+    const detail = dead.map(d => (d.suggestion ? `${d.cls} → ${d.suggestion}` : d.cls)).join(', ');
+    reportWarning('ARCH-11', filePath, `Clases de token muertas (no existen en @theme, no generan CSS): ${detail}`);
+}
+
+/**
+ * Extrae el `template:` inline de un componente y le corre los mismos checks
+ * que a un .html. Sin esto, un proyecto 100% inline (como el boilerplate) pasa
+ * la auditoría de templates sin que se haya revisado una sola línea de markup.
+ */
+function analyzeInlineTemplate(filePath, content) {
+    const match = content.match(/template\s*:\s*`([\s\S]*?)`/);
+    if (match) analyzeTemplateContent(match[1], filePath);
+}
+
 // ─── Análisis de Templates HTML ─────────────────────────────────────────────
 
 function analyzeTemplate(filePath) {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    analyzeTemplateContent(fs.readFileSync(filePath, 'utf-8'), filePath);
+}
+
+/**
+ * Checks sobre markup, compartidos entre archivos .html y templates INLINE de .ts.
+ *
+ * El boilerplate usa `template:` inline en todos sus componentes y no tiene un
+ * solo .html, así que sin esta separación las reglas de template no auditaban
+ * absolutamente nada.
+ */
+function analyzeTemplateContent(content, filePath) {
+
+    reportDeadTokenClasses(filePath, content);
+
+    // ICON-01: acumular iconos usados. Los `[name]` dinámicos no son
+    // verificables estáticamente, así que se cuentan aparte y solo se informa.
+    const { statics, ternaryLiterals, dynamicCount } = collectUsedIcons(content);
+    for (const icon of [...statics, ...ternaryLiterals]) iconsUsed.add(icon);
+    if (dynamicCount > 0) iconDynamicFiles.add(filePath);
+
+    for (const icon of findIconOnlyButtonsWithoutLabel(content)) {
+        reportError('A11Y-03', filePath, `Botón cuyo único contenido es el icono "${icon}" y no tiene aria-label`);
+    }
 
     // ── Regla 6: Directivas deprecadas ──────────────────────────────────────
     const deprecatedDirectives = [
@@ -395,6 +481,7 @@ function scanDirectory(dir) {
         // TypeScript files (excluir specs del análisis de código)
         if (fullPath.endsWith('.ts') && !fullPath.endsWith('.spec.ts')) {
             analyzeTypeScript(fullPath);
+            analyzeInlineTemplate(fullPath, fs.readFileSync(fullPath, 'utf-8'));
 
             // ── Regla 3: TDD — Core Services y Facades deben tener .spec.ts ──
             const isCoreLogic =
@@ -428,6 +515,49 @@ function scanDirectory(dir) {
 
 for (const dir of targetDirs) {
     scanDirectory(dir);
+}
+
+// ─── Checks globales (una sola vez, no por archivo) ──────────────────────────
+
+// ARCH-22: una clase del DS que se llama igual que una utilidad "pelada" de
+// Tailwind. Tailwind genera SU regla homónima en @layer utilities y se SUMA a
+// la del design system en vez de reemplazarla — el síntoma es un estilo extra
+// que aparece de la nada (ej. `.overline` dibujando una línea sobre el texto).
+{
+    const scssPath = path.join(process.cwd(), 'src', 'styles', 'tokens', '_variables.scss');
+    try {
+        const scss = fs.readFileSync(scssPath, 'utf-8');
+        for (const cls of findReservedTailwindClassCollisions(scss)) {
+            reportError('ARCH-22', scssPath, `La clase .${cls} coincide con una utilidad bare reservada de Tailwind.`);
+        }
+    } catch { /* fail-open: si no existe el archivo, otro check lo señalará */ }
+}
+
+// ARCH-18: alias prohibidos dentro del propio @theme.
+{
+    const cssPath = path.join(process.cwd(), 'src', 'tailwind.css');
+    try {
+        const css = fs.readFileSync(cssPath, 'utf-8');
+        for (const alias of findForbiddenThemeAliases(css)) {
+            reportError('ARCH-18', cssPath, `Alias prohibido en @theme: ${alias}`);
+        }
+    } catch { /* fail-open */ }
+}
+
+// ICON-01: iconos usados en templates vs registrados en el pick() de app.config.
+// Un icono usado y no registrado NO rompe el build: lucide lanza en runtime.
+if (iconsUsed.size > 0) {
+    const appConfigPath = path.join(process.cwd(), 'src', 'app', 'app.config.ts');
+    try {
+        const registered = parseRegisteredIcons(fs.readFileSync(appConfigPath, 'utf-8'), ts);
+        const missing = [...iconsUsed].filter(i => !registered.has(kebabToPascal(i)));
+        if (missing.length > 0) {
+            reportError('ICON-01', appConfigPath, `Iconos usados en templates pero NO registrados: ${missing.join(', ')}`);
+        }
+        if (iconDynamicFiles.size > 0) {
+            console.log(cyan, `   ℹ ICON-01: ${iconDynamicFiles.size} archivo(s) usan [name] dinámico — no verificable estáticamente.`);
+        }
+    } catch { /* fail-open */ }
 }
 
 console.log('');

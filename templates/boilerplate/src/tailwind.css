@@ -42,6 +42,10 @@
   --color-text-disabled: var(--text-disabled);
 
   /* ── Bordes ── */
+  /* `border` a secas y `border-border`: sin estos mapeos Tailwind v4 deja la
+     utilidad sin color y el borde se ve negro por defecto del navegador. */
+  --color-border: var(--border-default);
+  --color-border-border: var(--border-default);
   --color-border-subtle: var(--border-subtle);
   --color-border-default: var(--border-default);
   --color-border-strong: var(--border-strong);
@@ -52,6 +56,19 @@
   --color-warning: var(--state-warning);
   --color-error: var(--state-error);
   --color-info: var(--state-info);
+
+  /* ── Fondos y bordes de estado ──
+     Los tokens ya existían en _variables.scss pero no estaban expuestos a
+     Tailwind: sin esto, `bg-success-subtle` o `border-error-border` no existen
+     como utilidades y hay que recomponerlas a mano. */
+  --color-success-subtle: var(--state-success-bg);
+  --color-warning-subtle: var(--state-warning-bg);
+  --color-error-subtle: var(--state-error-bg);
+  --color-info-subtle: var(--state-info-bg);
+  --color-success-border: var(--state-success-border);
+  --color-warning-border: var(--state-warning-border);
+  --color-error-border: var(--state-error-border);
+  --color-info-border: var(--state-info-border);
 
   /* ── Fuentes ── */
   --font-display: var(--font-display);

@@ -109,10 +109,14 @@ $bp-lg: 1024px;
     }
 
     /* Hero + fila de KPIs separada + celda protagonista.
-       Fila 1 = hero (full-width, agota la fila).
-       Fila 2 = KPIs (.bento-square × N — el auto-flow denso los ubica solos).
-       Fila 3 = .bento-fill (llena el resto).
-       No requiere data-row-start: el flujo natural del grid resuelve la posición. */
+       Fila 1 = header, Fila 2 = KPIs, Fila 3 = `.bento-fill` (llena el resto).
+
+       ⚠️ En un grid fill-screen TODA celda hija debe ocupar UNA sola fila, o el
+       template explícito se desborda y el grid crea filas implícitas que se
+       superponen. `.bento-hero`, `.bento-feature` y `.bento-tall` ocupan DOS
+       filas: no sirven acá. Usar `.bento-banner` (full-width, 1 fila) y anidar
+       adentro lo que haga falta — los KPIs van como grid/flex DENTRO del banner
+       de la fila 2, no como celdas sueltas del bento. */
     &.bento-grid--fill-screen-kpi {
       @container layoutmain (min-width: #{$bp-lg}) {
         height: calc(100vh - var(--app-shell-offset));

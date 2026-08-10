@@ -118,6 +118,12 @@ scrollea mal**. App-like OBLIGA a los dos juntos:
 | `.bento-grid--hero-fit` | La 1ª fila se ajusta a su contenido (hero slim sin hueco debajo). |
 | `.bento-grid--rows-fit` | TODAS las filas se ajustan. Solo para grids de puros `.bento-banner`. |
 
+- **Toda celda hija de un grid fill-screen debe ocupar UNA sola fila.** Los modificadores
+  definen un `grid-template-rows` explícito; si una celda pide 2 filas, el template se
+  desborda, el grid crea filas implícitas y **las celdas se superponen**. `.bento-hero`,
+  `.bento-feature` y `.bento-tall` ocupan 2 filas → **no sirven acá**. Usar `.bento-banner`
+  (full-width, 1 fila) y anidar adentro: una fila de KPIs es un `grid grid-cols-4` DENTRO
+  del banner, no cuatro `.bento-square` sueltos.
 - **PROHIBIDO** `contain` o `min-height` **inline** en la celda — el canon vive en `.bento-fill`.
   Duplicarlo inline rompe el layout dual.
 - **`flex`, no `grid`,** para las columnas internas: solo flex propaga el alto para que cada
@@ -127,6 +133,30 @@ scrollea mal**. App-like OBLIGA a los dos juntos:
   `class="bento-fill flex flex-col"`.
 - El descuento de topbar/gutters vive en `--app-shell-offset` (default `120px`) dentro de
   `_bento-grid.scss`. Si cambiás la altura del topbar, ajustalo ahí — no hardcodees el `calc()`.
+
+### Ejemplo mínimo
+
+```html
+<!-- Todas las celdas son .bento-banner → 1 fila cada una.
+     Los KPIs se anidan DENTRO del banner de la fila 2. -->
+<section class="bento-grid bento-grid--fill-screen-kpi" appBentoReveal appBentoGridLayout>
+
+  <!-- Fila 1 — header -->
+  <div class="bento-banner surface-hero rounded-2xl p-6">…</div>
+
+  <!-- Fila 2 — KPIs anidados, NO celdas sueltas del bento -->
+  <div class="bento-banner grid grid-cols-2 gap-4 lg:grid-cols-4">
+    @for (k of kpis(); track k.id) {
+      <app-kpi-card [label]="k.label" [value]="k.value" />
+    }
+  </div>
+
+  <!-- Fila 3 — la celda que crece y scrollea internamente -->
+  <div class="bento-banner bento-fill card flex flex-col overflow-hidden min-h-0">
+    <ul class="flex-1 overflow-y-auto min-h-0">…</ul>
+  </div>
+</section>
+```
 
 ### Pilar 2 — Densidad adaptativa (medir por CONTENEDOR)
 

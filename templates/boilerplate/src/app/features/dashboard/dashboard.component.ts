@@ -92,7 +92,7 @@ import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component
               class="m-0 text-sm font-medium"
               style="color: rgba(255,255,255,0.7)"
             >
-              {{ today | date: "EEEE, d MMMM y" : "" : "es" }}
+              {{ today | date: "EEEE, d MMMM y" }}
             </p>
             <h1
               class="m-0 text-3xl font-bold"

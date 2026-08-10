@@ -1,4 +1,10 @@
-import { ApplicationConfig, ErrorHandler, importProvidersFrom } from "@angular/core";
+import { ApplicationConfig, ErrorHandler, LOCALE_ID, importProvidersFrom } from "@angular/core";
+import { registerLocaleData } from "@angular/common";
+import localeEs from "@angular/common/locales/es";
+
+// Angular NO trae los datos de locale cargados: usar `| date: ... : 'es'` sin
+// registrarlo lanza NG0701 en cada render. Se registra una sola vez, acá.
+registerLocaleData(localeEs);
 import {
   provideRouter,
   withComponentInputBinding,
@@ -106,6 +112,7 @@ export const appConfig: ApplicationConfig = {
       },
     }),
     provideCoreAuth(),
+    { provide: LOCALE_ID, useValue: "es" },
     // Atrapa excepciones no manejadas y las muestra saneadas en un toast,
     // en vez de dejar la app congelada sin señal para el usuario.
     { provide: ErrorHandler, useClass: GlobalErrorHandler },

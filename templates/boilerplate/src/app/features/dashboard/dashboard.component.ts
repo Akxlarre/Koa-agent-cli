@@ -15,6 +15,7 @@ import { GsapAnimationsService } from "@core/services/gsap-animations.service";
 import { BentoGridLayoutDirective } from "@core/directives/bento-grid-layout.directive";
 import { CardHoverDirective } from "@core/directives/card-hover.directive";
 import { AnimateInDirective } from "@core/directives/animate-in.directive";
+import { BentoRevealDirective } from "@core/directives/bento-reveal.directive";
 import { IconComponent } from "@shared/components/icon/icon.component";
 import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component";
 
@@ -31,7 +32,7 @@ import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component
  * │  app-icon          → iconos Lucide (cero emojis)                   │
  * │  appCardHover    → hover GSAP en todas las cards                 │
  * │  [appBentoGridLayout] → grid con FLIP animation en reflow          │
- * │  animateBentoGrid  → stagger de entrada de las celdas              │
+ * │  appBentoReveal    → stagger de entrada sin flash de las celdas    │
  * │  animateHero       → blur + scale en el banner principal           │
  * │  staggerListItems  → entrada escalonada en listas de actividad     │
  * │  skeleton → content → appAnimateIn en transición de carga        │
@@ -56,6 +57,7 @@ import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component
   imports: [
     DatePipe,
     BentoGridLayoutDirective,
+    BentoRevealDirective,
     CardHoverDirective,
     AnimateInDirective,
     IconComponent,
@@ -69,6 +71,7 @@ import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component
     <section
       #gridEl
       class="bento-grid"
+      appBentoReveal
       appBentoGridLayout
       aria-label="Panel de control"
     >
@@ -443,8 +446,8 @@ export class DashboardComponent implements AfterViewInit {
     // 1. Hero — blur + scale (siempre primero, contexto visual inmediato)
     this.gsap.animateHero(this.heroEl().nativeElement);
 
-    // 2. Bento grid — stagger de celdas desde abajo
-    this.gsap.animateBentoGrid(this.gridEl().nativeElement);
+    // 2. El stagger del bento lo maneja [appBentoReveal]: acopla el pre-hide
+    //    pre-paint con el reveal, así no hay parpadeo, y registra su cleanup.
 
     // 3. Lista de actividad — slide desde la izquierda con stagger
     const list = this.activityList()?.nativeElement;

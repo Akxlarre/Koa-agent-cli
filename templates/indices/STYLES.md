@@ -52,3 +52,9 @@
 3. **Colores y espaciado**: usar tokens `var(--*)` de `_variables.scss` — NUNCA valores hex/px directos
 4. **Componentes PrimeNG**: los overrides ya están en `_primeng-overrides.scss` — NO sobrescribir en componentes individuales
 5. **Animaciones de página**: usar View Transitions API (`_view-transitions.scss`) — NO crear transiciones de ruta custom
+
+## Auto-Index — Detectado por AST (generado automáticamente)
+
+<!-- AUTO-GENERATED:BEGIN -->
+_Sin entradas auto-detectadas aún. Ejecuta `npm run indices:sync` para poblar._
+<!-- AUTO-GENERATED:END -->

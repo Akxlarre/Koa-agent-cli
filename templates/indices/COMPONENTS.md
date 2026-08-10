@@ -19,8 +19,7 @@
 
 | Componente | API (inputs / outputs) | Descripción | Ubicación | Estado |
 |------------|------------------------|-------------|-----------|--------|
-| `app-kpi-card` | `value:number` (req) `label:string` (req) `suffix?:string` `prefix?:string` `trend?:number` `trendLabel?:string` `accent?:boolean` | KPI numérico con animación counter y badge de tendencia | `shared/components/kpi-card/kpi-card.component.ts` | ✅ Estable |
-| `app-kpi-card-skeleton` | — | Skeleton colocated de app-kpi-card | `shared/components/kpi-card/kpi-card-skeleton.component.ts` | ✅ Estable |
+| `app-kpi-card` | `value:number` (req) `label:string` (req) `suffix?:string` `prefix?:string` `trend?:number` `trendLabel?:string` `accent?:boolean` `loading?:boolean` | KPI numérico con animación counter, badge de tendencia y skeleton interno (`loading`) | `shared/components/kpi-card/kpi-card.component.ts` | ✅ Estable |
 
 ## Moléculas — Feedback
 *Comunicación de estados del sistema al usuario.*
@@ -97,8 +96,8 @@
   trendLabel="últimas 24 h"
 />
 
-<!-- Skeleton mientras carga -->
-<app-kpi-card-skeleton />
+<!-- Skeleton mientras carga — interno, sin componente aparte -->
+<app-kpi-card [value]="0" label="Ingresos" [loading]="true" />
 ```
 
 ### app-empty-state

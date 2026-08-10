@@ -1,4 +1,4 @@
-import { ApplicationConfig, importProvidersFrom } from "@angular/core";
+import { ApplicationConfig, ErrorHandler, importProvidersFrom } from "@angular/core";
 import {
   provideRouter,
   withComponentInputBinding,
@@ -81,6 +81,7 @@ import {
 
 import { routes } from "./app.routes";
 import { provideCoreAuth } from "@core/auth/provide-core-auth";
+import { GlobalErrorHandler } from "@core/errors/global-error-handler";
 
 /**
  * Configuración principal de la aplicación.
@@ -105,6 +106,9 @@ export const appConfig: ApplicationConfig = {
       },
     }),
     provideCoreAuth(),
+    // Atrapa excepciones no manejadas y las muestra saneadas en un toast,
+    // en vez de dejar la app congelada sin señal para el usuario.
+    { provide: ErrorHandler, useClass: GlobalErrorHandler },
     MessageService,
     ConfirmationService,
     /**

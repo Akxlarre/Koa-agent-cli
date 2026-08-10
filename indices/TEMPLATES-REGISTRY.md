@@ -11,7 +11,7 @@
 | `templates/AGENTS.md` | `AGENTS.md` | **Master universal** self-contained para todos los AI tools (OpenCode, Copilot, Codex…). Workflow de 5 pasos, reglas arquitectónicas, anti-patterns, los 10 índices. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
 | `templates/gitignore.template` | `.gitignore` | .gitignore con entradas para Angular, Supabase, GSAP, Vitest, Playwright. |
 | `templates/docs/` | `docs/` | Guías de usuario: HOOKS-SYSTEM.md, TECH-STACK-RULES.md, BRAND_GUIDELINES.md, PRODUCT-VISION.md. |
-| `templates/indices/` | `indices/` | 10 índices vacíos con estructura lista para completar: COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, PIPES, STYLES, STORES, DATABASE, ANTI-PATTERNS. |
+| `templates/indices/` | `indices/` | 15 índices. **12 se auto-generan** con `npm run indices:sync` (COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, GUARDS, UTILS, PIPES, STYLES, DATABASE, ROUTES, USAGE-MAP): el contenido va entre marcadores `<!-- AUTO-GENERATED:BEGIN/END -->` y se sobrescribe. Los 3 restantes (ANTI-PATTERNS, LAYOUTS, STORES) son manuales. |
 | `templates/context/domain.md` | `context/domain.md` | Entidades del negocio, reglas de dominio, terminología específica, stakeholders. Gitignored. |
 | `templates/context/brief.md` | `context/brief.md` | Objetivo de la sesión actual (campo `last_updated`). Se actualiza al inicio de cada sesión. Gitignored. |
 | `templates/context/constraints.md` | `context/constraints.md` | Restricciones del proyecto: integraciones externas, deuda técnica aceptada, entorno, límites del cliente. Gitignored. |
@@ -63,7 +63,9 @@
 | `templates/boilerplate/src/app/core/directives/` | `src/app/core/directives/` | 11 directivas: `animate-in`, `bento-grid-layout`, `bento-reveal` (pre-hide + reveal sin flash), `card-hover`, `click-outside`, `has-role`, `modal-overlay`, `press-feedback`, `scroll-container`, `scroll-reveal`, `search-shortcut`, `stable-width`. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/core/models/layout.model.ts` | `src/app/core/models/layout.model.ts` | Tipo `LayoutTier` (`mobile \| tablet \| desktop`), resuelto por ancho de contenedor. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/` | `src/` | Código Angular inicial: layout, auth, dashboard, shared components | Siempre en Full Scaffold |
-| `templates/boilerplate/scripts/` | `scripts/` | indices-sync.js, lint-arch-wrapper.js, architect.js, set-env.js, assignments-sync.js, assignments-audit.js | Siempre en Full Scaffold |
+| `templates/boilerplate/scripts/` | `scripts/` | `indices-sync.js` (auto-indexer AST con caché incremental: genera 12 índices), `lib/sql-schema.js` (parser de migraciones → DATABASE.md), `architect.js`, `lint-arch-wrapper.js`, `set-env.js`, `assignments-sync.js`, `assignments-audit.js`, más `package.json` que declara la carpeta como ESM. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/services/error-sanitizer.service.ts` | `src/app/core/services/error-sanitizer.service.ts` | Convierte errores crudos (SQLSTATE de Postgres, HTTP, Auth de Supabase) en mensajes de usuario. Nunca expone `details`/`hint`, que filtran tablas y policies RLS. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/errors/global-error-handler.ts` | `src/app/core/errors/global-error-handler.ts` | `ErrorHandler` global: atrapa excepciones no manejadas y las muestra saneadas en un toast. Registrado en `app.config.ts`. | Siempre en Full Scaffold |
 | `templates/boilerplate/vitest.config.ts` | `vitest.config.ts` | Config de Vitest (reemplaza Karma) | Siempre en Full Scaffold |
 | `templates/boilerplate/postcss.config.json` | `postcss.config.json` | PostCSS para Tailwind v4 (.json obligatorio — Angular ignora .js/.mjs) | Siempre en Full Scaffold |
 | `templates/boilerplate-e2e/` | `e2e/` + `playwright.config.ts` | Tests E2E con Playwright | `--with-e2e` |

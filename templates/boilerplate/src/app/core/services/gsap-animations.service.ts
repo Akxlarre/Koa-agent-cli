@@ -2,6 +2,7 @@ import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { CustomEase } from 'gsap/CustomEase';
 
 /**
  * GsapAnimationsService - Centralized GSAP animation patterns
@@ -21,9 +22,19 @@ export class GsapAnimationsService {
   private platformId = inject(PLATFORM_ID);
   private prefersReducedMotion = false;
 
+  /** CustomEase registrado → permite convertir tokens cubic-bezier en eases reales de GSAP. */
+  private customEaseReady = false;
+  /** Cache token → milisegundos, para no releer getComputedStyle en cada animación. */
+  private readonly tokenCache = new Map<string, number>();
+  /** Cache token → nombre de ease GSAP resuelto (evita recrear CustomEase en cada llamada). */
+  private readonly easeCache = new Map<string, string>();
+
   constructor() {
     if (isPlatformBrowser(this.platformId)) {
-      gsap.registerPlugin(ScrollTrigger);
+      // CustomEase (gratuito desde GSAP 3.13) permite traducir los tokens
+      // `cubic-bezier(...)` del design system a eases reales de GSAP.
+      gsap.registerPlugin(ScrollTrigger, CustomEase);
+      this.customEaseReady = true;
 
       // Check user's motion preference
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -39,29 +50,80 @@ export class GsapAnimationsService {
   /**
    * Animación de entrada para celdas bento — stagger desde abajo.
    * Todas las celdas (incl. hero) usan la misma animación.
-   * @param containerEl - Elemento contenedor del bento-grid
+   *
+   * Devuelve el cleanup: registralo en `DestroyRef` o usá `[appBentoReveal]`,
+   * que ya lo hace. Sin cleanup, navegar fuera de la página deja tweens vivos
+   * sobre nodos destruidos.
+   *
+   * @param containerEl        Contenedor del bento-grid
+   * @param options.skipOpacity `true` cuando una View Transition de ruta ya hace
+   *   el fade del contenedor: evita el doble-fade (VT + grid). Koa provee
+   *   `withViewTransitions()` por defecto, así que suele aplicar en navegación.
    */
-  animateBentoGrid(containerEl: HTMLElement): void {
+  animateBentoGrid(
+    containerEl: HTMLElement | null | undefined,
+    options: { skipOpacity?: boolean } = {},
+  ): () => void {
+    if (!containerEl) return () => {};
+
+    // El pre-hide (`.is-reveal-pending`, puesto por [appBentoReveal]) mantiene las
+    // celdas en opacity:0 hasta acá → sin parpadeo. Se retira en cuanto GSAP fija
+    // el estado inicial inline (immediateRender), o de inmediato si no animamos.
+    const clearPending = () => containerEl.classList.remove('is-reveal-pending');
+
     const cells = Array.from(containerEl.children) as HTMLElement[];
 
     if (!this.shouldAnimate()) {
       gsap.set(cells, { opacity: 1, y: 0, scale: 1 });
-      return;
+      clearPending();
+      return () => {};
     }
 
-    gsap.fromTo(
-      cells,
-      { opacity: 0, y: 24, scale: 0.97 },
-      {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        duration: 0.55,
-        ease: 'power3.out',
-        stagger: { amount: 0.25, from: 'start' },
-        clearProps: 'transform',
-      },
-    );
+    const { skipOpacity = false } = options;
+
+    // Tempo desde tokens del design system — no hardcodear motion.
+    const duration = this.getCssDuration('--duration-reveal-cell', 0.52);
+    const staggerEach = this.getTokenMs('--stagger-reveal') / 1000 || 0.06;
+    const ease = this.getCssEase('--ease-spring', 'back.out(1.2)');
+
+    // Promover solo transform/opacity al compositor, y SOLO mientras dura la
+    // animación: dejar `will-change` fijo consume memoria de GPU sin beneficio.
+    cells.forEach((el) => (el.style.willChange = 'transform, opacity'));
+
+    // gsap.context aísla los tweens al contenedor y habilita un revert()
+    // determinista al destruir (deshace también los estilos inline aplicados).
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        onComplete: () => cells.forEach((el) => (el.style.willChange = '')),
+      });
+
+      if (cells.length > 0) {
+        const fromVars: gsap.TweenVars = { y: 30, scale: 0.9 };
+        if (!skipOpacity) fromVars.opacity = 0;
+
+        tl.fromTo(
+          cells,
+          fromVars,
+          {
+            y: 0,
+            scale: 1,
+            opacity: 1,
+            duration,
+            ease,
+            stagger: { each: staggerEach, from: 'start' },
+            overwrite: 'auto',
+            clearProps: 'transform' + (skipOpacity ? '' : ',opacity'),
+          },
+          0,
+        );
+      }
+    }, containerEl);
+
+    // immediateRender ya fijó el estado inicial inline → retirar el pre-hide
+    // ahora es seamless, sin reflasheo.
+    clearPending();
+
+    return () => ctx.revert();
   }
 
   /**
@@ -1339,18 +1401,6 @@ export class GsapAnimationsService {
     return isPlatformBrowser(this.platformId) && !this.prefersReducedMotion;
   }
 
-  /** Obtiene un token de duración en ms (ej: "250ms" → 250) */
-  private getTokenMs(name: string): number {
-    if (typeof document === 'undefined') return 0;
-    const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    if (!val) return 0;
-    const match = val.match(/^(\d+(?:\.\d+)?)\s*ms$/);
-    if (match) return parseFloat(match[1]);
-    const matchS = val.match(/^(\d+(?:\.\d+)?)\s*s$/);
-    if (matchS) return parseFloat(matchS[1]) * 1000;
-    return 0;
-  }
-
   /**
    * Returns true if animations should run (browser + user hasn't reduced motion).
    * Use in components that need to conditionally run custom GSAP animations.
@@ -1368,12 +1418,70 @@ export class GsapAnimationsService {
    * cambio de tempo en `_variables.scss` se propaga a las animaciones JS.
    */
   private getCssDuration(token: string, fallbackSeconds: number): number {
-    if (!isPlatformBrowser(this.platformId)) return fallbackSeconds;
-    const raw = getComputedStyle(document.documentElement)
+    return this.getTokenMs(token) / 1000 || fallbackSeconds;
+  }
+
+  /**
+   * Lee un token de tiempo (`--duration-*`, `--stagger-*`) y lo devuelve en ms.
+   * Acepta valores en `ms` o `s`. Cachea por token: `getComputedStyle` fuerza
+   * un reflow y estas animaciones corren en cada montaje de página.
+   */
+  private getTokenMs(token: string): number {
+    if (!isPlatformBrowser(this.platformId)) return 0;
+
+    const cached = this.tokenCache.get(token);
+    if (cached !== undefined) return cached;
+
+    const val = getComputedStyle(document.documentElement)
       .getPropertyValue(token)
       .trim();
-    const ms = parseFloat(raw);
-    return Number.isFinite(ms) && ms > 0 ? ms / 1000 : fallbackSeconds;
+
+    let result = 0;
+    const inMs = val.match(/^(\d+(?:\.\d+)?)\s*ms$/);
+    const inS = val.match(/^(\d+(?:\.\d+)?)\s*s$/);
+    if (inMs) result = parseFloat(inMs[1]);
+    else if (inS) result = parseFloat(inS[1]) * 1000;
+
+    this.tokenCache.set(token, result);
+    return result;
+  }
+
+  /**
+   * Traduce un token de easing del design system a un ease usable por GSAP.
+   *
+   * GSAP no entiende `cubic-bezier(...)` nativamente, así que los tokens
+   * `--ease-*` se convierten a un CustomEase equivalente, registrado y cacheado
+   * por token. Así el motion de JS y el de CSS comparten una única fuente.
+   */
+  private getCssEase(token: string, fallback: string): string {
+    if (!isPlatformBrowser(this.platformId)) return fallback;
+
+    const cached = this.easeCache.get(token);
+    if (cached) return cached;
+
+    const val = getComputedStyle(document.documentElement)
+      .getPropertyValue(token)
+      .trim();
+    let result = fallback;
+
+    const bezier = val.match(
+      /cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/,
+    );
+    if (bezier && this.customEaseReady) {
+      const name = `cssease-${token}`;
+      try {
+        CustomEase.create(name, `M0,0 C${bezier[1]},${bezier[2]} ${bezier[3]},${bezier[4]} 1,1`);
+        result = name;
+      } catch {
+        result = fallback;
+      }
+    } else if (val && /^[a-z]/i.test(val)) {
+      // El token ya contiene un nombre de ease nativo de GSAP.
+      result = val;
+    }
+
+    this.easeCache.set(token, result);
+    return result;
   }
 
   /**

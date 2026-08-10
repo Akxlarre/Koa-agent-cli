@@ -110,6 +110,10 @@
   --duration-login-out: 250ms;
   --duration-login-in: 400ms;
   /* Login → App: transición más dramática que la navegación intra-app */
+  --duration-reveal-cell: 520ms;
+  /* Celdas del bento al revelarse */
+  --stagger-reveal: 60ms;
+  /* Desfase entre celdas del grid */
   --duration-theme: 220ms;
   --duration-toast-life: 3s;
   /* Sincronizado con ToastService duración por defecto */

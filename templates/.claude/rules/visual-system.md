@@ -124,6 +124,8 @@ scrollea mal**. App-like OBLIGA a los dos juntos:
   `.bento-feature` y `.bento-tall` ocupan 2 filas → **no sirven acá**. Usar `.bento-banner`
   (full-width, 1 fila) y anidar adentro: una fila de KPIs es un `grid grid-cols-4` DENTRO
   del banner, no cuatro `.bento-square` sueltos.
+  **ARCH-23 lo caza** (`npm run lint:arch`): el navegador no lanza ningún error acá — solo
+  se ven celdas encimadas —, así que la regla es la única red que atrapa este bug.
 - **PROHIBIDO** `contain` o `min-height` **inline** en la celda — el canon vive en `.bento-fill`.
   Duplicarlo inline rompe el layout dual.
 - **`flex`, no `grid`,** para las columnas internas: solo flex propaga el alto para que cada

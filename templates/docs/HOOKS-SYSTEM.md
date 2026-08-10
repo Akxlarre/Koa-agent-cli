@@ -173,6 +173,7 @@ de markup no auditarían nada.
 | ARCH-18 | Alias prohibidos dentro del propio `@theme` |
 | ARCH-21 | Clase `.bento-*` definida sin aprobar en `scripts/lib/bento-classes.allowlist.json`. Freno contra el sprawl del grid — ver el árbol de decisión en `indices/STYLES.md` |
 | ARCH-22 | Una clase del DS con el nombre de una utilidad "pelada" de Tailwind. Tailwind genera SU regla homónima en `@layer utilities` y **se suma** a la tuya en vez de reemplazarla |
+| ARCH-23 | Celda hija de un grid `.bento-grid--fill-screen*` que ocupa 2 filas (`.bento-hero`/`.bento-feature`/`.bento-tall` o `data-row-span="2"`). Desborda el `grid-template-rows` explícito: las filas implícitas se superponen sin lanzar ningún error — ver el patrón App-like en `.claude/rules/visual-system.md` |
 
 **Disciplina de clases (con ratchet):**
 

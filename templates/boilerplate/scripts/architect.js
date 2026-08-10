@@ -34,6 +34,7 @@ import { parseThemeTokens, findDeadTokenClasses, findForbiddenThemeAliases } fro
 import { kebabToPascal, collectUsedIcons, parseRegisteredIcons } from './lib/icon-registry.js';
 import { findIconOnlyButtonsWithoutLabel } from './lib/a11y-guardrails.js';
 import { findReservedTailwindClassCollisions } from './lib/tailwind-bare-utilities.js';
+import { findFillScreenRowViolations } from './lib/bento-fill-rows.js';
 import { extractBentoClasses, diffBentoClasses } from './check-bento-classes.js';
 import {
     isPillWhitelisted, isTypographyWhitelisted,
@@ -105,6 +106,11 @@ const RULES = {
         name: 'Ad-hoc typography cluster',
         doc: '.claude/rules/visual-system.md',
         fix: 'Usa .micro-label / .item-title / .section-eyebrow / .kpi-value en vez de recomponer el cluster de utilities.',
+    },
+    'ARCH-23': {
+        name: 'Fill-screen bento cell spanning 2 rows',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'En un grid App-like toda celda hija ocupa UNA fila: usa .bento-banner y anida adentro (KPIs como grid/flex dentro del banner). .bento-hero/.bento-feature/.bento-tall ocupan 2 filas y desbordan el template explícito.',
     },
     'A11Y-03': {
         name: 'Icon-only button without accessible name',
@@ -512,6 +518,16 @@ function analyzeTemplateContent(content, filePath) {
     const { statics, ternaryLiterals, dynamicCount } = collectUsedIcons(content);
     for (const icon of [...statics, ...ternaryLiterals]) iconsUsed.add(icon);
     if (dynamicCount > 0) iconDynamicFiles.add(filePath);
+
+    // ARCH-23: en un grid App-like, una celda de 2 filas desborda el template
+    // explícito y las filas implícitas se superponen. No lanza ningún error en
+    // runtime — se ve como celdas encimadas, así que solo lo caza un linter.
+    for (const { tag, causes } of findFillScreenRowViolations(content)) {
+        reportError(
+            'ARCH-23', filePath,
+            `<${tag}> es hija directa de un grid --fill-screen y ocupa 2 filas (${causes.join(', ')})`,
+        );
+    }
 
     for (const icon of findIconOnlyButtonsWithoutLabel(content)) {
         reportError('A11Y-03', filePath, `Botón cuyo único contenido es el icono "${icon}" y no tiene aria-label`);

@@ -85,6 +85,11 @@ la necesidad se resuelve con lo que ya hay.
 4. **Solo si nada de lo anterior alcanza** → clase nueva + entrada en el allowlist con
    una línea explicando por qué no bastaba.
 
+> ⚠️ Dentro de un grid `--fill-screen*` el paso 1 se recorta: `.bento-tall`, `.bento-feature`
+> y `.bento-hero` ocupan **2 filas** y desbordan el `grid-template-rows` explícito, así que
+> las celdas terminan superpuestas sin que el navegador avise. Ahí toda celda hija va en
+> `.bento-banner` (1 fila) y lo que necesite subdividirse se anida adentro. ARCH-23 lo caza.
+
 ## Estilos Globales (`styles.scss`)
 
 | Concepto | Clases/Selectores | Propósito |

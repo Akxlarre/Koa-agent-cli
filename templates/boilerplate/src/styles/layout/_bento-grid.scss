@@ -353,17 +353,10 @@ $bp-lg: 1024px;
       }
     }
 
-    /* Dashboard: Actividad (izq) + Alertas (der) — forzar 50/50 y misma altura en desktop.
-       Selector directo para que no sea pisado por auto-placement ni por otras reglas. */
-    .bento-grid>.bento-activity-lg {
-      grid-column: 1 / span 6;
-      grid-row: span 2;
-    }
-
-    .bento-grid>.bento-alerts-lg {
-      grid-column: 7 / span 6;
-      grid-row: span 2;
-    }
+    /* Para una fila de dos paneles 50/50 a la misma altura, usar dos
+       `.bento-feature` o `data-col-span="6"` en cada celda. No se agregan
+       clases nombradas por CONTENIDO (activity/alerts/…): el bento describe
+       formas, no secciones concretas de una app. */
   }
 }
 

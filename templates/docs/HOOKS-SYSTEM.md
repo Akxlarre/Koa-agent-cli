@@ -145,7 +145,7 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 
 ## Linter Arquitectónico Completo (`architect.js` v2.0)
 
-El linter AST se ejecuta con `npm run lint:arch` y valida **15 reglas**.
+El linter AST se ejecuta con `npm run lint:arch` y valida **16 reglas**.
 
 Analiza los `.ts`, los `.scss` y **los templates `template:` inline**, no solo los
 `.html`: el boilerplate no tiene un solo archivo `.html`, así que sin eso las reglas
@@ -171,6 +171,7 @@ de markup no auditarían nada.
 |---|---|
 | ARCH-11 | Clases de token muertas: no existen en `@theme`, Tailwind no genera CSS y la clase no hace nada |
 | ARCH-18 | Alias prohibidos dentro del propio `@theme` |
+| ARCH-21 | Clase `.bento-*` definida sin aprobar en `scripts/lib/bento-classes.allowlist.json`. Freno contra el sprawl del grid — ver el árbol de decisión en `indices/STYLES.md` |
 | ARCH-22 | Una clase del DS con el nombre de una utilidad "pelada" de Tailwind. Tailwind genera SU regla homónima en `@layer utilities` y **se suma** a la tuya en vez de reemplazarla |
 
 **Disciplina de clases (con ratchet):**

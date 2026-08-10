@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 /**
- * check-bento-classes.js — fix-084-b (ASG-b-057, Nivel 1 punto 3).
+ * check-bento-classes.js — Freno contra el sprawl del sistema bento.
  *
- * Freno standalone contra el sprawl del sistema bento (33 clases hoy, sin ninguna
- * revisión que lo frenara). Compara las clases `.bento-*` definidas en
- * `_bento-grid.scss` contra `scripts/lib/bento-classes.allowlist.json` — falla si
- * aparece una clase nueva no revisada.
+ * Compara las clases `.bento-*` definidas en `_bento-grid.scss` contra
+ * `scripts/lib/bento-classes.allowlist.json` y falla si aparece una clase nueva
+ * que nadie revisó. El grid tiende a crecer por acumulación: cada pantalla suma
+ * "una clasecita más" hasta que hay 30 y ninguna se puede borrar sin miedo.
  *
- * ⚠️ NO está cableado a `npm run lint:arch` — eso requeriría editar `scripts/architect.js`,
- * protegido por el File Protector (mismo patrón que ARCH-19/20 en fix-078-b/079-b: dejar
- * el check escrito y funcional, wiring pendiente de que un humano aplique el patch si lo
- * quiere en el pipeline automático). Correr manualmente:
+ * Está cableado como **ARCH-21** en `architect.js`, así que corre con
+ * `npm run lint:arch`. También se puede correr suelto:
  *
- *   node scripts/check-bento-classes.js
+ *   npm run check:bento
  *
- * Si agregás una clase bento legítima nueva (revisada, no resuelve con una existente):
- * sumala a `classes` en el allowlist, con una línea explicando por qué no alcanzaba con
- * las que ya había.
+ * Criterio para aprobar una clase nueva: el bento describe FORMAS, no contenidos.
+ * Si el nombre alude a la sección de la app que la usa (`bento-invoices`,
+ * `bento-activity-lg`), casi siempre se resuelve con una proporción existente o
+ * con los data-attributes de placement (`data-col-span`, `data-row-span`).
  *
- * `diffBentoClasses` es una función pura (Data In → Data Out) — testeable sin fs, ver
- * scripts/lib/bento-classes.test.mjs.
+ * `extractBentoClasses` y `diffBentoClasses` son funciones puras (Data In → Data
+ * Out), testeables sin fs — ver `scripts/lib/bento-classes.test.mjs`.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';

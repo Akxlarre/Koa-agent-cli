@@ -34,6 +34,7 @@ import { parseThemeTokens, findDeadTokenClasses, findForbiddenThemeAliases } fro
 import { kebabToPascal, collectUsedIcons, parseRegisteredIcons } from './lib/icon-registry.js';
 import { findIconOnlyButtonsWithoutLabel } from './lib/a11y-guardrails.js';
 import { findReservedTailwindClassCollisions } from './lib/tailwind-bare-utilities.js';
+import { extractBentoClasses, diffBentoClasses } from './check-bento-classes.js';
 import {
     isPillWhitelisted, isTypographyWhitelisted,
     findAdhocPills, findButtonSizeOverrides, findArbitraryTextSizes, findAdhocTypography,
@@ -74,6 +75,11 @@ const RULES = {
         name: 'Forbidden bare aliases in @theme',
         doc: '.claude/rules/visual-system.md',
         fix: 'Un alias "pelado" en @theme colisiona con utilidades nativas de Tailwind. Renombra el token.',
+    },
+    'ARCH-21': {
+        name: 'Unreviewed .bento-* class',
+        doc: 'indices/STYLES.md',
+        fix: 'Antes de sumar la clase al allowlist, verificá que no se resuelva con una proporción existente ni con los data-attributes de placement. El bento describe FORMAS, no contenidos: una clase nombrada por la sección que la usa es señal de que falta un data-col-span.',
     },
     'ARCH-22': {
         name: 'DS class collides with bare Tailwind utility',
@@ -626,6 +632,26 @@ checkClassDiscipline();
             reportError('ARCH-22', scssPath, `La clase .${cls} coincide con una utilidad bare reservada de Tailwind.`);
         }
     } catch { /* fail-open: si no existe el archivo, otro check lo señalará */ }
+}
+
+// ARCH-21: freno contra el sprawl del sistema bento. El grid creció por
+// acumulación en más de un proyecto; el allowlist obliga a que cada clase nueva
+// pase por una revisión explícita en vez de sumarse en silencio.
+{
+    const bentoScss = path.join(process.cwd(), 'src', 'styles', 'layout', '_bento-grid.scss');
+    const allowlistPath = path.join(process.cwd(), 'scripts', 'lib', 'bento-classes.allowlist.json');
+    try {
+        const current = extractBentoClasses(fs.readFileSync(bentoScss, 'utf-8'));
+        const allowlist = JSON.parse(fs.readFileSync(allowlistPath, 'utf-8')).classes;
+        const { newClasses, removedClasses } = diffBentoClasses(current, allowlist);
+
+        for (const cls of newClasses) {
+            reportError('ARCH-21', bentoScss, `Clase .${cls} definida pero no aprobada en el allowlist.`);
+        }
+        if (removedClasses.length > 0) {
+            console.log(cyan, `   ℹ ARCH-21: ${removedClasses.length} clase(s) del allowlist ya no existen en el CSS (${removedClasses.join(', ')}) — depurá el allowlist.`);
+        }
+    } catch { /* fail-open */ }
 }
 
 // ARCH-18: alias prohibidos dentro del propio @theme.

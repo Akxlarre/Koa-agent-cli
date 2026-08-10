@@ -59,6 +59,32 @@
 > (`.truncate`, `.overline`, …): Tailwind genera su propia regla homónima en `@layer utilities`
 > que **se suma** a la tuya en vez de reemplazarla. ARCH-22 lo bloquea.
 
+## Cómo elegir una celda bento
+
+> El sistema bento está **congelado por allowlist** (ARCH-21): agregar una clase
+> `.bento-*` a `_bento-grid.scss` sin sumarla a `scripts/lib/bento-classes.allowlist.json`
+> hace fallar `npm run lint:arch`. El freno existe porque este grid tiende a crecer por
+> acumulación: cada pantalla suma "una clasecita más" hasta que hay treinta y ninguna se
+> puede borrar sin miedo.
+
+**El bento describe FORMAS, no contenidos.** Si el nombre que se te ocurre alude a la
+sección de la app que lo usa (`bento-facturas`, `bento-actividad-lg`), es señal de que
+la necesidad se resuelve con lo que ya hay.
+
+Árbol de decisión, en orden:
+
+1. **¿Alguna proporción existente sirve?** → `.bento-square` (1×1), `.bento-wide` (2:1),
+   `.bento-tall` (1×2), `.bento-feature` (protagonista), `.bento-hero` (full-width),
+   `.bento-banner` (full-width, 1 fila).
+2. **¿Necesitás una medida puntual?** → data-attributes de placement:
+   `data-col-span`, `data-row-span`, `data-col-start`. No requieren clase nueva.
+   Ej. dos paneles 50/50 a la misma altura: `data-col-span="6"` en cada celda.
+3. **¿Es un comportamiento del grid entero?** → modificador en el contenedor:
+   `--four-equal`, `--hero-fit`, `--rows-fit`, `--wizard`, o los `--fill-screen*` del
+   patrón App-like.
+4. **Solo si nada de lo anterior alcanza** → clase nueva + entrada en el allowlist con
+   una línea explicando por qué no bastaba.
+
 ## Estilos Globales (`styles.scss`)
 
 | Concepto | Clases/Selectores | Propósito |

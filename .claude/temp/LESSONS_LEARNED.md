@@ -15,5 +15,5 @@
 | 2026-08-11 | `mcp__github__create_repository` | failed to create repository: POST https://api.github.com/user/repos: 403 Resourc | 1 | `mcp__github__create_repository:failed to create repository: POST https://api.github.com/user/repos: 403 Resourc` |  |
 | 2026-08-11 | `Bash` | Exit code 1 Client: Docker Engine - Community Version: 29.3.1 Context: default D | 1 | `Bash:Exit code 1 Client: Docker Engine - Community Version: 29.3.1 Context: default D` | docker info 2>&1 |
 | 2026-08-11 | `Bash` | Exit code 127 OCI runtime exec failed: exec failed: unable to start container pr | 1 | `Bash:Exit code 127 OCI runtime exec failed: exec failed: unable to start container pr` | docker exec pgv2 psql -U postgres -tAc "SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authe |
-| 2026-08-11 | `Bash` | Exit code 2 psql: error: connection to server at "127.0.0.1", port 55432 failed: | 1 | `Bash:Exit code 2 psql: error: connection to server at "127.0.0.1", port 55432 failed:` | export PGPASSWORD=postgres
-psql -h 127.0.0.1 -p 55432 -U postgres -tAc "SELECT rolname FROM pg_roles |
+| 2026-08-11 | `Bash` | Exit code 1 /tmp/claude-0/-home-user-Koa-agent-cli/7f19684b-0756-53da-94d7-049a2 | 1 | `Bash:Exit code 1 /tmp/claude-0/-home-user-Koa-agent-cli/7f19684b-0756-53da-94d7-049a2` | SP=/tmp/claude-0/-home-user-Koa-agent-cli/7f19684b-0756-53da-94d7-049a2b854f92/scratchpad
+export PAT |

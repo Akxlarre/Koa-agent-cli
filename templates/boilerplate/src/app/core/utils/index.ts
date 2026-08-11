@@ -1,5 +1,6 @@
 export * from './auth-errors.utils';
 export * from './date.utils';
+export * from './db-error.utils';
 export * from './layout-tier.utils';
 export * from './name.utils';
 export * from './percentage.utils';

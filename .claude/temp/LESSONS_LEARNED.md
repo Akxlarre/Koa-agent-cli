@@ -15,5 +15,5 @@
 | 2026-08-11 | `mcp__github__create_repository` | failed to create repository: POST https://api.github.com/user/repos: 403 Resourc | 1 | `mcp__github__create_repository:failed to create repository: POST https://api.github.com/user/repos: 403 Resourc` |  |
 | 2026-08-11 | `Bash` | Exit code 1 Client: Docker Engine - Community Version: 29.3.1 Context: default D | 1 | `Bash:Exit code 1 Client: Docker Engine - Community Version: 29.3.1 Context: default D` | docker info 2>&1 |
 | 2026-08-11 | `Bash` | Exit code 127 OCI runtime exec failed: exec failed: unable to start container pr | 1 | `Bash:Exit code 127 OCI runtime exec failed: exec failed: unable to start container pr` | docker exec pgv2 psql -U postgres -tAc "SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authe |
-| 2026-08-11 | `Bash` | Exit code 1 /tmp/claude-0/-home-user-Koa-agent-cli/7f19684b-0756-53da-94d7-049a2 | 1 | `Bash:Exit code 1 /tmp/claude-0/-home-user-Koa-agent-cli/7f19684b-0756-53da-94d7-049a2` | SP=/tmp/claude-0/-home-user-Koa-agent-cli/7f19684b-0756-53da-94d7-049a2b854f92/scratchpad
-export PAT |
+| 2026-08-11 | `Bash` | Exit code 2 ls: cannot access '/opt/pw-browsers/chromium/': Not a directory | 1 | `Bash:Exit code 2 ls: cannot access '/opt/pw-browsers/chromium/': Not a directory` | cd /workspace/app-familiar-v2 && sed -i "s#chromium.launch()#chromium.launch({ executablePath: '/opt |
+| 2026-08-11 | `Bash` | Exit code 144 | 1 | `Bash:Exit code 144` | pkill -f "ng serve" 2>/dev/null; cd /workspace/app-familiar-v2 && git diff --stat .claude/temp/LESSO |

@@ -1064,6 +1064,29 @@ export class GsapAnimationsService {
   }
 
   /**
+   * Contraparte de éxito de `animateInputError`: un bounce de escala en el botón
+   * submit cuando la operación terminó bien. Da la sensación de "completado" sin
+   * tocar la lógica de negocio — basta con llamarlo cuando `loading()` pasa de
+   * true a false con éxito.
+   *
+   * @param el - Botón o contenedor donde mostrar el feedback
+   * @param onComplete - Callback al terminar (ej: resetear el formulario). Se
+   *                     llama igual con `prefers-reduced-motion`, para que el
+   *                     flujo no dependa de que la animación corra.
+   */
+  animateSuccessFeedback(el: HTMLElement, onComplete?: () => void): void {
+    if (!this.shouldAnimate()) {
+      onComplete?.();
+      return;
+    }
+
+    const tl = gsap.timeline({ onComplete });
+    tl.to(el, { scale: 0.94, duration: 0.08, ease: 'power2.in' })
+      .to(el, { scale: 1.06, duration: 0.18, ease: 'back.out(2.5)' })
+      .to(el, { scale: 1, duration: 0.22, ease: 'power2.out', clearProps: 'transform' });
+  }
+
+  /**
    * Hover + press en pills de navegación (sidebar)
    * Scale sutil, nudge horizontal, feedback de click (usa addPressFeedback internamente)
    * @param containerEl - Contenedor con .p-menu-item-content o .p-menu-item-link

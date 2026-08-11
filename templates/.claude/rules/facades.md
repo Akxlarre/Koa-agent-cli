@@ -255,3 +255,32 @@ decisión en `indices/FACADES.md` con una tabla:
   es precisamente el caso que produce respuestas fuera de orden.
 - El filtro por tenant en el cliente **no reemplaza RLS**. La política de Row Level Security en
   Supabase es la frontera de seguridad real; el filtro del Facade es solo UX. Ver `database.md`.
+
+## 11. Errores: un solo sanitizador, y el SQLSTATE no se tira
+
+El mensaje crudo de PostgreSQL nombra la tabla, la columna y el constraint que falló. Nunca llega
+al usuario: se sanea con `mensajeSeguroDeBd` (`@core/utils/db-error.utils`), que es el **único**
+sanitizador del proyecto. `BaseFacade.sanitizeError` delega ahí.
+
+- **PROHIBIDO** escribir una segunda función que traduzca errores de BD, aunque sea "solo para
+  este Facade". Dos implementaciones que tienen que decir lo mismo terminan diciendo distinto.
+- **PROHIBIDO** mostrar `error.message` en un toast, en `_error` o en un `console.error` visible.
+- El Repository lanza `ErrorDeBd(error.message, error.code)`, **no** `new Error(error.message)`:
+  `error.code` es el SQLSTATE, el dato más confiable que trae PostgREST, y tirarlo deja el mapeo
+  por código sin ejecutar nunca.
+
+```typescript
+// Repository — conserva el código
+if (error) throw new ErrorDeBd(error.message, error.code);
+
+// Facade — los mensajes de nuestras propias funciones SQL pasan como tokens
+private static readonly MENSAJES_DEL_RPC = ['El registro ya fue procesado'] as const;
+
+catch (e) {
+  this.toast.error('No se pudo guardar', mensajeSeguroDeBd(e, 'No se pudo guardar', ProductosFacade.MENSAJES_DEL_RPC));
+}
+```
+
+Los `tokens` son la excepción deliberada: lo que **nuestro** SQL levanta con `RAISE EXCEPTION`
+está escrito para el usuario y no filtra esquema, así que se muestra tal cual. Deben coincidir
+textualmente con el SQL — si cambia el `RAISE EXCEPTION`, cambia el token.

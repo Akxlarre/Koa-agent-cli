@@ -22,7 +22,8 @@ DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 
 -- 3. Policy de UPDATE segura: cada usuario puede editar su propio perfil
 --    pero NUNCA la columna `role` (protegida solo para admin o service_role).
-CREATE POLICY IF NOT EXISTS "profiles_update_own_safe"
+DROP POLICY IF EXISTS "profiles_update_own_safe" ON public.profiles;
+CREATE POLICY "profiles_update_own_safe"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id)
   WITH CHECK (
@@ -34,7 +35,8 @@ CREATE POLICY IF NOT EXISTS "profiles_update_own_safe"
 -- 4. Policy: solo admins (vía service_role o función RPC) pueden cambiar roles
 --    Los cambios de role de usuarios deben hacerse desde el backend con service_role key,
 --    nunca desde el cliente con anon/user key.
-CREATE POLICY IF NOT EXISTS "profiles_admin_update_role"
+DROP POLICY IF EXISTS "profiles_admin_update_role" ON public.profiles;
+CREATE POLICY "profiles_admin_update_role"
   ON public.profiles FOR UPDATE
   USING (
     -- Solo si la sesión tiene claim 'admin' (requiere custom JWT o trigger de Supabase)
@@ -46,7 +48,8 @@ CREATE POLICY IF NOT EXISTS "profiles_admin_update_role"
 
 -- 5. Policy de INSERT: trigger handle_new_user lo hace automáticamente.
 --    Bloquear INSERT manual desde el cliente para evitar perfiles huérfanos.
-CREATE POLICY IF NOT EXISTS "profiles_insert_via_trigger_only"
+DROP POLICY IF EXISTS "profiles_insert_via_trigger_only" ON public.profiles;
+CREATE POLICY "profiles_insert_via_trigger_only"
   ON public.profiles FOR INSERT
   WITH CHECK (false);  -- nunca desde el cliente; solo el trigger puede insertar
 

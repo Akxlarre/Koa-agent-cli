@@ -20,11 +20,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Policy: cualquier usuario autenticado puede leer perfiles
-CREATE POLICY IF NOT EXISTS "profiles_select_public"
+DROP POLICY IF EXISTS "profiles_select_public" ON public.profiles;
+CREATE POLICY "profiles_select_public"
   ON public.profiles FOR SELECT
   USING (auth.role() = 'authenticated');
 
 -- Policy: cada usuario solo puede actualizar su propio perfil
-CREATE POLICY IF NOT EXISTS "profiles_update_own"
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
+CREATE POLICY "profiles_update_own"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);

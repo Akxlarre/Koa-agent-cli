@@ -153,8 +153,8 @@
   /* Tipografía — jerarquía de texto
      NUNCA usar para fondos ni acciones */
   --text-primary: #09090b;
-  --text-secondary: #52525b;
-  --text-muted: #a1a1aa;
+  --text-secondary: #3f3f46;
+  --text-muted: #52525b;
   --text-disabled: #d4d4d8;
 
   /* Bordes */
@@ -178,15 +178,15 @@
   /* Estados semánticos
      state-* = resultado de acciones del sistema
      ("guardado con éxito", "error de formulario", "información") */
-  --state-success: #16a34a;
+  --state-success: #15803d;
   --state-success-bg: #f0fdf4;
   --state-success-border: #bbf7d0;
 
-  --state-warning: #d97706;
+  --state-warning: #b45309;
   --state-warning-bg: #fffbeb;
   --state-warning-border: #fde68a;
 
-  --state-error: #dc2626;
+  --state-error: #b91c1c;
   --state-error-bg: #fef2f2;
   --state-error-border: #fecaca;
 
@@ -239,8 +239,11 @@
    ────────────────────────────────────────── */
 
   /* ── Botón primario ── */
-  --btn-primary-bg: var(--ds-brand);
-  --btn-primary-bg-hover: var(--color-primary-hover);
+  /* El botón NO usa --ds-brand directo: sky-500 con texto blanco da 2.77:1 y no
+     pasa AA. Usa el tono profundo de la misma marca (5.93:1). --ds-brand queda
+     intacto para iconos, acentos y gradientes, donde no hay texto encima. */
+  --btn-primary-bg: var(--color-primary-dark);
+  --btn-primary-bg-hover: #075985;
   --btn-primary-text: var(--color-primary-text);
   --btn-primary-radius: var(--radius-md);
   --btn-primary-padding-x: var(--space-4);
@@ -369,8 +372,8 @@
 
   /* ── Capa 2: Tipografía ── */
   --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
   --text-disabled: #52525b;
 
   /* ── Capa 2: Bordes ──
@@ -419,6 +422,13 @@
   --accent-border: rgba(56, 189, 248, 0.25);
   --accent-glow: rgba(56, 189, 248, 0.25);
   --shadow-focus: 0 0 0 3px rgba(56, 189, 248, 0.3);
+
+  /* Botón primario en oscuro: se INVIERTE. Un celeste oscuro con texto blanco
+     da 2.77:1; el celeste claro de la marca con texto casi negro da 9.29:1.
+     En un tema oscuro el acento brillante va de fondo, no de texto. */
+  --btn-primary-bg: var(--ds-brand);
+  --btn-primary-bg-hover: var(--color-primary-hover);
+  --btn-primary-text: #09090b;
 
   --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
   --gradient-hero: linear-gradient(
@@ -506,7 +516,7 @@ body {
 
    JERARQUÍA DE SUPERFICIES (dark mode):
    Delta mínimo +2.5% L entre cada nivel.
-   bg-base → bg-surface → bg-elevated → bg-subtle
+   bg-canvas → bg-surface → bg-elevated → bg-subtle
 
    EASING DISPONIBLE:
    --ease-standard  Transiciones generales de UI
@@ -619,6 +629,23 @@ body {
   color: var(--text-primary);
 }
 
+/* .row-value — Valor numérico a la derecha de una fila de lista.
+   Existe porque `.kpi-value` es `--text-4xl`: correcto en la banda de un hero,
+   ridículo en una fila, donde el número compite con el título y se come el
+   ancho que el título necesita para no truncar. Lo destapó la pantalla de
+   referencia (spec 0002): con `.kpi-value`, un monto de nueve cifras empujaba
+   el nombre del comercio a una segunda línea.
+   `tabular-nums` alinea las columnas de cifras entre filas. */
+.row-value {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-snug);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* .section-eyebrow — Línea de contexto LEGIBLE antes de un título (sin uppercase).
    La distinción con .micro-label importa: micro-label etiqueta un dato,
    section-eyebrow da contexto legible.
@@ -629,6 +656,61 @@ body {
   font-weight: var(--font-regular);
   line-height: var(--leading-normal);
   color: var(--text-secondary);
+}
+
+/* ── Campos de formulario ────────────────────────────────────
+   Los tokens --input-* existían desde el principio, pero sólo se consumían
+   como clusters de utilities escritos a mano: el login tiene una cadena de
+   catorce clases arbitrarias por campo, y el segundo formulario del proyecto
+   iba a copiarla.
+   ─────────────────────────────────────────────────────────── */
+
+/* .field-label — Etiqueta de un campo. Legible, no uppercase: .micro-label
+   etiqueta un dato ya escrito; esto le pide al usuario que escriba. */
+.field-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-snug);
+  color: var(--text-secondary);
+}
+
+/* .field-input — Input, select o textarea de una línea. */
+.field-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--input-padding-y) var(--input-padding-x);
+  border: 1px solid var(--input-border-default);
+  border-radius: var(--input-radius);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  outline: none;
+  transition: var(--transition-input);
+}
+
+.field-input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.field-input:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: var(--input-shadow-focus-neutral);
+}
+
+.field-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Estado inválido. Se aplica sólo cuando el campo ya fue tocado: marcar en rojo
+   un formulario recién abierto es hostil. */
+.field-input--invalid,
+.field-input--invalid:focus {
+  border-color: var(--state-error);
 }
 
 /* ── Jerarquía de Superficies ────────────────────────────────

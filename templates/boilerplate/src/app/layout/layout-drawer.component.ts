@@ -52,7 +52,7 @@ import { LayoutDrawerService } from '@core/services/layout-drawer.service';
 
     <div
       data-drawer-panel
-      class="relative z-10 flex h-full w-full flex-col overflow-hidden rounded-tl-2xl border-border-subtle bg-base lg:rounded-tr-2xl lg:border-x lg:border-t"
+      class="relative z-10 flex h-full w-full flex-col overflow-hidden rounded-tl-2xl border-border-subtle bg-canvas lg:rounded-tr-2xl lg:border-x lg:border-t"
       style="min-height: 0; will-change: transform;"
       role="dialog"
       [attr.aria-label]="title()"
@@ -128,7 +128,7 @@ import { LayoutDrawerService } from '@core/services/layout-drawer.service';
       <!-- Cuerpo dinámico -->
       <div class="mr-1 mb-2 flex flex-1 flex-col overflow-y-auto py-2 pr-3 pl-4 lg:mr-2 lg:pr-2">
         @if (component(); as componenteActivo) {
-          <ng-container *ngComponentOutlet="componenteActivo" />
+          <ng-container *ngComponentOutlet="componenteActivo; inputs: inputs()" />
         }
       </div>
     </div>
@@ -146,6 +146,7 @@ export class LayoutDrawerComponent implements OnDestroy {
   protected readonly icon = this.drawer.icon;
   protected readonly actions = this.drawer.actions;
   protected readonly badge = this.drawer.badge;
+  protected readonly inputs = this.drawer.inputs;
   protected readonly canGoBack = this.drawer.canGoBack;
 
   /** El signal `isOpen` cambia antes que el DOM: hace falta saber qué se animó. */
@@ -178,6 +179,10 @@ export class LayoutDrawerComponent implements OnDestroy {
     // El drawer bloquea el scroll del body en mobile. Si el componente muere con
     // el panel abierto, la página quedaría trabada para siempre.
     document.body.style.overflow = '';
+    // Y si muere a mitad de la animación de entrada o salida, el tween sigue
+    // corriendo sobre nodos desprendidos (AC12, spec 0002).
+    this.gsap.killTweensOf(this.el.nativeElement);
+    this.gsap.killTweensOf(this.backdrop());
   }
 
   private backdrop(): HTMLElement | null {

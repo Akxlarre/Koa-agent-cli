@@ -147,7 +147,7 @@ export class ExampleFacade {
 | NEVER | ALWAYS |
 |---|---|
 | `text-red-500`, `text-blue-200` | `text-primary`, `text-secondary`, `text-muted` |
-| `bg-[#hex]`, arbitrary hex | `bg-base` (page), `bg-surface` (cards/modals) |
+| `bg-[#hex]`, arbitrary hex | `bg-canvas` (page), `bg-surface` (cards/modals) |
 | any Tailwind color utility | `var(--ds-brand)`, `var(--color-primary)` |
 
 ### Component Priority

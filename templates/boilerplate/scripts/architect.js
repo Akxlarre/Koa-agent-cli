@@ -33,14 +33,16 @@ import { createRequire } from 'module';
 import { parseThemeTokens, findDeadTokenClasses, findForbiddenThemeAliases } from './lib/theme-tokens.js';
 import { kebabToPascal, collectUsedIcons, parseRegisteredIcons } from './lib/icon-registry.js';
 import { findIconOnlyButtonsWithoutLabel } from './lib/a11y-guardrails.js';
-import { findReservedTailwindClassCollisions } from './lib/tailwind-bare-utilities.js';
+import { findReservedTailwindClassCollisions, findThemeTokenCollisions } from './lib/tailwind-bare-utilities.js';
 import { findFillScreenRowViolations } from './lib/bento-fill-rows.js';
 import { extractBentoClasses, diffBentoClasses } from './check-bento-classes.js';
 import {
     isPillWhitelisted, isTypographyWhitelisted,
     findAdhocPills, findButtonSizeOverrides, findArbitraryTextSizes, findAdhocTypography,
+    findAdhocInputClusters,
     buildBaseline, compareWithBaseline,
 } from './lib/class-discipline.js';
+import { parsearTemas, verificarPares } from './lib/contrast-check.js';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -107,10 +109,25 @@ const RULES = {
         doc: '.claude/rules/visual-system.md',
         fix: 'Usa .micro-label / .item-title / .section-eyebrow / .kpi-value en vez de recomponer el cluster de utilities.',
     },
+    'ARCH-24': {
+        name: 'Ad-hoc input cluster',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Usa .field-input (y .field-label) en vez de recomponer el cluster de borde + fondo + padding + radio sobre un campo.',
+    },
     'ARCH-23': {
         name: 'Fill-screen bento cell spanning 2 rows',
         doc: '.claude/rules/visual-system.md',
         fix: 'En un grid App-like toda celda hija ocupa UNA fila: usa .bento-banner y anida adentro (KPIs como grid/flex dentro del banner). .bento-hero/.bento-feature/.bento-tall ocupan 2 filas y desbordan el template explícito.',
+    },
+    'ARCH-25': {
+        name: 'Contrast below WCAG AA',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Ajusta el token de texto o el de fondo hasta 4.5:1 (3.0:1 si el texto es grande). Que un token exista en los dos temas no significa que se pueda leer.',
+    },
+    'ARCH-26': {
+        name: 'Theme token collides with a native Tailwind utility',
+        doc: '.claude/rules/visual-system.md',
+        fix: 'Renombra el token: un --color-X donde X es un valor de una escala nativa (base, sm, lg, xl…) genera una utilidad de COLOR que le gana a la nativa. `--color-base` hacía que `text-base` pintara texto del color del fondo.',
     },
     'A11Y-03': {
         name: 'Icon-only button without accessible name',
@@ -160,7 +177,7 @@ const RULES = {
     'ARCH-08': {
         name: 'No hardcoded Tailwind colors',
         doc: 'docs/TECH-STACK-RULES.md#arch-08',
-        fix: 'Usa tokens semánticos: text-primary, text-muted, bg-surface, bg-base, var(--ds-brand).',
+        fix: 'Usa tokens semánticos: text-primary, text-muted, bg-surface, bg-canvas, var(--ds-brand).',
     },
     'ARCH-09': {
         name: 'Complexity warning (shared components)',
@@ -211,6 +228,7 @@ const dsCounts = {
     'ARCH-16': new Map(),
     'ARCH-17': new Map(),
     'ARCH-19': new Map(),
+    'ARCH-24': new Map(),
 };
 
 function trackClassDiscipline(filePath, content) {
@@ -236,6 +254,9 @@ function trackClassDiscipline(filePath, content) {
         const clusters = findAdhocTypography(content);
         add('ARCH-19', clusters.length, [...new Set(clusters)].join(', '));
     }
+
+    const inputs = findAdhocInputClusters(content);
+    add('ARCH-24', inputs.length, inputs[0]);
 }
 
 function checkClassDiscipline() {
@@ -559,7 +580,7 @@ function analyzeTemplateContent(content, filePath) {
         reportError(
             'ARCH-08', filePath,
             `Colores Tailwind hardcodeados en template: ${[...new Set(colorMatches)].join(', ')}`,
-            'Usa tokens semánticos: text-primary, text-muted, bg-surface, bg-base.'
+            'Usa tokens semánticos: text-primary, text-muted, bg-surface, bg-canvas.'
         );
     }
 }
@@ -671,12 +692,17 @@ checkClassDiscipline();
 }
 
 // ARCH-18: alias prohibidos dentro del propio @theme.
+// ARCH-26: tokens del @theme que colisionan con una escala nativa de Tailwind.
 {
     const cssPath = path.join(process.cwd(), 'src', 'tailwind.css');
     try {
         const css = fs.readFileSync(cssPath, 'utf-8');
         for (const alias of findForbiddenThemeAliases(css)) {
             reportError('ARCH-18', cssPath, `Alias prohibido en @theme: ${alias}`);
+        }
+        for (const c of findThemeTokenCollisions(css)) {
+            reportError('ARCH-26', cssPath,
+                `${c.token} genera la utilidad de color \`${c.utilidad}\`, que le gana a la nativa de la escala \`${c.prefijo}\`.`);
         }
     } catch { /* fail-open */ }
 }
@@ -695,6 +721,45 @@ if (iconsUsed.size > 0) {
             console.log(cyan, `   ℹ ICON-01: ${iconDynamicFiles.size} archivo(s) usan [name] dinámico — no verificable estáticamente.`);
         }
     } catch { /* fail-open */ }
+}
+
+// ─── ARCH-25: contraste AA, con ratchet ──────────────────────────────────────
+// Ratcheado por la misma razón que class-discipline: el proyecto arranca con
+// deuda de contraste real y bloquear el build hoy no la arregla, sólo frena.
+// El baseline fija cuántas fallas se toleran; una más es regresión.
+const CONTRAST_BASELINE_PATH = path.join(process.cwd(), 'scripts', 'lib', 'contrast.baseline.json');
+try {
+    const temas = parsearTemas(path.join(process.cwd(), 'src', 'styles', 'tokens', '_variables.scss'));
+    const { fallas, sinResolver } = verificarPares(temas);
+
+    let toleradas = [];
+    try {
+        toleradas = JSON.parse(fs.readFileSync(CONTRAST_BASELINE_PATH, 'utf-8')).toleradas ?? [];
+    } catch { /* sin baseline: tolerancia cero */ }
+
+    if (process.argv.includes('--update-contrast-baseline')) {
+        fs.writeFileSync(CONTRAST_BASELINE_PATH, JSON.stringify({
+            nota: 'Deuda de contraste tolerada. Cada entrada es un par que HOY no pasa AA. Bajar esta lista es el objetivo; crecerla es una regresión.',
+            toleradas: fallas.map(f => `${f.tema}:${f.fg}:${f.sobre}`),
+        }, null, 2) + '\n');
+        console.log(cyan, `   ℹ ARCH-25: baseline de contraste actualizado (${fallas.length} pares tolerados).`);
+    } else {
+        const tolerado = new Set(toleradas);
+        const regresiones = fallas.filter(f => !tolerado.has(`${f.tema}:${f.fg}:${f.sobre}`));
+        for (const f of regresiones) {
+            reportError('ARCH-25', 'src/styles/tokens/_variables.scss',
+                `[${f.tema}] ${f.fg} sobre ${f.sobre} da ${f.ratio}:1 (mínimo ${f.minimo}).`);
+        }
+        if (fallas.length > 0 && regresiones.length === 0) {
+            console.log(cyan, `   ℹ ARCH-25: ${fallas.length} par(es) con deuda de contraste tolerada. Ver contrast.baseline.json.`);
+        }
+    }
+
+    if (sinResolver.length > 0) {
+        console.log(cyan, `   ℹ ARCH-25: ${sinResolver.length} par(es) no evaluables (color-mix u otros).`);
+    }
+} catch (e) {
+    console.log(cyan, `   ℹ ARCH-25 no pudo correr: ${e.message}`);
 }
 
 console.log('');

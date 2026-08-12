@@ -153,19 +153,32 @@ export class GsapAnimationsService {
   }
 
   /**
-   * Números KPI — counter animado
+   * Números KPI — counter animado.
+   *
+   * **Devuelve el tween, y hay que matarlo al destruir el componente.** No es
+   * una cortesía: este tween anima un objeto plano interno, no el elemento, así
+   * que `gsap.killTweensOf(el)` —la forma en que se limpia todo lo demás acá— no
+   * lo alcanza. Sin el handle, un componente que muere durante los 1.2s deja el
+   * tween corriendo y escribiendo sobre un nodo ya desprendido del DOM.
+   *
+   * ```ts
+   * const tween = this.gsap.animateCounter(el, valor);
+   * this.destroyRef.onDestroy(() => tween?.kill());
+   * ```
+   *
    * @param el - Elemento que mostrará el número
    * @param target - Valor objetivo
    * @param suffix - Sufijo opcional (ej: '%', 'hrs')
+   * @returns El tween, o `null` si no se animó (reduced-motion o SSR).
    */
-  animateCounter(el: HTMLElement, target: number, suffix = ''): void {
+  animateCounter(el: HTMLElement, target: number, suffix = ''): gsap.core.Tween | null {
     if (!this.shouldAnimate()) {
       el.textContent = Math.round(target) + suffix;
-      return;
+      return null;
     }
 
     const obj = { val: 0 };
-    gsap.to(obj, {
+    return gsap.to(obj, {
       val: target,
       duration: 1.2,
       ease: 'power2.out',
@@ -1064,29 +1077,6 @@ export class GsapAnimationsService {
   }
 
   /**
-   * Contraparte de éxito de `animateInputError`: un bounce de escala en el botón
-   * submit cuando la operación terminó bien. Da la sensación de "completado" sin
-   * tocar la lógica de negocio — basta con llamarlo cuando `loading()` pasa de
-   * true a false con éxito.
-   *
-   * @param el - Botón o contenedor donde mostrar el feedback
-   * @param onComplete - Callback al terminar (ej: resetear el formulario). Se
-   *                     llama igual con `prefers-reduced-motion`, para que el
-   *                     flujo no dependa de que la animación corra.
-   */
-  animateSuccessFeedback(el: HTMLElement, onComplete?: () => void): void {
-    if (!this.shouldAnimate()) {
-      onComplete?.();
-      return;
-    }
-
-    const tl = gsap.timeline({ onComplete });
-    tl.to(el, { scale: 0.94, duration: 0.08, ease: 'power2.in' })
-      .to(el, { scale: 1.06, duration: 0.18, ease: 'back.out(2.5)' })
-      .to(el, { scale: 1, duration: 0.22, ease: 'power2.out', clearProps: 'transform' });
-  }
-
-  /**
    * Hover + press en pills de navegación (sidebar)
    * Scale sutil, nudge horizontal, feedback de click (usa addPressFeedback internamente)
    * @param containerEl - Contenedor con .p-menu-item-content o .p-menu-item-link
@@ -1450,6 +1440,40 @@ export class GsapAnimationsService {
   }
 
   /**
+   * Feedback de éxito en formularios — scale bounce en el botón submit.
+   * Diseñado para usarse cuando loading() pasa de true a false con éxito.
+   * Crea una sensación de "completado" sin requerir cambios en la lógica de negocio.
+   *
+   * @param el - Elemento botón o contenedor del feedback
+   * @param onComplete - Callback al finalizar (ej: resetear el estado del formulario)
+   */
+  animateSuccessFeedback(el: HTMLElement, onComplete?: () => void): void {
+    if (!this.shouldAnimate()) {
+      onComplete?.();
+      return;
+    }
+
+    const tl = gsap.timeline({ onComplete });
+
+    tl.to(el, {
+      scale: 0.94,
+      duration: 0.08,
+      ease: 'power2.in',
+    })
+      .to(el, {
+        scale: 1.06,
+        duration: 0.18,
+        ease: 'back.out(2.5)',
+      })
+      .to(el, {
+        scale: 1,
+        duration: 0.22,
+        ease: 'power2.out',
+        clearProps: 'transform',
+      });
+  }
+
+  /**
    * Check if animations should run based on user preferences
    */
   private shouldAnimate(): boolean {
@@ -1584,9 +1608,28 @@ export class GsapAnimationsService {
     return () => st.kill();
   }
 
+  /**
+   * Mata los tweens de un elemento concreto. Es lo que un componente llama en su
+   * `DestroyRef.onDestroy`: sin esto, una animación de entrada de 0.7s sigue
+   * corriendo sobre un nodo ya desprendido del DOM (AC12, spec 0002).
+   *
+   * Existe para que los componentes NO importen `gsap` directamente — todo el
+   * movimiento pasa por este servicio, incluida su limpieza.
+   *
+   * Ojo: sólo alcanza tweens cuyo target es el elemento. `animateCounter` anima
+   * un objeto plano y devuelve su propio handle por esa razón.
+   */
+  killTweensOf(el: HTMLElement | null | undefined): void {
+    if (!el || !isPlatformBrowser(this.platformId)) return;
+    gsap.killTweensOf(el);
+  }
+
   killAll(): void {
-    if (isPlatformBrowser(this.platformId)) {
-      gsap.killTweensOf('*');
-    }
+    if (!isPlatformBrowser(this.platformId)) return;
+    gsap.killTweensOf('*');
+    // `killTweensOf('*')` sólo alcanza targets que son elementos del DOM. Los
+    // tweens sobre objetos planos —el contador de KPI es uno— sobreviven. Vaciar
+    // el timeline global es lo único que los mata de verdad.
+    gsap.globalTimeline.clear();
   }
 }

@@ -19,3 +19,6 @@
 | 2026-08-12 | `Bash` | Exit code 144 | 6 | `Bash:Exit code 144` | pkill -f "ng serve" 2>/dev/null; cd /workspace/app-familiar-v2 && git diff --stat .claude/temp/LESSO |
 | 2026-08-11 | `Bash` | Exit code 1 angular-component angular-forms angular-primeng angular-signals desi | 1 | `Bash:Exit code 1 angular-component angular-forms angular-primeng angular-signals desi` | cd /workspace/app-familiar-v2 && ls .claude/skills/ && ls .claude/skills/sdd/ 2>/dev/null && wc -l . |
 | 2026-08-11 | `Bash` | Exit code 2 000 ls: cannot access '/tmp/claude-0/-home-user-Koa-agent-cli/7f1968 | 1 | `Bash:Exit code 2 000 ls: cannot access '/tmp/claude-0/-home-user-Koa-agent-cli/7f1968` | curl -s -o /dev/null -w "%{http_code}\n" --max-time 10 http://localhost:4263/ 2>&1; ls -la /tmp/clau |
+| 2026-08-12 | `Bash` | Exit code 1 0005-la-pantalla-de-la-plata === ¿hay categorías sembradas? === fail | 1 | `Bash:Exit code 1 0005-la-pantalla-de-la-plata === ¿hay categorías sembradas? === fail` | cd /workspace/app-familiar-v2 && python3 - <<'PY'
+import pathlib
+p = pathlib.Path('specs/ROADMAP.md' |

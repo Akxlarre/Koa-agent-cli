@@ -28,11 +28,11 @@ export class MenuConfigService {
         routerLink: '/app/dashboard',
       },
       // TODO: Añade tus rutas de feature aquí
-      {
-        label: 'Configuración',
-        icon: 'settings',
-        routerLink: '/app/settings',
-      },
+      // Sólo va en el menú lo que TIENE ruta en app.routes.ts. Este archivo
+      // nacía con una entrada a /app/settings que nunca existió: el usuario
+      // hacía clic y caía en el not-found. NAV-01 ahora lo bloquea.
+      //
+      // Para agregar una sección: primero su ruta, después su NavItem.
     ];
   });
 }

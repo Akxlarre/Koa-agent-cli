@@ -41,18 +41,20 @@ describe("BreadcrumbService", () => {
     expect(service.breadcrumb().items.length).toBe(0);
   });
 
-  it("breadcrumb items should contain the matched menu label for '/app/settings'", async () => {
-    // Las rutas del menú viven bajo /app (ver MenuConfigService): navegar a
-    // '/settings' no matchea ninguna entrada y el breadcrumb sale vacío.
-    await router.navigateByUrl("/app/settings");
+  it("breadcrumb items should contain the matched menu label", async () => {
+    // Antes navegaba a /app/settings y esperaba "Configuración": una entrada de
+    // menú que nunca tuvo ruta. Verificaba el comportamiento de un enlace
+    // muerto. Ahora se apunta al dashboard, que existe (NAV-01).
+    await router.navigateByUrl("/app/dashboard");
     const items = service.breadcrumb().items;
     expect(items.length).toBe(1);
-    expect(items[0].label).toBe("Configuración");
+    expect(items[0].label).toBe("Dashboard");
   });
 
   it("the active breadcrumb item should have no routerLink (current page)", async () => {
-    await router.navigateByUrl("/settings");
+    await router.navigateByUrl("/app/dashboard");
     const last = service.breadcrumb().items.at(-1);
+    expect(last).toBeDefined();
     expect(last?.routerLink).toBeUndefined();
   });
 

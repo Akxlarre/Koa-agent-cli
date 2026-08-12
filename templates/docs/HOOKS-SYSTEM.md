@@ -145,7 +145,7 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 
 ## Linter Arquitectónico Completo (`architect.js` v2.0)
 
-El linter AST se ejecuta con `npm run lint:arch` y valida **24 reglas**.
+El linter AST se ejecuta con `npm run lint:arch` y valida **25 reglas**.
 
 Analiza los `.ts`, los `.scss` y **los templates `template:` inline**, no solo los
 `.html`: el boilerplate no tiene un solo archivo `.html`, así que sin eso las reglas
@@ -199,6 +199,7 @@ tolerancia cero.
 |---|---|
 | A11Y-03 | Botón cuyo único contenido es un icono y no tiene nombre accesible |
 | ICON-01 | Icono usado en un template pero **no registrado** en el `LucideAngularModule.pick()` de `app.config.ts`. No rompe el build: lucide lanza en **runtime** |
+| NAV-01 | Entrada del menú que no resuelve a ninguna ruta de `app.routes.ts`. El usuario hace clic y cae en el not-found, y nada en el build lo delata. Koa mismo nacía con una: `/app/settings` estaba en el menú sin existir como ruta |
 
 Los guardrails viven en `scripts/lib/` con sus propios tests: `npm run lint:arch:test`.
 

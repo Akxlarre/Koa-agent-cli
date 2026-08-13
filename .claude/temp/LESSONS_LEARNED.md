@@ -22,4 +22,5 @@
 | 2026-08-12 | `Bash` | Exit code 7 HTTP 000 | 2 | `Bash:Exit code 7 HTTP 000` | curl -s --noproxy '*' -X POST localhost:8000/ -H 'Content-Type: application/json' -d '{}' -w '\nHTTP |
 | 2026-08-12 | `Bash` | Exit code 2 src/app/core/facades/base.facade.spec.ts(10,21): error TS2558: Expec | 1 | `Bash:Exit code 2 src/app/core/facades/base.facade.spec.ts(10,21): error TS2558: Expec` | cd /workspace/app-familiar-v2 && npx tsc --noEmit -p tsconfig.spec.json 2>&1 |
 | 2026-08-12 | `Bash` | Exit code 7 --- puerto 8000: 000 | 1 | `Bash:Exit code 7 --- puerto 8000: 000` | ps aux |
-| 2026-08-13 | `Bash` | Exit code 128 5da5e10 0004: fases 5 y 6 — la primera corrida y los guards cablea | 1 | `Bash:Exit code 128 5da5e10 0004: fases 5 y 6 — la primera corrida y los guards cablea` | cd /workspace/app-familiar-v2 && git log --oneline -3 && echo "--- 16ad643?" && git cat-file -t 16ad |
+| 2026-08-13 | `Bash` | Exit code 1 [33m🔍 Iniciando Auditoría Arquitectónica (AST Mode v2.0)...[0m [ | 1 | `Bash:Exit code 1 [33m🔍 Iniciando Auditoría Arquitectónica (AST Mode v2.0)...[0m [` | S=$(mktemp -d) && mkdir -p $S/src/app/features && cat > $S/src/app/features/x.component.ts <<'EOF'
+i |

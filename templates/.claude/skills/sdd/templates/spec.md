@@ -4,6 +4,15 @@
 > **Created:** {{DATE}}
 > **Owner:** {{OWNER}}
 > **Priority:** {{P0|P1|P2}}
+> **Modifica:** ninguna
+
+---
+
+> **`Modifica:`** las specs YA ESCRITAS que esta cambia — por ejemplo `0007, 0008`. No es lo
+> mismo que depender de ellas: es que un AC suyo deja de valer, se mueve o se absorbe acá. Las
+> specs referenciadas tienen que mencionar a ésta de vuelta, y `npm run lint:specs` lo verifica
+> en las dos direcciones. Sin eso, la spec vieja sigue prometiendo algo que ya vive en otro lado
+> y nadie se entera hasta construirla.
 
 ---
 

@@ -8,27 +8,73 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { execSync, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const HOOK = path.resolve(__dirname, '..', 'hooks', 'pre-write-guard.js');
 
+let sessionCounter = 0;
+
 /**
  * Ejecuta el hook con un TOOL_INPUT simulado.
+ *
+ * Cada llamada usa un CLAUDE_SESSION_ID unico para que el dedup de Context
+ * Injection y el Circuit Breaker no arrastren estado entre tests.
+ *
+ * Por defecto se pre-crea el flag de descubrimiento: las capas del hook corren
+ * en orden y el Discovery Gate (capa 2) bloquearia antes de llegar al Architect
+ * Guard (capa 3), haciendo intesteable todo lo que va despues. Los tests que
+ * quieren verificar el Gate en si pasan { discovered: false }.
+ *
  * @param {object} input - { tool_name, tool_input: { file_path, content|new_string } }
- * @returns {{ exitCode: number, stdout: string, stderr: string }}
+ * @param {{ discovered?: boolean }} [opts]
+ * @returns {{ exitCode: number, stdout: string, stderr: string, sessionId: string }}
  */
-function runHook(input) {
+function runHook(input, opts = {}) {
+  const { discovered = true } = opts;
+  const sessionId = `test-session-${Date.now()}-${sessionCounter++}`;
+
+  if (discovered) {
+    const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
+    fs.writeFileSync(flagPath, `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`);
+  }
+
   const result = spawnSync('node', [HOOK], {
     input: JSON.stringify(input),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: 'test-session-' + Date.now() }
+    env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
   });
   return {
     exitCode: result.status,
     stdout: result.stdout || '',
-    stderr: result.stderr || ''
+    stderr: result.stderr || '',
+    sessionId
   };
+}
+
+/**
+ * Ejecuta el hook N veces reusando la MISMA sesion — necesario para probar
+ * el Circuit Breaker, que cuenta bloqueos identicos por sesion.
+ */
+function runHookRepeated(input, times) {
+  const sessionId = `test-breaker-${Date.now()}-${sessionCounter++}`;
+  fs.writeFileSync(
+    path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`),
+    `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`
+  );
+
+  const runs = [];
+  for (let i = 0; i < times; i++) {
+    const result = spawnSync('node', [HOOK], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
+    });
+    runs.push({ exitCode: result.status, stderr: result.stderr || '' });
+  }
+  return runs;
 }
 
 function makeInput(filePath, content, toolName = 'Write') {
@@ -119,7 +165,7 @@ describe('ARCHITECT GUARD — A11Y', () => {
   });
 
   test('permite <app-icon> con aria-label', () => {
-    const r = runHook(makeInput(htmlPath, '<app-icon name="trash" [attr.aria-label]="'Eliminar'" />'));
+    const r = runHook(makeInput(htmlPath, `<app-icon name="trash" [attr.aria-label]="'Eliminar'" />`));
     // No debe bloquear por A11Y-01
     assert.ok(r.exitCode !== 2 || !r.stderr.includes('A11Y-01'));
   });
@@ -156,5 +202,56 @@ describe('ARCHITECT GUARD — ARCH-11', () => {
     ));
     assert.equal(r.exitCode, 2);
     assert.ok(r.stderr.includes('ARCH-11') || r.stderr.includes('AUTO-GENERADO'));
+  });
+});
+
+// ─── CIRCUIT BREAKER tests ────────────────────────────────────────────────
+describe('CIRCUIT BREAKER', () => {
+  const htmlPath = '/project/src/app/features/dashboard/dashboard.component.html';
+  const badContent = '<div *ngIf="cond">x</div>';
+
+  test('avisa del contador a partir del 2do intento identico', () => {
+    const runs = runHookRepeated(makeInput(htmlPath, badContent), 2);
+    assert.equal(runs[0].exitCode, 2);
+    assert.ok(!runs[0].stderr.includes('Intento'), 'el 1er intento no debe mencionar contador');
+    assert.ok(runs[1].stderr.includes('Intento 2/3'));
+  });
+
+  test('escala a CIRCUIT BREAKER al 3er intento identico', () => {
+    const runs = runHookRepeated(makeInput(htmlPath, badContent), 3);
+    assert.equal(runs[2].exitCode, 2);
+    assert.ok(runs[2].stderr.includes('CIRCUIT BREAKER'));
+    assert.ok(runs[2].stderr.includes('DETENTE'));
+  });
+
+  test('el contador es por sesion — otra sesion arranca limpia', () => {
+    runHookRepeated(makeInput(htmlPath, badContent), 3);
+    const fresh = runHook(makeInput(htmlPath, badContent));
+    assert.equal(fresh.exitCode, 2);
+    assert.ok(!fresh.stderr.includes('CIRCUIT BREAKER'));
+  });
+
+  test('no escala si el codigo es valido (no hay bloqueo que contar)', () => {
+    const runs = runHookRepeated(
+      makeInput(htmlPath, '@if (cond) { <div>x</div> }'),
+      3
+    );
+    assert.ok(runs.every(r => r.exitCode !== 2));
+  });
+});
+
+// ─── DISCOVERY GATE tests ─────────────────────────────────────────────────
+describe('DISCOVERY GATE', () => {
+  const featurePath = '/project/src/app/features/dashboard/dashboard.component.ts';
+
+  test('bloquea escritura en src/app sin haber leido indices', () => {
+    const r = runHook(makeInput(featurePath, 'export class X {}'), { discovered: false });
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('DISCOVERY GATE'));
+  });
+
+  test('permite pasar del Gate una vez leidos los indices', () => {
+    const r = runHook(makeInput(featurePath, 'export class X {}'), { discovered: true });
+    assert.ok(!r.stderr.includes('DISCOVERY GATE'));
   });
 });

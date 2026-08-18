@@ -33,6 +33,34 @@ try {
   }
 } catch { /* fail-open */ }
 
+// ─── CIRCUIT BREAKER ─────────────────────────────────────────────────────────
+// Un bloqueo con exit 2 es un "no" sin memoria: el agente puede reintentar la
+// misma escritura indefinidamente y el guard la rechazara igual cada vez,
+// quemando tokens sin avanzar. El breaker cuenta bloqueos identicos por sesion
+// y al tercero cambia el mensaje: deja de explicar el arreglo y ordena parar.
+const BREAKER_THRESHOLD = 3;
+
+/**
+ * Registra un bloqueo y devuelve cuantas veces se repitio el mismo
+ * {archivo, motivo} en esta sesion. Fail-open: ante cualquier error de FS
+ * devuelve 1, de modo que el guard sigue bloqueando pero sin escalar.
+ */
+function recordBlock(sessionId, filePath, reason) {
+  try {
+    const statePath = path.join(os.tmpdir(), `koa-breaker-${sessionId}.json`);
+    const key = `${path.basename(filePath)}::${String(reason).replace(/\s+/g, ' ').slice(0, 120)}`;
+    let state = {};
+    if (fs.existsSync(statePath)) {
+      try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')) || {}; } catch { state = {}; }
+    }
+    state[key] = (state[key] || 0) + 1;
+    fs.writeFileSync(statePath, JSON.stringify(state));
+    return state[key];
+  } catch {
+    return 1;
+  }
+}
+
 // SEC-04: Limit stdin to 10 MB to prevent memory exhaustion (DoS) from crafted hook inputs.
 const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let data = '';
@@ -308,10 +336,33 @@ process.stdin.on('end', () => {
 
     // --- Reportar violaciones ---
     if (violations.length > 0) {
+      // El breaker cuenta por la PRIMERA violacion, no por la lista completa:
+      // el agente suele arreglar una y dejar la otra, y el conjunto cambia en
+      // cada intento aunque el problema de fondo sea siempre el mismo.
+      const attempts = recordBlock(sessionId, filePath, violations[0]);
+
+      if (attempts >= BREAKER_THRESHOLD) {
+        process.stderr.write(
+          `\u{1F534} CIRCUIT BREAKER: ${attempts} intentos bloqueados por lo mismo en ${path.basename(filePath)}.\n\n` +
+          `Violacion persistente:\n  \u274C ${violations[0]}\n\n` +
+          `DETENTE. No vuelvas a intentar esta escritura \u2014 el guard la va a rechazar igual.\n` +
+          `Ya van ${attempts} rondas y el enfoque no esta funcionando. Haz esto:\n` +
+          `  1. Explicale al humano que estas bloqueado y pega la violacion de arriba.\n` +
+          `  2. Di que entendiste de la regla y por que tu solucion no la satisface.\n` +
+          `  3. Espera indicaciones. Si crees que la regla esta mal aplicada, dilo \u2014 pero no la esquives.\n\n` +
+          `NO intentes rodear el guard escribiendo por Bash, renombrando el archivo\n` +
+          `ni troceando el cambio en escrituras mas chicas.`
+        );
+        process.exit(2);
+      }
+
       process.stderr.write(
         `\u{1F6A8} ARCHITECT GUARD: Violaciones detectadas en ${path.basename(filePath)}:\n` +
         violations.map(v => `  \u274C ${v}`).join('\n') +
-        `\nCorrige el codigo antes de escribirlo.`
+        `\nCorrige el codigo antes de escribirlo.` +
+        (attempts > 1
+          ? `\n\n\u26A0\uFE0F  Intento ${attempts}/${BREAKER_THRESHOLD} con la misma violacion. Al ${BREAKER_THRESHOLD}\u00BA se corta y hay que escalar al humano \u2014 cambia de enfoque, no de sintaxis.`
+          : '')
       );
       process.exit(2);
     }

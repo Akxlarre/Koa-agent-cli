@@ -1,4 +1,4 @@
-# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.1)
+# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.5)
 
 > Este documento explica cómo el sistema de hooks convierte las reglas arquitectónicas
 > en **constraints** reales que Claude no puede ignorar.
@@ -100,16 +100,43 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 ### 3. Bash Guard (`bash-guard.js`)
 - **Evento**: PreToolUse
 - **Matcher**: `Bash`
-- **Función**: Bloquea dos patrones peligrosos:
-  - Creación de archivos `.ts/.html/.scss/.sql` via Bash (debe usar Edit/Write)
-  - Operaciones destructivas (`rm -rf`) sobre directorios críticos
+- **Función**: Tres capas:
+  - **Creación de archivos fuente** — `.ts/.html/.scss/.sql` via Bash queda bloqueado
+    (debe usar Edit/Write). Cubre redirecciones (`>`, `cat`, `tee`), creación directa
+    (`touch`, `cp`, `mv`) y generadores (`ng generate`). Todos esos caminos escriben
+    código a disco **sin que el Architect Guard llegue a ver el contenido**.
+  - **Operaciones destructivas** — `rm -rf` sobre directorios críticos.
+  - **Approval Gate de base de datos** — ver abajo.
+
+#### Approval Gate (dentro de bash-guard)
+
+Las capas anteriores protegen el filesystem, que es recuperable con git.
+Una migración aplicada contra una base remota no lo es.
+
+| Comando | Por qué necesita un humano |
+|---|---|
+| `supabase db push` | Ejecuta DDL sin rollback automático |
+| `supabase db reset` | Borra todos los datos |
+| `supabase migration repair` | Reescribe el historial de migraciones |
+| `supabase link` | Define contra qué base apuntan los comandos siguientes |
+| `psql … DROP/TRUNCATE/DELETE/ALTER` | Cambios de esquema fuera de migraciones versionadas |
+
+El agente **sí** escribe la migración en `supabase/migrations/`. Lo que no hace es
+aplicarla: informa el comando exacto y espera. `supabase start`, `migration new` y
+`gen types` no se ven afectados.
 
 ### 4. Compact Recovery (`compact-recovery.js`)
 - **Evento**: PostCompact
 - **Matcher**: ninguno (se ejecuta en cada compactación)
-- **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contenido
-  de todos los archivos `indices/*.md` al contexto. Claude nunca pierde la memoria
-  de lo que existe en el proyecto.
+- **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contexto
+  que el agente estaba usando. Tres decisiones de diseño:
+  - **Selectiva** — solo los índices que el agente había leído (más los 3 core),
+    según el flag de discovery. No los 11.
+  - **Parcial** — corta cada índice en `<!-- DETAIL:BEGIN -->`: vuelve la Quick
+    Reference, no los ejemplos de código.
+  - **Solo lo pendiente** — del task-spec activo re-inyecta únicamente las casillas
+    `- [ ]`. Lo ya completado se descarta a propósito (Context Offloading): el agente
+    necesita saber qué le falta, no qué ya hizo.
 
 ### 5. Failure Tracker (`failure-tracker.js`)
 - **Evento**: PostToolUseFailure
@@ -128,7 +155,45 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
   componentes/servicios nuevos sin actualizar los índices. Si detecta drift,
   fuerza a Claude a continuar y actualizar los índices.
 
-### 7. Prettier (post-edit.js)
+### 7. Circuit Breaker (dentro de `pre-write-guard.js`)
+- **Evento**: PreToolUse (Edit|Write|MultiEdit)
+- **Función**: Un `exit 2` es un "no" sin memoria — el agente puede reintentar la
+  misma escritura indefinidamente. El breaker cuenta bloqueos por `{archivo, violación}`
+  en un estado de sesión (`$TMPDIR/koa-breaker-{sessionId}.json`):
+
+  | Intento | Qué recibe el agente |
+  |---|---|
+  | 1º | Violación + cómo corregirla |
+  | 2º | Lo mismo + aviso de que va 2/3 |
+  | 3º | **STOP**: deja de explicar el arreglo y le ordena escalar al humano |
+
+  El mensaje del 3º intento cierra explícitamente las vías de escape (Bash, renombrar
+  el archivo, trocear el cambio) porque son los rodeos que un agente bloqueado intenta.
+
+  Cuenta por la **primera** violación, no por la lista completa: el agente suele
+  arreglar una y dejar otra, con lo que el conjunto cambia en cada intento aunque el
+  problema de fondo sea el mismo.
+
+### 8. Spec Reflection (`spec-reflection.js`)
+- **Evento**: Stop
+- **Función**: `/plan` genera un task-spec con un "Criterio de done" en casillas
+  markdown. Hasta v6.4 nadie las verificaba nunca — el spec era write-only. Este hook
+  lee el spec activo al terminar la respuesta y devuelve los puntos sin cerrar, más
+  evidencia del filesystem sobre los que puede comprobar solo (p.ej. si los fuentes
+  son más recientes que los índices, la casilla de índices no está cumplida de verdad).
+
+  **No re-evalúa el código** — eso es `/review` + `code-judge`. Solo comprueba que lo
+  que el agente declaró que iba a hacer, lo hizo.
+
+  **Anti-bucle**: el mismo estado del spec no se reporta dos veces. Sin eso el agente
+  responde, el hook lo frena, vuelve a responder y el hook lo frena otra vez con lo
+  mismo. Si el spec avanza (o retrocede), el aviso vuelve a salir.
+
+  Si el spec no tiene **ninguna** casilla marcada, el hook calla: el agente no está
+  usando el flujo del task-spec y no tiene sentido reclamarle pendientes de un
+  documento que no adoptó.
+
+### 9. Prettier (post-edit.js)
 - **Evento**: PostToolUse
 - **Matcher**: `Edit|Write|MultiEdit`
 - **Función**: Formatea automáticamente con Prettier cada archivo editado.
@@ -193,3 +258,35 @@ Envuelve los `echo` en `if [[ $- == *i* ]]; then ... fi`.
 ### "Quiero editar un archivo protegido"
 Los archivos del sistema de hooks están protegidos contra edición por Claude.
 Edítalos manualmente en tu editor de texto.
+
+---
+
+## Subagentes (`.claude/agents/`)
+
+Los hooks restringen al agente. Los subagentes le dan **presupuesto de contexto**:
+corren en su propia ventana y devuelven un resumen en vez de volcar archivos.
+
+| Subagente | Devuelve | Modelo | Puede escribir |
+|---|---|---|---|
+| `discovery-scout` | Qué reutilizar / qué crear / qué evitar | rápido | no |
+| `arch-auditor` | Violaciones de `lint:arch` + `tsc`, comprimidas | rápido | no |
+| `index-syncer` | Diff de índices actualizados | rápido | solo `indices/` |
+| `supabase-schema` | Tablas, FKs y políticas RLS reales | rápido | no |
+| `code-judge` | Veredicto por criterio contra la rúbrica | razonador | no |
+
+### Por qué el juez usa un modelo más caro
+
+`code-judge` corre con un modelo de razonamiento mientras el resto usa uno rápido.
+Un evaluador que razona igual que el generador no detecta los errores del generador —
+comparte sus puntos ciegos. El resto de subagentes hacen tareas mecánicas (correr un
+comando, comparar dos listas) donde un modelo rápido rinde igual y cuesta menos.
+
+### Qué cubre el juez que los hooks no
+
+Los guardrails detectan **sintaxis**: `*ngIf`, `@Input()`, colores hardcodeados, falta
+de `OnPush`. Todo eso es regex y AST, y se atrapa solo.
+
+Lo que ningún hook atrapa es el **diseño**: una facade que no respeta su contrato, un
+Repository saltado, un Smart component disfrazado de Dumb, un nombre que contradice
+`context/domain.md`. Para eso hace falta un modelo leyendo la rúbrica, y por eso
+`/review` existe además de `npm run lint:arch`.

@@ -6,7 +6,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?style=flat-square&logo=nodedotjs)](https://nodejs.org)
 [![Angular](https://img.shields.io/badge/Angular-v20%2B-dd0031?style=flat-square&logo=angular)](https://angular.dev)
-[![Blueprint](https://img.shields.io/badge/Blueprint-v6.4.0-6366f1?style=flat-square)](./CHANGELOG.md)
+[![Blueprint](https://img.shields.io/badge/Blueprint-v6.5.0-6366f1?style=flat-square)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](./CONTRIBUTING.md)
 
@@ -59,8 +59,9 @@ my-app/
 ├── .claude/               # The agentic harness
 │   ├── CLAUDE.md          # Agent directive: stack, rules, workflow
 │   ├── hooks/             # Real-time guardrails (table below)
+│   ├── agents/            # 5 subagents with their own context windows
 │   ├── rules/             # 13 path-scoped architectural rules
-│   ├── skills/            # 7 reusable agent skills (/angular-component, …)
+│   ├── skills/            # 8 reusable agent skills (/plan, /review, …)
 │   └── tests/             # Unit tests for the hooks themselves
 │
 ├── context/               # Semantic seed: session brief, domain glossary,
@@ -103,7 +104,18 @@ This is the core differentiator. `.claude/` is not documentation — it's active
 | `write-tracker` | After file writes | Records modified files for the Sync Check |
 | `compact-recovery` | On context compaction | Re-injects indexes so the agent doesn't lose memory mid-session |
 | `sync-check` | On agent stop | Compares file timestamps vs. indexes; reminds the agent to update its memory |
+| `spec-reflection` | On agent stop | Checks the active task-spec's done criteria and returns what's still open |
 | `post-edit` | After file writes | Runs Prettier automatically |
+
+Two of these fire only when the agent is heading somewhere it shouldn't:
+
+- **Circuit Breaker** (inside `pre-write-guard`) — a plain `exit 2` is a "no" with no
+  memory, so a blocked agent can retry the same write forever. After three identical
+  blocks the guard stops explaining the fix and orders the agent to escalate to a human,
+  explicitly closing the escape hatches (shell, renaming, splitting the change).
+- **Approval Gate** (inside `bash-guard`) — `supabase db push`, `db reset`,
+  `migration repair`, `link` and destructive `psql` need a person. Writing the migration
+  is the agent's job; applying it against a real database is not.
 
 The hooks ship with their own unit tests (`npm run claude:test-hooks`) — the harness is code, and it's tested like code.
 
@@ -133,6 +145,32 @@ Every write is validated in real time against the project's architecture. The gu
 - SQL migrations without Row Level Security
 
 Everything the guard enforces in real time is also available as a full audit: `npm run lint:arch` walks the AST of the whole project and reports violations with `[ARCH-NN]` codes and doc links.
+
+### Subagents — what the guard can't see
+
+The guard catches **syntax**: `*ngIf`, `@Input()`, hardcoded colors, a missing `OnPush`.
+All of that is regex and AST, and it catches itself.
+
+What no hook catches is **design** — a facade that doesn't honor its contract, a
+repository skipped, a Smart component wearing a Dumb component's clothes, a name that
+contradicts the project's own domain glossary. Those pass every guardrail clean.
+
+That's what `.claude/agents/` is for. Each subagent runs in its own context window and
+returns a summary instead of dumping files into the main conversation:
+
+| Subagent | Returns | Model |
+|---|---|---|
+| `discovery-scout` | What to reuse / what to create / what to avoid | fast |
+| `arch-auditor` | `lint:arch` + `tsc` compressed to actionable violations | fast |
+| `index-syncer` | Reconciles `indices/*.md` against the real code | fast |
+| `supabase-schema` | Real tables, FKs and RLS policies from the migrations | fast |
+| `code-judge` | Per-criterion verdict against the project's rubric | reasoning |
+
+`/review` invokes `code-judge` against a fixed rubric — the `ARCH-*` codes, the
+path-scoped rules, and `indices/ANTI-PATTERNS.md`. It runs on a stronger model than the
+one writing the code, on purpose: an evaluator that reasons like the generator shares
+the generator's blind spots. A `RECHAZADO` verdict must name a file and a concrete fix,
+or it gets demoted to a minor finding — opinions don't block commits.
 
 ### Living indexes
 

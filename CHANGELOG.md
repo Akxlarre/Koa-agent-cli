@@ -6,6 +6,81 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.5.0] — 2026-08-18
+
+Esta versión cierra los huecos agénticos del harness: hasta ahora los guardrails
+detectaban **sintaxis** pero nada revisaba **diseño**, un agente bloqueado podía
+reintentar sin límite, y el criterio de done que generaba `/plan` no lo verificaba nadie.
+
+### Fixed
+- **`compact-recovery.js` no compilaba.** Tenía saltos de línea literales dentro de
+  strings con comillas simples: el hook PostCompact fallaba en silencio en cada
+  compactación desde que se añadió el bloque de `context/`. La re-inyección de índices
+  y contexto **no estaba ocurriendo** en ningún proyecto generado. Además el regex de
+  detección de plantillas vacías usaba `[sS]` en vez de `[\s\S]`, con lo que no
+  eliminaba comentarios HTML y trataba plantillas vacías como contenido real.
+- **`bash-guard.js` no cubría `touch`, `cp`, `mv` ni `ng generate`.** Todos escriben
+  archivos fuente a disco sin pasar por Edit/Write, así que el Architect Guard nunca
+  veía el contenido. La suite de tests ya afirmaba que `touch` estaba bloqueado — el
+  test decía la verdad y el hook no.
+- **La suite de tests estaba roja (4 de 8).** `pre-write-guard.test.js` no compilaba
+  (comillas simples anidadas) y su harness no creaba el flag de discovery, así que el
+  Discovery Gate bloqueaba antes que el Architect Guard y todos los asserts sobre
+  mensajes de violación fallaban. Ahora: **55 tests, 55 en verde.**
+
+### Added
+- **Subagentes (`.claude/agents/`)** — `discovery-scout`, `arch-auditor`, `index-syncer`,
+  `supabase-schema`, `code-judge`. Corren en su propia ventana de contexto y devuelven
+  un resumen en vez de volcar archivos al contexto principal.
+- **Skill `/review` + subagente `code-judge`** — juez con rúbrica que califica el diff
+  contra `ARCH-*`, `A11Y-*`, `.claude/rules/*` e `indices/ANTI-PATTERNS.md`. Cubre el
+  diseño, que es lo que ni el regex del hook ni el AST del linter pueden ver. Corre con
+  un modelo de razonamiento a propósito: un evaluador que razona igual que el generador
+  comparte sus puntos ciegos.
+- **Circuit Breaker** en `pre-write-guard.js` — cuenta bloqueos por `{archivo, violación}`
+  y al 3º deja de explicar el arreglo y ordena escalar al humano, cerrando explícitamente
+  las vías de escape (Bash, renombrar, trocear el cambio).
+- **Approval Gate** en `bash-guard.js` — `supabase db push`, `db reset`, `migration repair`,
+  `link` y SQL destructivo vía `psql` requieren un humano. `start`, `migration new` y
+  `gen types` siguen permitidos.
+- **`spec-reflection.js`** (Stop hook) — lee el "Criterio de done" del task-spec activo y
+  devuelve los puntos sin cerrar, con evidencia del filesystem. Incluye anti-bucle: el
+  mismo estado del spec no se reporta dos veces.
+- **Context Offloading activo** — `compact-recovery.js` re-inyecta solo las casillas
+  `- [ ]` pendientes del task-spec; lo completado se descarta del contexto.
+- **Tests nuevos** — `spec-reflection.test.js` y `compact-recovery.test.js` (el hook que
+  estuvo roto sin que nadie lo notara ahora tiene un test que verifica que simplemente corre).
+
+### Changed
+- **`.mcp.json` — mínimo privilegio.** El servidor MCP de Supabase venía con un Personal
+  Access Token inline y sin acotar: escritura a nivel de cuenta sobre **todos** los
+  proyectos del usuario, producción incluida. Ahora ships con `--read-only`,
+  `--project-ref` y el token vía variable de entorno `SUPABASE_ACCESS_TOKEN` en vez de
+  commiteado en el repo.
+- **`skills/plan.md` → `skills/plan/SKILL.md`** — era la única skill suelta; el resto ya
+  usaba la forma de directorio. El task-spec ahora incluye una sección de reutilización
+  (alimentada por `discovery-scout`) y pasos de ejecución en casillas marcables.
+- **Flujo de 5 pasos** — DESCUBRIR delega en `discovery-scout`, VALIDAR suma `arch-auditor`
+  y `/review`, SINCRONIZAR delega en `index-syncer`.
+
+### Migración desde 6.4
+1. Copiar `.claude/agents/` completo (carpeta nueva).
+2. Reemplazar `.claude/hooks/compact-recovery.js`, `pre-write-guard.js` y `bash-guard.js`.
+3. Copiar `.claude/hooks/spec-reflection.js` y registrarlo en `.claude/settings.json`
+   dentro de `Stop`, **antes** de `sync-check.js`.
+4. Mover `.claude/skills/plan.md` a `.claude/skills/plan/SKILL.md` y copiar
+   `.claude/skills/review/SKILL.md`.
+5. **Revisar `.mcp.json`**: si ya pegaste un PAT inline, rótalo en
+   supabase.com/dashboard/account/tokens — quedó en el historial de git — y pasa a
+   `SUPABASE_ACCESS_TOKEN` + `--read-only` + `--project-ref`.
+6. Copiar los tests nuevos y correr `npm run claude:test-hooks`.
+
+**Nota sobre el Approval Gate**: si tu flujo dependía de que el agente corriera
+`supabase db push`, ahora queda bloqueado a propósito. El agente escribe la migración
+e informa el comando; lo aplica una persona.
+
+---
+
 ## [6.1.0] — 2026-03-26
 
 ### Changed

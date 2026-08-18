@@ -105,27 +105,51 @@ for (const cf of CONTEXT_FILES) {
   if (!fs.existsSync(fullPath)) continue;
 
   const raw = fs.readFileSync(fullPath, 'utf-8').trim();
-  // Saltar archivos que son solo plantilla (sin contenido real)
-  const stripped = raw.replace(/<!--[sS]*?-->/g, '').trim();
+  // Saltar archivos que son solo plantilla (sin contenido real).
+  // Se eliminan comentarios HTML antes de medir: las plantillas de context/
+  // son casi enteramente <!-- instrucciones -->, asi que sin contenido real
+  // el resultado queda por debajo del umbral.
+  const stripped = raw.replace(/<!--[\s\S]*?-->/g, '').trim();
   if (stripped.length < 80) continue;
 
   if (!contextAdded) {
-    output += '─── Contexto del proyecto (context/) ───
-
-';
+    output += '\n─── Contexto del proyecto (context/) ───\n\n';
     contextAdded = true;
   }
-  output += '--- ' + cf.label + ' ---
-';
-  output += raw + '
-
-';
+  output += '--- ' + cf.label + ' ---\n';
+  output += raw + '\n\n';
 }
 
 if (contextAdded) {
-  output += '─── Fin contexto del proyecto ───
-
-';
+  output += '─── Fin contexto del proyecto ───\n\n';
 }
+
+// ─── Trabajo pendiente del task-spec activo ─────────────────────────────────
+// Context Offloading: tras un compact solo se re-inyecta lo que sigue ABIERTO.
+// Los pasos ya completados ([x]) se descartan — el agente no necesita recordar
+// lo que ya hizo, solo lo que le falta.
+try {
+  const specDir = path.join(cwd, '.claude', 'temp');
+  if (fs.existsSync(specDir)) {
+    const specs = fs.readdirSync(specDir)
+      .filter(f => f.startsWith('task-spec-') && f.endsWith('.md'))
+      .sort();
+    const latest = specs[specs.length - 1];
+    if (latest) {
+      const specRaw = fs.readFileSync(path.join(specDir, latest), 'utf-8');
+      const pending = specRaw
+        .split('\n')
+        .filter(l => /^\s*-\s*\[ \]/.test(l))
+        .map(l => l.trim());
+      if (pending.length > 0) {
+        output += '─── Task-spec activo: ' + latest + ' ───\n';
+        output += 'Pendiente (los pasos completados se omiten a proposito):\n';
+        output += pending.join('\n') + '\n\n';
+        output += 'Lee .claude/temp/' + latest + ' si necesitas el objetivo completo.\n';
+        output += '─── Fin task-spec ───\n\n';
+      }
+    }
+  }
+} catch { /* fail-open */ }
 
 process.stdout.write(output);

@@ -73,6 +73,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node .claude/hooks/spec-reflection.js"
+          },
+          {
+            "type": "command",
             "command": "node .claude/hooks/sync-check.js"
           },
           {

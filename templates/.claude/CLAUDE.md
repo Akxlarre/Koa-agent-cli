@@ -65,6 +65,10 @@ llenar tu contexto principal de output que solo necesitas una vez.
 El juez usa a propósito un modelo más capaz que el que genera el código: un
 evaluador que razona igual que el generador no detecta los errores del generador.
 
+**Delegar no es gratis** — cada subagente es una llamada completa que arranca sin
+nada de lo que ya sabes. `.claude/rules/delegation.md` (se carga sola al editar
+código) dice cuándo vale la pena y cuándo hacerlo tú.
+
 `code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff como archivo
 (`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría escribir
 usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un hecho.
@@ -82,6 +86,7 @@ Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las i
 | `src/app/**/*.html` + `shared/**` + `styles/**` | `visual-system`, `ai-readability` |
 | `src/app/features/**` + `layout/**` | `notifications`, `layout-blueprints` |
 | `supabase/**` + `core/services/**` | `database` |
+| `src/app/**/*.ts` + `.html` + `supabase/migrations/**` | `delegation` (cuándo usar un subagente y cuándo no) |
 
 ## Referencias (leer bajo demanda — no cargadas automáticamente)
 

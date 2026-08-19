@@ -6,7 +6,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?style=flat-square&logo=nodedotjs)](https://nodejs.org)
 [![Angular](https://img.shields.io/badge/Angular-v20%2B-dd0031?style=flat-square&logo=angular)](https://angular.dev)
-[![Blueprint](https://img.shields.io/badge/Blueprint-v6.7.0-6366f1?style=flat-square)](./CHANGELOG.md)
+[![Blueprint](https://img.shields.io/badge/Blueprint-v6.8.0-6366f1?style=flat-square)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](./CONTRIBUTING.md)
 
@@ -61,7 +61,7 @@ my-app/
 │   ├── hooks/             # Real-time guardrails (table below)
 │   │   └── validators/    # Generic, flag-driven structure validators
 │   ├── agents/            # 5 subagents with their own context windows
-│   ├── rules/             # 13 path-scoped architectural rules
+│   ├── rules/             # 14 path-scoped architectural rules
 │   ├── skills/            # 8 reusable agent skills (/plan, /review, …)
 │   └── tests/             # Unit tests for the hooks themselves
 │

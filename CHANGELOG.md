@@ -6,6 +6,51 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.8.0] — 2026-08-19
+
+Dos huecos que quedaron abiertos al agregar los subagentes en 6.5.
+
+### Added
+- **`.claude/rules/delegation.md`** — los subagentes existían desde 6.5 pero solo
+  estaban anunciados en `CLAUDE.md`, que es precisamente el tipo de *guideline* que
+  este proyecto sostiene que no funciona. Ahora es una regla path-scoped: se carga
+  sola al editar código, que es cuando la decisión de delegar se toma.
+
+  La mitad útil de la regla es **cuándo NO delegar**. Cada subagente es una llamada
+  completa que arranca sin nada de lo que el agente principal ya sabe: pedirle a
+  `discovery-scout` un dato que Session Start ya inyectó paga una llamada por
+  nada, y un resumen de treinta líneas es lo peor que puedes tener antes de
+  refactorizar un servicio.
+
+- **`indices/ANTI-PATTERNS.md` — 6 anti-patrones nuevos (AP-007→012).** El índice
+  ya traía seis, pero los seis eran cosas que el Architect Guard bloquea por regex:
+  documentaban lo que el hook ya impedía, sin aportar nada que el hook no supiera.
+
+  Los nuevos son los que **ningún regex puede ver**: un Smart component disfrazado
+  de Dumb, `effect()` usado para estado derivado, un Facade que expone su signal
+  escribible, un Repository que filtra la forma de la respuesta de Supabase, un
+  nombre que contradice `context/domain.md`, y una tabla con RLS activado pero sin
+  políticas —el guard exige `ENABLE ROW LEVEL SECURITY` pero no verifica que exista
+  una sola `CREATE POLICY`, y una tabla con RLS y cero políticas no es segura: es
+  inaccesible, hasta que alguien la "arregla" con `USING (true)`.
+
+  El archivo ahora explica esa división y cómo agregar entradas nuevas. Importa
+  porque `code-judge` lee este índice como criterio C9 de su rúbrica: una entrada
+  aquí se convierte en algo que se revisa en cada `/review`.
+
+### Migración desde 6.7
+1. Copiar `.claude/rules/delegation.md`.
+2. Reemplazar `indices/ANTI-PATTERNS.md` — o, si ya lo llenaste con hallazgos
+   propios, copiar solo el Grupo 2 y la sección "Cómo leer este índice". Tus
+   entradas propias son más valiosas que las que trae el blueprint.
+
+### Sabido y no resuelto
+El Architect Guard no verifica que una migración con `CREATE TABLE` incluya
+políticas RLS. Queda documentado como AP-012 y lo detecta `/review`, pero no hay
+guardrail automático. Sería una regex más en `pre-write-guard.js`.
+
+---
+
 ## [6.7.0] — 2026-08-19
 
 Auditoría del **boilerplate**. Las versiones 6.5 y 6.6 trabajaron sobre el harness;

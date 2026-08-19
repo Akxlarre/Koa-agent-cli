@@ -11,7 +11,7 @@
 | `templates/AGENTS.md` | `AGENTS.md` | **Master universal** self-contained para todos los AI tools (OpenCode, Copilot, Codex…). Workflow de 5 pasos, reglas arquitectónicas, anti-patterns, los 10 índices. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
 | `templates/gitignore.template` | `.gitignore` | .gitignore con entradas para Angular, Supabase, GSAP, Vitest, Playwright. |
 | `templates/docs/` | `docs/` | Guías de usuario: HOOKS-SYSTEM.md, TECH-STACK-RULES.md, BRAND_GUIDELINES.md, PRODUCT-VISION.md. |
-| `templates/indices/` | `indices/` | 10 índices vacíos con estructura lista para completar: COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, PIPES, STYLES, STORES, DATABASE, ANTI-PATTERNS. |
+| `templates/indices/` | `indices/` | 11 índices con estructura lista para completar: COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, PIPES, STYLES, STORES, LAYOUTS, DATABASE, ANTI-PATTERNS. **ANTI-PATTERNS.md no viene vacío**: 12 anti-patrones en dos grupos — AP-001→006 los bloquea el Architect Guard, AP-007→012 son de diseño y solo los ve `code-judge` o una persona. |
 | `templates/context/domain.md` | `context/domain.md` | Entidades del negocio, reglas de dominio, terminología específica, stakeholders. Gitignored. |
 | `templates/context/brief.md` | `context/brief.md` | Objetivo de la sesión actual (campo `last_updated`). Se actualiza al inicio de cada sesión. Gitignored. |
 | `templates/context/constraints.md` | `context/constraints.md` | Restricciones del proyecto: integraciones externas, deuda técnica aceptada, entorno, límites del cliente. Gitignored. |
@@ -30,7 +30,7 @@
 | `templates/.claude/hooks/` | `.claude/hooks/` | 12 hooks de guardrails (ver tabla abajo). |
 | `templates/.claude/hooks/validators/` | `.claude/hooks/validators/` | Validadores genéricos parametrizados por flags. No saben nada del proyecto. Trae su `package.json` que fuerza CommonJS. |
 | `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
-| `templates/.claude/rules/` | `.claude/rules/` | 13 reglas arquitectónicas path-scoped. |
+| `templates/.claude/rules/` | `.claude/rules/` | 14 reglas arquitectónicas path-scoped. |
 | `templates/.claude/skills/` | `.claude/skills/` | 9 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices, plan, review). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
 | `templates/.claude/tests/` | `.claude/tests/` | 7 archivos de tests de contrato de los hooks (`node --test`). 91 tests. |
@@ -101,6 +101,7 @@
 | `database.md` | `supabase/**`, `core/services/**` | Migrations SQL, RLS obligatorio |
 | `layout-blueprints.md` | `src/app/features/**` | 8 arquetipos de página: hero, grid, componentes por tipo |
 | `a11y-spec.md` | `src/app/**/*.html` | Reglas de accesibilidad: aria-label en iconos de acción, caption en tablas |
+| `delegation.md` | `src/app/**/*.ts`, `.html`, `supabase/migrations/**` | Cuándo delegar en un subagente y —más importante— cuándo no. Permisos acotados de `index-syncer` y `code-judge` |
 
 ## Subagentes en templates/.claude/agents/
 

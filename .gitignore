@@ -26,6 +26,12 @@ bazel-out/
 .claude/logs/
 .gemini/
 
+# Estado efímero de los hooks: LESSONS_LEARNED.md, session-writes.json, task-specs.
+# Es memoria de sesión, no código. El .gitignore que enviamos a los proyectos
+# generados ya lo ignoraba; este repo no, y por eso aparecía como cambio suelto
+# en cada commit.
+.claude/temp/
+
 
 # Workshop — espacio de trabajo privado (planes, research, ADRs, visión)
 /workshop/

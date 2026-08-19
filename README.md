@@ -409,10 +409,13 @@ koa-agent-cli/
 │   ├── boilerplate/   # Angular source boilerplate (+ -e2e, -ngrx variants)
 │   ├── adapters/      # Cursor / Windsurf / Copilot rule adapters
 │   ├── docs/          # Human-facing guides
-│   └── supabase/      # Supabase local config + migrations dir
-└── ok-project/        # Reference output — a generated project kept in-repo
-                       # as a living example of what the scaffold produces
+    └── supabase/      # Supabase local config + migrations dir
 ```
+
+To see what the scaffold produces, run the CLI — a generated project is not kept
+in-repo. A checked-in sample drifts from `templates/` the moment either changes,
+and a stale copy of the harness sitting next to the real one is worse than none:
+it is the first thing an agent finds when it greps.
 
 ---
 

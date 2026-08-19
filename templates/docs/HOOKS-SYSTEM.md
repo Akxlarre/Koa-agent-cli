@@ -1,4 +1,4 @@
-# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.6)
+# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.7)
 
 > Este documento explica cómo el sistema de hooks convierte las reglas arquitectónicas
 > en **constraints** reales que Claude no puede ignorar.

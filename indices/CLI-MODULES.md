@@ -7,13 +7,13 @@
 
 | Archivo | Responsabilidad | Tamaño actual |
 |---------|----------------|---------------|
-| `bin/index.js` | Entry point: resuelve stack, ejecuta preflight, muestra inquirer prompts, orquesta el flujo de scaffolding. Sin lógica de negocio propia. | ~115 líneas |
+| `bin/index.js` | Entry point: resuelve stack, ejecuta preflight, muestra inquirer prompts, orquesta el flujo de scaffolding. Sin lógica de negocio propia. | ~160 líneas |
 
 ## lib/ — Módulos especializados
 
 | Módulo | Responsabilidad | Exports principales | Dependencias externas |
 |--------|----------------|---------------------|-----------------------|
-| `lib/config.js` | Resolución de stack desde CLI flags y koa-config.json. Validación de nombres de proyecto. Constantes globales. | `BLUEPRINT_VERSION`, `MIN_NODE_MAJOR`, `resolveStack()`, `validateProjectName()`, `parseMajor()`, `parseJsonc()` | fs, path, chalk |
+| `lib/config.js` | Resolución de stack desde CLI flags y koa-config.json. Validación de nombres de proyecto. Constantes globales. | `BLUEPRINT_VERSION`, `MIN_NODE_MAJOR`, `resolveStack()`, `validateProjectName()`, `validateBlueprintJson()`, `parseMajor()`, `parseJsonc()` | fs, path, chalk |
 | `lib/runner.js` | Wrapper `spawn` asíncrono para comandos externos. Plataforma-aware (Windows .cmd). | `run(cmd, args, opts)`, `NPM`, `NPX` | child_process |
 | `lib/preflight.js` | Verificación de requisitos del sistema. Termina con exit(1) si falta npm/npx. Warnings para git/docker. | `preflight()`, `checkCommand(cmd, args, opts)` | child_process, chalk, lib/config.js |
 | `lib/installer.js` | Instalación de dependencias npm condicionales por stack. Creación del proyecto Angular base con ng new. Gestiona sus propios spinners y lanza Error en fallo. | `createAngularProject(projectName, tempDir)`, `installDependencies(targetDir, stack)` | lib/runner.js, chalk, ora |

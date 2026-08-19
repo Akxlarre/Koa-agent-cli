@@ -25,12 +25,15 @@
 | Ruta en templates/.claude/ | Destino | Propósito |
 |---|---|---|
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (8 hooks activos). |
+| `templates/.claude/settings.json` | `.claude/settings.json` | Cableado de hooks. 7 eventos: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostCompact, Stop. |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 8 hooks de guardrails (ver tabla de hooks abajo). |
-| `templates/.claude/rules/` | `.claude/rules/` | 12 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 7 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 12 hooks de guardrails (ver tabla abajo). |
+| `templates/.claude/hooks/validators/` | `.claude/hooks/validators/` | Validadores genéricos parametrizados por flags. No saben nada del proyecto. Trae su `package.json` que fuerza CommonJS. |
+| `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
+| `templates/.claude/rules/` | `.claude/rules/` | 13 reglas arquitectónicas path-scoped. |
+| `templates/.claude/skills/` | `.claude/skills/` | 9 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices, plan, review). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
+| `templates/.claude/tests/` | `.claude/tests/` | 7 archivos de tests de contrato de los hooks (`node --test`). 91 tests. |
 
 ## Adapters de AI tools (condicional)
 
@@ -54,6 +57,8 @@
 | `templates/boilerplate/src/app/shared/components/error-state/error-state.component.ts` | `src/app/shared/components/error-state/error-state.component.ts` | Estado de error unificado para Facades. Envuelve `app-alert-card severity="error"` con output `(retry)`. Conectar a `facade.retryLoad()`. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/shared/components/error-state/error-state.component.spec.ts` | `src/app/shared/components/error-state/error-state.component.spec.ts` | Tests: creación, renderizado de message, título default, emit retry al clic. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/` | `src/` | Código Angular inicial: layout, auth, dashboard, shared components | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/services/` | `src/app/core/services/` | Todos los servicios viven **planos** aquí. No hay subcarpetas: `core/services/ui/` existió por una copia mal hecha y se eliminó en 6.7. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/styles/` | `src/styles/` | Todo `.scss` bajo `styles/` **debe** estar alcanzable desde `src/styles.scss` vía `@use`. Un parcial huérfano es código muerto que nadie nota. | Siempre en Full Scaffold |
 | `templates/boilerplate/scripts/` | `scripts/` | indices-sync.js, lint-arch-wrapper.js, architect.js, set-env.js | Siempre en Full Scaffold |
 | `templates/boilerplate/vitest.config.ts` | `vitest.config.ts` | Config de Vitest (reemplaza Karma) | Siempre en Full Scaffold |
 | `templates/boilerplate/postcss.config.json` | `postcss.config.json` | PostCSS para Tailwind v4 (.json obligatorio — Angular ignora .js/.mjs) | Siempre en Full Scaffold |
@@ -64,14 +69,19 @@
 
 | Hook | Evento Claude Code | Propósito | Dependencias |
 |---|---|---|---|
-| `pre-write-guard.js` | PreToolUse (Edit/Write) | 4 capas: File Protection, Discovery Gate, Architect Guard (ARCH-01→12 + LLM-01→02), Context Injection | discovery-tracker flag, blueprint.json |
-| `discovery-tracker.js` | PostToolUse (Read) | Crea flag cuando se leen indices/ — levanta el Discovery Gate | — |
+| `session-start.js` | SessionStart | Inyecta índices core, objetivo del brief y pendientes del último task-spec. Audita frescura del brief. **Escribe el discovery flag** | indices/, context/brief.md, task-spec |
+| `prompt-context.js` | UserPromptSubmit | Reinyecta el `## Out of scope` del brief y las casillas abiertas del spec. Dedup por contenido, refresco cada 8 prompts | context/brief.md, task-spec |
+| `pre-write-guard.js` | PreToolUse (Edit/Write) | 4 capas: File Protection, Discovery Gate, Architect Guard (ARCH-01→12 + A11Y + LLM + SEC), Context Injection. Incluye **Circuit Breaker** (3 bloqueos idénticos → escalar al humano) | discovery flag, blueprint.json |
+| `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de fuentes via Bash (`>`, `touch`, `cp`, `mv`, `ng generate`), destructivos sobre dirs críticos, y **Approval Gate** de operaciones DB irreversibles | — |
+| `spec-diff-check.js` | PreToolUse (Bash → git commit) | Bloquea el commit si hay componentes/facades nuevos sin registrar en índices | session-writes.json |
+| `discovery-tracker.js` | PostToolUse (Read) | Crea/appendea el flag cuando se leen `indices/` o `context/` | — |
+| `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos fuente modificados en session-writes.json | — |
 | `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
-| `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de archivos .ts/.html/.scss via Bash | — |
-| `compact-recovery.js` | PostCompact | Re-inyecta índices tras compactación de contexto | discovery-tracker flag |
-| `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos modificados en session-writes.json | — |
-| `sync-check.js` | Stop | Verifica si los índices necesitan actualización al cerrar sesión | write-tracker JSON |
-| `context-guardian.js` | Stop | Audita frescura de context/: brief.md >7d y learnings.md >14d sin actualizar | — |
+| `compact-recovery.js` | PostCompact | Re-inyecta índices (selectivo + cortado en `DETAIL:BEGIN`) y **solo las casillas pendientes** del spec | discovery flag, task-spec |
+| `spec-reflection.js` | Stop | Verifica el "Criterio de done" del task-spec activo con evidencia del filesystem. Anti-bucle por estado del spec | task-spec, session-writes.json |
+| `sync-check.js` | Stop | Compara mtime de fuentes vs índices al cerrar sesión | session-writes.json |
+| `context-guardian.js` | Stop | Audita si `context/learnings.md` lleva >14d sin crecer. (La frescura del brief se auditó ya en SessionStart) | — |
+| `validators/validate-file-contains.js` | Invocado por skills | Validador genérico: `--directory`, `--pattern`, `--contains`, `--max-age`, `--require-file`. Lo usa `/plan` desde su frontmatter | — |
 | `post-edit.js` (scripts/) | PostToolUse (Edit/Write) | Corre Prettier automáticamente tras cada escritura | — |
 
 ## Reglas en templates/.claude/rules/
@@ -90,3 +100,39 @@
 | `notifications.md` | `features/**`, `layout/**` | ToastService, nunca MessageService directo |
 | `database.md` | `supabase/**`, `core/services/**` | Migrations SQL, RLS obligatorio |
 | `layout-blueprints.md` | `src/app/features/**` | 8 arquetipos de página: hero, grid, componentes por tipo |
+| `a11y-spec.md` | `src/app/**/*.html` | Reglas de accesibilidad: aria-label en iconos de acción, caption en tablas |
+
+## Subagentes en templates/.claude/agents/
+
+> Corren en su propia ventana de contexto y devuelven un resumen, no volcados de archivos.
+> El campo `model:` del frontmatter implementa escalation/fallback: rápido para lo
+> mecánico, razonador para juzgar.
+
+| Subagente | Devuelve | Modelo | Tools |
+|---|---|---|---|
+| `discovery-scout.md` | Qué reutilizar / qué crear / qué evitar | haiku | Read, Grep, Glob |
+| `arch-auditor.md` | `lint:arch` + `tsc` comprimidos a violaciones accionables | haiku | Bash, Read, Grep |
+| `index-syncer.md` | Diff de índices reconciliados contra el código real | haiku | Bash, Read, Edit, Write, Grep, Glob |
+| `supabase-schema.md` | Tablas, FKs y políticas RLS reales según migraciones | haiku | Read, Grep, Glob, Bash |
+| `code-judge.md` | Veredicto por criterio contra la rúbrica | opus | Read, Grep, Glob |
+
+`code-judge` **no tiene `Bash`** a propósito: recibe el diff como archivo
+(`.claude/temp/review-diff.patch`, que deja `/review`). Con shell podría escribir con
+`>` y la regla "el juez no arregla nada" dependería de su buen comportamiento.
+
+## Contratos entre piezas
+
+Dos contratos se pueden romper sin que nada avise hasta que falla en producción:
+
+**Task-spec** — lo comparten cinco piezas: la skill `/plan`, el hook de su frontmatter,
+`spec-reflection.js`, `prompt-context.js` y `compact-recovery.js`.
+- Nombre `task-spec-YYYYMMDD-HHMMSS.md` (los hooks toman el último por orden alfabético,
+  que solo coincide con el cronológico si el formato se respeta)
+- Casillas `- [ ]` / `- [x]`
+- Encabezados `##` exactos: `Objetivo`, `Artefactos afectados`, `Reglas que aplican`,
+  `Pasos de ejecucion`, `Criterio de done`
+
+**Discovery flag** — `$TMPDIR/koa-discovery-{sessionId}.flag`. Lo escriben
+`discovery-tracker.js` y `session-start.js`; lo leen el Discovery Gate de
+`pre-write-guard.js` y `compact-recovery.js`. Cada línea debe seguir conteniendo
+`indices/NOMBRE.md`: `compact-recovery.js` parsea eso para decidir qué re-inyectar.

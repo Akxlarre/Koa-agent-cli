@@ -12,7 +12,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { IconComponent } from '../icon/icon.component';
 import { PressFeedbackDirective } from '@core/directives/press-feedback.directive';
-import { GsapAnimationsService } from '@core/services/ui/gsap-animations.service';
+import { GsapAnimationsService } from '@core/services/gsap-animations.service';
 
 /**
  * DrawerComponent — Componente de panel lateral premium animado con GSAP.

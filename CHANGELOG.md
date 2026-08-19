@@ -6,6 +6,66 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.7.0] — 2026-08-19
+
+Auditoría del **boilerplate**. Las versiones 6.5 y 6.6 trabajaron sobre el harness;
+nadie había ejecutado nunca los scripts que se le envían al usuario final.
+
+El hallazgo que resume todo: **el proyecto generado fallaba su propio linter**.
+Un usuario corría `npx create-koa-agent`, después `npm run lint:arch`, y recibía
+4 errores en un scaffold recién creado. El agente, en el paso VALIDAR, se
+encontraba con que el proyecto estaba roto antes de escribir una línea.
+
+### Fixed
+- **`core/services/ui/` era una copia mal hecha.** Contenía un `gsap-animations.service.ts`
+  duplicado (39 KB) y dos servicios de layout-drawer. Los tres sin `.spec.ts`, que es lo
+  que producía 3 de los 4 errores de `lint:arch`.
+  La copia de `ui/` resultó ser el **superset**: 46 métodos contra 39 del canónico, sin
+  ninguna firma incompatible (la única diferencia era el nombre de un parámetro). Y
+  `drawer.component.ts` importaba desde `ui/` precisamente porque necesitaba
+  `animateDrawerEnter`/`animateDrawerLeave`, que solo existían allí. Se promovió la
+  versión completa al path canónico, se movieron los layout-drawer a `core/services/`
+  —donde viven todos los demás— y `ui/` desapareció.
+- **`toast.service.ts` no tenía tests** (el 4º error de `lint:arch`). Ahora tiene spec,
+  igual que `layout-drawer.service.ts` y `layout-drawer.facade.service.ts`.
+- **`.animate-fade-in-up` y `.animate-stagger` no existían.** `styles/_animations.scss`
+  las define, y `AGENTS.md`, `.claude/CLAUDE.md` y la inyección de contexto de
+  `pre-write-guard.js` se las recomiendan a los proyectos **sin GSAP** — que es el
+  default. Pero `styles.scss` nunca hacía `@use` del archivo: las clases existían solo
+  en la documentación. Ahora está cableado y verificado en el CSS compilado.
+- **5 parciales SCSS huérfanos eliminados** (~28 KB inalcanzables desde `styles.scss`):
+  `styles/_view-transitions.scss`, `styles/_animations.scss` (este se cableó en vez de
+  borrarse), y los directorios anidados `styles/layout/layout/` y `styles/motion/motion/`.
+  Los anidados eran más nuevos y más ricos que los importados, pero **no se podían
+  promover**: migran a container queries con `@container layoutmain (…)` y nada en el
+  boilerplate declara `container-name: layoutmain` — sus breakpoints nunca habrían
+  disparado. Son trabajo extraído de otro proyecto y nunca adaptado. Siguen en el
+  historial de git si se quiere retomarlos, pero requieren además declarar ese container
+  en el shell.
+
+### Verificado
+Los cuatro scripts del boilerplate se ejecutaron por primera vez contra un proyecto
+generado real: `architect.js` (0 errores, 0 advertencias), `indices-sync.js` (incluida
+la segunda corrida, que confirma el cache incremental), `lint-arch-wrapper.js` y
+`set-env.js` (exit 1 sin variables de entorno, exit 0 y escritura correcta con ellas).
+
+### Changed
+- `indices/TEMPLATES-REGISTRY.md` y `indices/CLI-MODULES.md` sincronizados. El registry
+  llevaba tres versiones desactualizado: decía 8 hooks (hay 12 + 1 validador), 7 skills
+  (hay 9), 12 reglas (hay 13) y no mencionaba los subagentes. Ahora documenta también
+  los dos contratos que se pueden romper en silencio: el del task-spec y el del
+  discovery flag.
+
+### Migración desde 6.6
+1. Si tu proyecto importaba desde `@core/services/ui/…`, cambia a `@core/services/…`.
+   El servicio de GSAP resultante es un superset — no pierdes métodos.
+2. Agrega `@use "./styles/animations";` a `src/styles.scss` si usas las clases
+   `.animate-*` sin GSAP.
+3. Copia los tres `.spec.ts` nuevos si quieres que `lint:arch` pase en limpio.
+4. Revisa si tienes parciales SCSS bajo `src/styles/` que ningún `@use` alcance.
+
+---
+
 ## [6.6.0] — 2026-08-19
 
 Los guardrails de 6.5 corrigen al agente **después** de que decidió mal. Esta versión

@@ -1,4 +1,4 @@
-# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.7)
+# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.9)
 
 > Este documento explica cómo el sistema de hooks convierte las reglas arquitectónicas
 > en **constraints** reales que Claude no puede ignorar.
@@ -105,6 +105,8 @@ objetivo equivocado.
 | No Facade en Dumb comp. | shared/.component.ts | Dumb components no inyectan Facades |
 | Naming de migraciones | supabase/migrations/ | Formato: YYYYMMDDHHMMSS_dominio_tipo_desc.sql |
 | RLS obligatorio | .sql con CREATE TABLE | Toda tabla nueva debe tener RLS activado |
+| `SEC-RLS-01` | .sql con CREATE TABLE | RLS activado sin ninguna `CREATE POLICY` — la tabla queda inaccesible |
+| `SEC-RLS-02` | .sql con CREATE POLICY | `USING (true)` / `WITH CHECK (true)` en ALL/INSERT/UPDATE/DELETE. Permitido en FOR SELECT |
 
 **Contexto inyectado por tipo de archivo (Context Injection):**
 
@@ -245,6 +247,22 @@ El linter AST se ejecuta con `npm run lint:arch` y valida **8 reglas**:
 | 6 | Sin *ngIf/*ngFor/[ngClass]/[ngStyle] | Regex en .html |
 | 7 | Sin @keyframes en SCSS | Regex en .scss/.css |
 | 8 | Sin colores Tailwind hardcodeados | Regex en .ts/.html |
+| SEC-RLS-01 | Tabla sin políticas RLS | Agregado **entre todas** las migraciones |
+| SEC-RLS-02 | Política permisiva en operación de escritura | Regex por sentencia |
+| SEC-RLS-03 | Tabla sin RLS activado | Agregado entre todas las migraciones |
+
+### RLS: por qué el hook y el linter no son redundantes
+
+Es el único caso donde los dos miran lo mismo con criterios distintos, y es a propósito:
+
+- **El hook** ve un archivo en el momento de escribirlo. Exige el par tabla+política
+  **juntos**, que es la convención del blueprint (sus propias migraciones lo hacen así).
+- **El linter** ve todas las migraciones a la vez. Reconstruye el esquema acumulado y
+  detecta el agujero real: una tabla que, sumadas todas las migraciones, sigue sin
+  políticas. Una tabla creada en la migración 3 con políticas en la 7 le parece bien.
+
+Por eso el linter es más permisivo en un eje y más completo en el otro. Ninguno de los
+dos solo alcanza: el hook no puede ver los otros archivos, y el linter corre después.
 
 ## Diferencia entre Hooks y Linter
 

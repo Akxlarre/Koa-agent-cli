@@ -327,11 +327,55 @@ process.stdin.on('end', () => {
           '     Ejemplo: 20250301120000_auth_create_profiles.sql'
         );
 
-      if (/CREATE\s+TABLE/i.test(newContent) && !/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(newContent))
+      const createsTable = /CREATE\s+TABLE/i.test(newContent);
+
+      if (createsTable && !/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(newContent))
         violations.push(
           'Toda tabla nueva DEBE tener RLS activado.\n' +
           '     Agrega: ALTER TABLE nombre ENABLE ROW LEVEL SECURITY;'
         );
+
+      // [SEC-RLS-01] RLS activado sin politicas no es una tabla segura: es una
+      // tabla INACCESIBLE. Postgres deniega por defecto, asi que sin al menos una
+      // policy nadie puede leerla — ni la app. El fallo aparece en runtime, lejos
+      // de aqui, y se suele "arreglar" con una policy permisiva (ver SEC-RLS-02).
+      // Una migracion que SOLO agrega politicas a una tabla existente es valida y
+      // no entra en este check: por eso se exige el par solo cuando hay CREATE TABLE.
+      if (createsTable && !/CREATE\s+POLICY/i.test(newContent))
+        violations.push(
+          '[SEC-RLS-01] La migracion crea una tabla pero no define ninguna politica RLS.\n' +
+          '     Con RLS activado y cero politicas, Postgres deniega TODO: la tabla queda\n' +
+          '     inaccesible incluso para tu propia app.\n' +
+          '     Agrega al menos una politica por operacion que necesites:\n' +
+          '       CREATE POLICY "tabla_select_own" ON public.tabla\n' +
+          '         FOR SELECT USING (auth.uid() = user_id);\n' +
+          '     Documenta las politicas en indices/DATABASE.md.'
+        );
+
+      // [SEC-RLS-02] `USING (true)` en una policy de escritura deja la tabla
+      // abierta a cualquier usuario autenticado. En SELECT puede ser legitimo
+      // (una tabla de catalogo publica), por eso solo se bloquea cuando la policy
+      // cubre ALL / INSERT / UPDATE / DELETE.
+      const policyChunks = newContent.split(/CREATE\s+POLICY/i).slice(1);
+      for (const chunk of policyChunks) {
+        const permissive = /\b(?:USING|WITH\s+CHECK)\s*\(\s*true\s*\)/i.test(chunk);
+        if (!permissive) continue;
+
+        const forMatch = chunk.match(/\bFOR\s+(ALL|SELECT|INSERT|UPDATE|DELETE)\b/i);
+        // Sin clausula FOR, Postgres asume ALL — el caso mas permisivo.
+        const command = forMatch ? forMatch[1].toUpperCase() : 'ALL';
+        if (command === 'SELECT') continue;
+
+        violations.push(
+          `[SEC-RLS-02] Politica FOR ${command} con condicion \`true\`.\n` +
+          '     Eso permite a cualquier usuario autenticado escribir sobre cualquier fila.\n' +
+          '     Acota la condicion al dueno del dato o al rol correspondiente:\n' +
+          '       USING (auth.uid() = user_id)\n' +
+          '       USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = \'admin\'))\n' +
+          '     `USING (true)` solo es defendible en FOR SELECT de una tabla publica.'
+        );
+        break;
+      }
     }
 
     // --- Reportar violaciones ---

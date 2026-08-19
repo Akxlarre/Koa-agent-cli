@@ -113,12 +113,27 @@ entiende el diseño.
 - Por qué no lo atrapa el guard: es un identificador válido. Lo detecta
   `code-judge` (criterio C10) o una persona que conozca el dominio.
 
-## AP-012 — Migración que crea una tabla sin política RLS
+## AP-012 — Tabla sin políticas, o con una política permisiva
 
-- El Architect Guard sí exige `ENABLE ROW LEVEL SECURITY` — eso es regex.
-- Lo que **no** verifica es que existan políticas. Una tabla con RLS activado y
-  cero políticas no es segura: es inaccesible. El síntoma llega después, cuando
-  alguien "arregla" el bloqueo con una política `USING (true)` y deja la tabla
-  abierta a cualquier usuario autenticado.
+Este entró al Grupo 2 y **ya no pertenece ahí**: desde v6.9 hay guardrail. Se deja
+documentado porque el razonamiento importa más que la regla.
+
+- Una tabla con RLS activado y **cero políticas** no es segura: es *inaccesible*.
+  Postgres deniega por defecto, así que sin políticas nadie lee la tabla — ni tu
+  propia app. El fallo aparece en runtime, lejos de la migración.
+- El "arreglo" natural de ese bloqueo es una política `USING (true)`, que abre la
+  tabla a cualquier usuario autenticado. Se pasa de inaccesible a totalmente
+  abierta en un solo commit, y ambos extremos compilan.
 - **Sí**: toda tabla nueva lleva RLS **y** políticas explícitas por operación,
-  documentadas en `indices/DATABASE.md`.
+  acotadas al dueño del dato o al rol. Documentadas en `indices/DATABASE.md`.
+
+Qué lo vigila ahora:
+
+| Check | Dónde | Alcance |
+|---|---|---|
+| `SEC-RLS-01` | hook + `lint:arch` | Tabla creada sin ninguna política |
+| `SEC-RLS-02` | hook + `lint:arch` | `USING (true)` / `WITH CHECK (true)` en ALL/INSERT/UPDATE/DELETE |
+| `SEC-RLS-03` | `lint:arch` | Tabla sin `ENABLE ROW LEVEL SECURITY` en ninguna migración |
+
+`USING (true)` sigue permitido en `FOR SELECT`: una tabla de catálogo pública es un
+caso legítimo. Es la única forma en que `true` es defendible.

@@ -186,11 +186,15 @@ describe('ARCHITECT GUARD — SQL', () => {
     assert.ok(r.stderr.includes('RLS') || r.stderr.includes('ROW LEVEL SECURITY'));
   });
 
-  test('permite CREATE TABLE con RLS', () => {
+  test('permite CREATE TABLE con RLS y politica', () => {
+    // Desde SEC-RLS-01, activar RLS ya no alcanza: una tabla con RLS y cero
+    // politicas queda inaccesible. El contrato ahora es tabla + RLS + politica.
     const r = runHook(makeInput(migrationPath,
-      'CREATE TABLE public.users (id uuid PRIMARY KEY);\nALTER TABLE public.users ENABLE ROW LEVEL SECURITY;'
+      'CREATE TABLE public.users (id uuid PRIMARY KEY);\n' +
+      'ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;\n' +
+      'CREATE POLICY "users_select_own" ON public.users FOR SELECT USING (auth.uid() = id);'
     ));
-    assert.ok(r.exitCode !== 2 || !r.stderr.includes('RLS'));
+    assert.notEqual(r.exitCode, 2);
   });
 });
 
@@ -253,5 +257,98 @@ describe('DISCOVERY GATE', () => {
   test('permite pasar del Gate una vez leidos los indices', () => {
     const r = runHook(makeInput(featurePath, 'export class X {}'), { discovered: true });
     assert.ok(!r.stderr.includes('DISCOVERY GATE'));
+  });
+});
+
+// ─── RLS / migraciones SQL ────────────────────────────────────────────────
+describe('ARCHITECT GUARD — RLS en migraciones', () => {
+  const mig = '/project/supabase/migrations/20250101000000_pedidos_create.sql';
+  const table = 'CREATE TABLE public.pedidos (id uuid);\n';
+  const rls = 'ALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;\n';
+
+  test('bloquea CREATE TABLE sin RLS', () => {
+    const r = runHook(makeInput(mig, table));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('ROW LEVEL SECURITY'));
+  });
+
+  test('[SEC-RLS-01] bloquea RLS activado sin ninguna politica', () => {
+    const r = runHook(makeInput(mig, table + rls));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('SEC-RLS-01'));
+    assert.ok(r.stderr.includes('inaccesible'), 'debe explicar que el efecto es denegar todo');
+  });
+
+  test('permite tabla con RLS y politica acotada', () => {
+    const sql = table + rls +
+      'CREATE POLICY "pedidos_select_own" ON public.pedidos FOR SELECT USING (auth.uid() = user_id);\n';
+    const r = runHook(makeInput(mig, sql));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('acepta CREATE POLICY IF NOT EXISTS (forma usada por el blueprint)', () => {
+    const sql = table + rls +
+      'CREATE POLICY IF NOT EXISTS "p" ON public.pedidos FOR SELECT USING (auth.uid() = user_id);\n';
+    const r = runHook(makeInput(mig, sql));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('no exige politicas en una migracion que no crea tablas', () => {
+    // Agregar politicas a una tabla existente es un cambio valido por si solo.
+    const r = runHook(makeInput(
+      '/project/supabase/migrations/20250101000001_pedidos_rls.sql',
+      'CREATE POLICY "p2" ON public.pedidos FOR SELECT USING (auth.uid() = user_id);\n',
+    ));
+    assert.notEqual(r.exitCode, 2);
+  });
+});
+
+describe('ARCHITECT GUARD — politicas RLS permisivas', () => {
+  const mig = '/project/supabase/migrations/20250101000000_pedidos_create.sql';
+  const base = 'CREATE TABLE public.pedidos (id uuid);\nALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;\n';
+
+  const blocked = ['ALL', 'UPDATE', 'DELETE', 'INSERT'];
+  for (const cmd of blocked) {
+    test(`[SEC-RLS-02] bloquea FOR ${cmd} con USING (true)`, () => {
+      const r = runHook(makeInput(mig, base + `CREATE POLICY "p" ON public.pedidos FOR ${cmd} USING (true);\n`));
+      assert.equal(r.exitCode, 2);
+      assert.ok(r.stderr.includes('SEC-RLS-02'));
+      assert.ok(r.stderr.includes(`FOR ${cmd}`));
+    });
+  }
+
+  test('permite FOR SELECT con USING (true) — tabla de catalogo publica', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos FOR SELECT USING (true);\n'));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('bloquea una politica sin clausula FOR (Postgres asume ALL)', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos USING (true);\n'));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('SEC-RLS-02'));
+  });
+
+  test('permite WITH CHECK (false) — insercion solo via trigger', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos FOR INSERT WITH CHECK (false);\n'));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('bloquea WITH CHECK (true) en una escritura', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos FOR INSERT WITH CHECK (true);\n'));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('SEC-RLS-02'));
+  });
+
+  test('las migraciones que envia el blueprint pasan el guard', () => {
+    // Regresion: si un check nuevo rompe las migraciones propias, el proyecto
+    // generado arranca bloqueado.
+    const migDir = path.resolve(__dirname, '..', '..', 'supabase', 'migrations');
+    const files = fs.readdirSync(migDir).filter(f => f.endsWith('.sql'));
+    assert.ok(files.length > 0, 'deberia haber migraciones que verificar');
+    for (const f of files) {
+      const sql = fs.readFileSync(path.join(migDir, f), 'utf-8');
+      const r = runHook(makeInput(`/project/supabase/migrations/${f}`, sql));
+      assert.notEqual(r.exitCode, 2, `${f} quedo bloqueada: ${r.stderr}`);
+    }
   });
 });

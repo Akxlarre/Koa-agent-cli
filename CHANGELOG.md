@@ -6,6 +6,64 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.9.0] — 2026-08-19
+
+Cierra el punto que 6.8 dejó documentado como sabido-y-no-resuelto: no había
+guardrail para políticas RLS.
+
+### Added
+- **`SEC-RLS-01` — tabla creada sin ninguna política.** El guard ya exigía
+  `ENABLE ROW LEVEL SECURITY`, pero nada verificaba que existiera una sola
+  `CREATE POLICY`. Una tabla con RLS y cero políticas **no es segura: es
+  inaccesible** — Postgres deniega por defecto, así que ni tu propia app puede
+  leerla. El fallo aparece en runtime, lejos de la migración que lo causó.
+- **`SEC-RLS-02` — política permisiva sobre una escritura.** El "arreglo" natural
+  del bloqueo anterior es `USING (true)`, que abre la tabla a cualquier usuario
+  autenticado: se pasa de inaccesible a totalmente abierta en un commit, y ambos
+  extremos compilan. Se bloquea en `FOR ALL / INSERT / UPDATE / DELETE`, y también
+  cuando **falta la cláusula `FOR`** — ahí Postgres asume `ALL`, que es el caso más
+  permisivo y el más fácil de escribir por accidente.
+  `FOR SELECT USING (true)` sigue permitido: una tabla de catálogo pública es
+  legítima, y es la única forma en que `true` se defiende.
+- **`architect.js` ahora audita `supabase/migrations/`.** Nunca lo había hecho: el
+  linter solo escaneaba `src/app/**`, así que el SQL del proyecto no pasaba por
+  ninguna auditoría completa. Suma `SEC-RLS-03` (tabla sin RLS en ninguna migración).
+
+### Por qué el hook y el linter no son redundantes aquí
+
+Es el único caso donde ambos miran lo mismo con criterios distintos, a propósito:
+
+- El **hook** ve un archivo en el momento de escribirlo y exige el par
+  tabla+política **juntos** — la convención del blueprint, que sus propias
+  migraciones siguen.
+- El **linter** ve todas las migraciones a la vez, reconstruye el esquema acumulado
+  y detecta el agujero real: una tabla que, sumadas todas las migraciones, sigue sin
+  políticas. Una tabla creada en la migración 3 con políticas en la 7 le parece bien,
+  porque lo es.
+
+Ninguno solo alcanza: el hook no puede ver los otros archivos, y el linter corre
+después de que el código ya se escribió.
+
+### Changed
+- **Un test existente cambió de expectativa.** `permite CREATE TABLE con RLS`
+  afirmaba que activar RLS bastaba. Desde `SEC-RLS-01` no basta, y el test lo
+  detectó al primer intento. Ahora es `permite CREATE TABLE con RLS y politica`.
+- **AP-012 se reescribió.** Estaba en el Grupo 2 ("invisibles para el regex") y ya
+  no pertenece ahí. Se conserva porque el razonamiento —cómo se pasa de inaccesible
+  a abierta— vale más que la regla, y ahora lista qué check lo vigila.
+- 105 tests (6.8 cerró con 91). Incluye una regresión que verifica que las
+  migraciones que envía el blueprint sigan pasando el guard: si un check nuevo las
+  rompe, el proyecto generado arranca bloqueado.
+
+### Migración desde 6.8
+1. Reemplazar `.claude/hooks/pre-write-guard.js` y `scripts/architect.js`.
+2. Correr `npm run lint:arch`. Si tenés tablas sin políticas o con `USING (true)`
+   en operaciones de escritura, van a aparecer ahora. **No las silencies**: una
+   tabla sin políticas está rota, y una permisiva está abierta.
+3. Reemplazar `indices/ANTI-PATTERNS.md` (AP-012 reescrito) si no lo personalizaste.
+
+---
+
 ## [6.8.0] — 2026-08-19
 
 Dos huecos que quedaron abiertos al agregar los subagentes en 6.5.

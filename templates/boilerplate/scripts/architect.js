@@ -105,6 +105,21 @@ const RULES = {
         doc: 'docs/TECH-STACK-RULES.md#arch-10',
         fix: 'Extrae lógica a helpers/servicios y reduce inject() y métodos largos. Mantén la Facade como orquestador.',
     },
+    'SEC-RLS-01': {
+        name: 'Table without RLS policies',
+        doc: 'indices/ANTI-PATTERNS.md#ap-012',
+        fix: 'Agrega al menos una CREATE POLICY por operación necesaria. RLS activado sin políticas deniega todo: la tabla queda inaccesible.',
+    },
+    'SEC-RLS-02': {
+        name: 'Permissive RLS policy on a write operation',
+        doc: 'indices/ANTI-PATTERNS.md#ap-012',
+        fix: 'Acota la condición al dueño del dato o al rol: USING (auth.uid() = user_id). `true` solo es defendible en FOR SELECT de una tabla pública.',
+    },
+    'SEC-RLS-03': {
+        name: 'Table without RLS enabled',
+        doc: 'docs/TECH-STACK-RULES.md#database',
+        fix: 'ALTER TABLE public.tabla ENABLE ROW LEVEL SECURITY;',
+    },
 };
 
 const targetDirs = [
@@ -378,6 +393,75 @@ function analyzeStyles(filePath) {
     }
 }
 
+// ─── Auditoría de migraciones SQL ────────────────────────────────────────────
+//
+// A diferencia del resto del linter, esto NO se puede hacer archivo por archivo.
+// Una tabla creada en la migración 3 puede recibir sus políticas en la 7, y ambas
+// situaciones son correctas. Lo que importa es el estado ACUMULADO del esquema.
+//
+// Por eso el hook pre-write-guard y este chequeo no son redundantes: el hook mira
+// un archivo en el momento de escribirlo y exige el par tabla+política junto (la
+// convención del blueprint); esto mira el resultado final y detecta el agujero
+// real — una tabla que, sumadas todas las migraciones, sigue sin políticas.
+
+function auditMigrations() {
+    const dir = path.join(process.cwd(), 'supabase', 'migrations');
+    if (!fs.existsSync(dir)) return;
+
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+    if (files.length === 0) return;
+
+    const createdIn = new Map();   // tabla → archivo donde se creó
+    const rlsEnabled = new Set();  // tablas con ENABLE ROW LEVEL SECURITY
+    const withPolicy = new Set();  // tablas con al menos una política
+
+    /** Normaliza `public.tabla`, `"tabla"` y `tabla` a un único nombre. */
+    const norm = t => t.replace(/"/g, '').replace(/^public\./i, '').toLowerCase();
+
+    for (const file of files) {
+        const full = path.join(dir, file);
+        const sql = fs.readFileSync(full, 'utf-8');
+
+        for (const m of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/gi)) {
+            const t = norm(m[1]);
+            if (!createdIn.has(t)) createdIn.set(t, full);
+        }
+        for (const m of sql.matchAll(/ALTER\s+TABLE\s+([\w".]+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi)) {
+            rlsEnabled.add(norm(m[1]));
+        }
+        for (const m of sql.matchAll(/CREATE\s+POLICY[\s\S]*?\sON\s+([\w".]+)/gi)) {
+            withPolicy.add(norm(m[1]));
+        }
+
+        // Políticas permisivas sobre operaciones de escritura.
+        for (const chunk of sql.split(/CREATE\s+POLICY/i).slice(1)) {
+            if (!/\b(?:USING|WITH\s+CHECK)\s*\(\s*true\s*\)/i.test(chunk)) continue;
+            const forMatch = chunk.match(/\bFOR\s+(ALL|SELECT|INSERT|UPDATE|DELETE)\b/i);
+            // Sin cláusula FOR, Postgres asume ALL.
+            const command = forMatch ? forMatch[1].toUpperCase() : 'ALL';
+            if (command === 'SELECT') continue;
+            const onMatch = chunk.match(/\sON\s+([\w".]+)/i);
+            reportError(
+                'SEC-RLS-02', full,
+                `Política FOR ${command} con condición \`true\` sobre ${onMatch ? norm(onMatch[1]) : 'una tabla'}`,
+            );
+        }
+    }
+
+    for (const [table, file] of createdIn) {
+        if (!rlsEnabled.has(table)) {
+            reportError('SEC-RLS-03', file, `La tabla \`${table}\` no tiene RLS activado`);
+            continue;
+        }
+        if (!withPolicy.has(table)) {
+            reportError(
+                'SEC-RLS-01', file,
+                `La tabla \`${table}\` tiene RLS activado pero ninguna migración le define políticas`,
+            );
+        }
+    }
+}
+
 // ─── Recorrido de directorios ─────────────────────────────────────────────────
 
 function scanDirectory(dir) {
@@ -429,6 +513,8 @@ function scanDirectory(dir) {
 for (const dir of targetDirs) {
     scanDirectory(dir);
 }
+
+auditMigrations();
 
 console.log('');
 

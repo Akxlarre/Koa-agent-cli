@@ -234,6 +234,7 @@ purpose. Do not widen it to work around this rule.
 ## Note for Claude Code users
 
 When running Claude Code, `.claude/CLAUDE.md` extends this file with:
+- **Session Start / Prompt Context** hooks that inject the indexes, the session objective, and the out-of-scope list before you can go wrong
 - **Hooks** that automatically enforce rules (Discovery Gate, Architect Guard, File Protector, etc.)
 - **Circuit Breaker** that stops retry loops after 3 identical blocked writes
 - **Approval Gate** on irreversible database operations

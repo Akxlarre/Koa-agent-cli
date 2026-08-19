@@ -6,7 +6,9 @@ Tu stack: **Angular + Tailwind v4 + PrimeNG + Supabase + GSAP**.
 
 Este proyecto tiene guardrails automáticos que se ejecutan sin intervención humana:
 
-- **Discovery Gate** — NO puedes escribir código en `src/app/` sin antes leer al menos un archivo de `indices/`. Serás bloqueado automáticamente.
+- **Session Start** — Al abrir la sesión se te inyectan los índices core (COMPONENTS, SERVICES, FACADES), el objetivo de `context/brief.md` y el trabajo pendiente del último task-spec. No arrancas a ciegas.
+- **Prompt Context** — Antes de cada prompt se te recuerda lo que está **fuera de alcance** esta sesión y qué queda pendiente del spec. Es lo primero que se olvida y nada en la conversación lo repite.
+- **Discovery Gate** — NO puedes escribir código en `src/app/` sin antes tener los índices en contexto. Session Start suele resolverlo por ti; si no, serás bloqueado hasta que leas `indices/`.
 - **Architect Guard** — Cada Edit/Write es validado en tiempo real. Se bloquean: `*ngIf`, `@Input()`, colores hardcodeados, imports de Supabase en UI, `@angular/animations`, `@keyframes`.
 - **File Protector** — No puedes modificar los archivos del sistema de hooks (`.claude/hooks/`, `settings.json`, `architect.js`).
 - **Bash Guard** — No puedes crear archivos `.ts/.html/.scss` via Bash. Usa Edit/Write.
@@ -16,7 +18,7 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Approval Gate** — Las operaciones irreversibles de base de datos (`supabase db push`, `db reset`, `migration repair`, `link`, SQL destructivo) las ejecuta un humano, no tú. Escribe la migración y pide que la corran.
 - **Spec Reflection** — Al terminar de responder, se revisa el "Criterio de done" del task-spec activo y se te devuelven los puntos sin cerrar.
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
-- **Context Guardian** — Al terminar de responder, audita la frescura del contexto semántico: avisa si `context/brief.md` tiene más de 7 días sin actualizar o si `context/learnings.md` lleva más de 14 días sin crecer.
+- **Context Guardian** — Al terminar de responder, pregunta si algo de esta sesión merece quedar en `context/learnings.md` (avisa si lleva más de 14 días sin crecer). La frescura del brief se audita al **arrancar**, no al cerrar.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
 
 Detalle completo: @docs/HOOKS-SYSTEM.md
@@ -31,8 +33,8 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 
 ## Flujo obligatorio (5 pasos)
 
-1. **DESCUBRIR** — Delega en el subagente `discovery-scout`: lee los índices por ti y te devuelve qué reutilizar, sin volcarte los archivos al contexto. Lee además `context/domain.md` + `context/brief.md` si existen. Los índices te dicen qué código hay; el contexto te dice qué es el negocio y qué se está construyendo hoy. **El Discovery Gate te bloqueará si no lees los índices.**
-2. **PLANIFICAR** — `/plan` genera el task-spec. Marca sus casillas `[x]` a medida que avanzas: Spec Reflection y Compact Recovery dependen de eso.
+1. **DESCUBRIR** — Session Start ya te dio los índices core y el objetivo. Para descubrimiento dirigido ("¿qué existe que pueda reutilizar para X?") delega en `discovery-scout`, que te devuelve un veredicto en vez de volcarte archivos. Lee `context/domain.md` si necesitas el vocabulario del negocio. **El Discovery Gate te bloqueará si escribes sin los índices en contexto.**
+2. **PLANIFICAR** — `/plan` genera el task-spec. Su formato **lo valida un hook**, no tu buena voluntad: si falta una sección obligatoria, no terminas. Marca las casillas `[x]` a medida que avanzas: Spec Reflection, Prompt Context y Compact Recovery dependen de eso.
 3. **EJECUTAR** — Escribe el código. Reutiliza siempre lo existente primero. Los hooks validarán cada escritura en tiempo real.
 4. **VALIDAR** — `arch-auditor` corre el linter y el build y te devuelve solo las violaciones. Después `/review` juzga el diseño contra la rúbrica, que es lo que los hooks de regex no pueden ver.
 5. **SINCRONIZAR** — `index-syncer` reconcilia `indices/*.md` con el código real. El Stop hook te lo recordará si lo olvidas.
@@ -62,6 +64,10 @@ llenar tu contexto principal de output que solo necesitas una vez.
 
 El juez usa a propósito un modelo más capaz que el que genera el código: un
 evaluador que razona igual que el generador no detecta los errores del generador.
+
+`code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff como archivo
+(`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría escribir
+usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un hecho.
 
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 

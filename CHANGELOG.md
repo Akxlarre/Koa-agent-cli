@@ -6,6 +6,61 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.6.0] — 2026-08-19
+
+Los guardrails de 6.5 corrigen al agente **después** de que decidió mal. Esta versión
+mueve la intervención hacia adelante: al arranque de la sesión y antes de cada prompt.
+
+Cambios inspirados en revisar [disler/claude-code-hooks-mastery](https://github.com/disler/claude-code-hooks-mastery),
+que documenta los 13 hook events del ciclo de vida — Koa usaba 6.
+
+### Added
+- **`session-start.js`** (SessionStart) — inyecta los índices core (Quick Reference,
+  truncados), el objetivo de `context/brief.md` y los pendientes del último task-spec
+  al abrir la sesión. **Levanta el Discovery Gate** escribiendo el mismo flag que
+  `discovery-tracker.js`: si el agente ya tiene los índices en contexto, bloquearlo por
+  "no haberlos leído" sería falso. Si no hay índices, el flag no se escribe y el Gate
+  sigue activo como red de seguridad.
+- **`prompt-context.js`** (UserPromptSubmit) — corre antes de que Claude vea el prompt.
+  No repite lo de SessionStart: solo lleva lo que se degrada dentro de una sesión — el
+  `## Out of scope` del brief y las casillas abiertas del spec. Con dedup por contenido
+  y refresco cada 8 prompts.
+- **`validators/validate-file-contains.js`** — validador genérico parametrizado por
+  flags (`--directory`, `--pattern`, `--contains`, `--max-age`, `--require-file`). No
+  sabe nada del proyecto: un validador, muchos usos.
+- **Hooks en el frontmatter de `/plan`** — la skill declara un hook de `Stop` que valida
+  que el task-spec exista y contenga sus cinco secciones obligatorias. Pedir un formato
+  en prosa es una guideline; esto lo convierte en guardrail.
+- **Tests** para los tres hooks nuevos: 91 en total, todos en verde (6.5 cerró con 55).
+
+### Changed
+- **`code-judge` perdió `Bash`.** Ahora tiene solo `Read, Grep, Glob` y recibe el diff
+  como archivo (`.claude/temp/review-diff.patch`, que deja `/review` con una
+  redirección). Antes tenía `Bash` para correr `git diff`, y con `Bash` podía escribir
+  usando `>` — la regla "el juez no arregla nada" dependía de que el juez se portara
+  bien. Un juez que puede editar el código que juzga no es un juez.
+- **`/review`** deja el diff en un archivo en vez de leerlo. El diff completo no entra
+  al contexto principal: lo lee el juez en su propia ventana.
+- **La frescura de `context/brief.md` se audita en SessionStart**, no en el Stop hook.
+  Avisar al cerrar que el brief estaba viejo llega después de que el agente ya codeó
+  contra el objetivo equivocado. `context-guardian.js` conserva el check de
+  `learnings.md`, que sí tiene sentido al cerrar.
+
+### Migración desde 6.5
+1. Copiar `.claude/hooks/session-start.js`, `.claude/hooks/prompt-context.js` y
+   `.claude/hooks/validators/` (carpeta nueva, con su `package.json` que fuerza CommonJS).
+2. Registrar en `.claude/settings.json` los eventos `SessionStart` y `UserPromptSubmit`.
+3. Reemplazar `.claude/hooks/context-guardian.js` (se le quitó el check de brief).
+4. Reemplazar `.claude/agents/code-judge.md` y `.claude/skills/review/SKILL.md`.
+5. Reemplazar `.claude/skills/plan/SKILL.md` — trae el hook de validación en su frontmatter.
+6. Copiar los tests nuevos y correr `npm run claude:test-hooks`.
+
+**Nota sobre los encabezados del task-spec**: ahora los valida un hook. Si tu `/plan`
+está personalizado con otros nombres de sección, actualiza los `--contains` del
+frontmatter o el hook bloqueará el cierre de cada tarea.
+
+---
+
 ## [6.5.0] — 2026-08-18
 
 Esta versión cierra los huecos agénticos del harness: hasta ahora los guardrails

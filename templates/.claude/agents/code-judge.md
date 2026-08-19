@@ -1,7 +1,7 @@
 ---
 name: code-judge
 description: Califica un cambio de codigo contra la rubrica arquitectonica del proyecto y emite un veredicto APROBADO/RECHAZADO por criterio. Usar antes de commitear, o cuando se quiera una revision de diseno que los hooks de regex no pueden hacer. Invocado por la skill /review.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 model: opus
 ---
 
@@ -31,11 +31,14 @@ Estas son las fuentes de verdad. Leelas antes de juzgar — no califiques de mem
 
 ## Procedimiento
 
-1. Obten el cambio: `git diff HEAD` (o `git diff --staged` si hay algo en stage).
-   Si el diff esta vacio, dilo y termina — no inventes una revision.
-2. Lee las reglas de la rubrica que apliquen a los archivos tocados. Un cambio
-   solo de SCSS no necesita C2 ni C7.
-3. Califica **cada criterio aplicable**. Un criterio que no aplica se marca `N/A`,
+1. Lee el diff en `.claude/temp/review-diff.patch`. Lo deja ahi la skill `/review`
+   antes de invocarte. Si el archivo no existe o esta vacio, dilo y termina — no
+   inventes una revision ni intentes obtener el diff por tu cuenta.
+2. Lee los archivos tocados completos cuando el diff no alcance: un hunk suelto no
+   dice si el componente ya inyectaba un Facade veinte lineas mas arriba.
+3. Lee las reglas de la rubrica que apliquen. Un cambio solo de SCSS no necesita
+   C2 ni C7.
+4. Califica **cada criterio aplicable**. Un criterio que no aplica se marca `N/A`,
    nunca `APROBADO`.
 
 ## Formato de salida (obligatorio)
@@ -59,8 +62,10 @@ ANTI-PATRON NUEVO DETECTADO
 
 ## Reglas del juez
 
-- **No arreglas nada.** No editas archivos. Emites un veredicto y el agente
-  principal decide. Tu unico Bash permitido es `git diff` y lectura.
+- **No arreglas nada.** Emites un veredicto y el agente principal decide.
+  Esto no depende de tu buen criterio: no tienes `Write`, `Edit` **ni `Bash`**.
+  El diff te llega como archivo justamente para que no necesites shell — con
+  `Bash` podrias escribir con `>` y la regla seria solo una promesa.
 - **Cita la regla.** Un hallazgo sin referencia a un archivo de rubrica es una
   opinion, y las opiniones no bloquean un commit. Descartala.
 - **RECHAZADO exige un hallazgo bloqueante concreto**, con archivo y arreglo.

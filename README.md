@@ -6,7 +6,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?style=flat-square&logo=nodedotjs)](https://nodejs.org)
 [![Angular](https://img.shields.io/badge/Angular-v20%2B-dd0031?style=flat-square&logo=angular)](https://angular.dev)
-[![Blueprint](https://img.shields.io/badge/Blueprint-v6.5.0-6366f1?style=flat-square)](./CHANGELOG.md)
+[![Blueprint](https://img.shields.io/badge/Blueprint-v6.6.0-6366f1?style=flat-square)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](./CONTRIBUTING.md)
 
@@ -59,6 +59,7 @@ my-app/
 ├── .claude/               # The agentic harness
 │   ├── CLAUDE.md          # Agent directive: stack, rules, workflow
 │   ├── hooks/             # Real-time guardrails (table below)
+│   │   └── validators/    # Generic, flag-driven structure validators
 │   ├── agents/            # 5 subagents with their own context windows
 │   ├── rules/             # 13 path-scoped architectural rules
 │   ├── skills/            # 8 reusable agent skills (/plan, /review, …)
@@ -95,6 +96,8 @@ This is the core differentiator. `.claude/` is not documentation — it's active
 
 | Hook | Trigger | What it does |
 |------|---------|--------------|
+| `session-start` | On session open | Injects core indexes, the brief's objective, and any unfinished task-spec — so the agent never starts blind |
+| `prompt-context` | Before each prompt | Re-surfaces what's out of scope this session and what's still open on the spec |
 | `pre-write-guard` | Before any file write | Runs 4 layers: File Protection → Discovery Gate → Architect Guard → Context Injection |
 | `discovery-tracker` | After any file read | Tracks when indexes are read; unlocks the Discovery Gate |
 | `context-guardian` | Session start / writes | Verifies `context/brief.md` exists and is fresh (warns after 7 days); stops the agent from coding blind |
@@ -146,6 +149,42 @@ Every write is validated in real time against the project's architecture. The gu
 
 Everything the guard enforces in real time is also available as a full audit: `npm run lint:arch` walks the AST of the whole project and reports violations with `[ARCH-NN]` codes and doc links.
 
+### Proactive context, not just reactive blocking
+
+A guardrail that fires *after* the agent decided what to do is a guardrail that
+costs a round trip. Two hooks run before the agent can go wrong:
+
+- **`session-start`** injects the core indexes, the session objective from
+  `context/brief.md`, and any unfinished task-spec — then writes the discovery flag
+  itself. If the agent already has the indexes in context, blocking it for "not
+  reading the indexes" would be a lie. The Discovery Gate stays as the safety net
+  for when this injection doesn't happen.
+- **`prompt-context`** runs before *every* prompt, so it deliberately carries almost
+  nothing: only what decays inside a single session — the brief's **out of scope**
+  list (the first constraint an agent forgets, because nothing in the conversation
+  repeats it) and the spec's open checkboxes. Deduplicated: a block re-appears only
+  if it changed, or every 8 prompts. A reminder shown every turn stops being read.
+
+### Structure validated, not requested
+
+`/plan` declares its own Stop hook in frontmatter:
+
+```yaml
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory .claude/temp --pattern "task-spec-*.md" --require-file
+            --contains "## Objetivo" --contains "## Criterio de done"
+```
+
+Asking an agent in prose to "produce a file with these sections" is a guideline, and
+guidelines get dropped under context pressure. This makes it a guardrail. The
+validator itself knows nothing about the project — it takes what to look for as
+flags, so one validator covers every artifact whose *structure* matters.
+
 ### Subagents — what the guard can't see
 
 The guard catches **syntax**: `*ngIf`, `@Input()`, hardcoded colors, a missing `OnPush`.
@@ -171,6 +210,11 @@ path-scoped rules, and `indices/ANTI-PATTERNS.md`. It runs on a stronger model t
 one writing the code, on purpose: an evaluator that reasons like the generator shares
 the generator's blind spots. A `RECHAZADO` verdict must name a file and a concrete fix,
 or it gets demoted to a minor finding — opinions don't block commits.
+
+The judge has no `Write`, no `Edit`, and no `Bash`. `/review` hands it the diff as a
+file so it doesn't need a shell — with `Bash` it could write via `>`, and "the judge
+doesn't fix anything" would be a promise instead of a fact. A judge that can edit the
+code it judges is not a judge.
 
 ### Living indexes
 

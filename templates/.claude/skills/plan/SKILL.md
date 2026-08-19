@@ -2,6 +2,21 @@
 name: plan
 description: Generar task-spec antes de implementar. Obliga al agente a declarar intencion antes de escribir codigo. Usar SIEMPRE antes de una tarea no trivial (>2 archivos o >1 dominio).
 user-invocable: true
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory .claude/temp
+            --pattern "task-spec-*.md"
+            --max-age 60
+            --require-file
+            --contains "## Objetivo"
+            --contains "## Artefactos afectados"
+            --contains "## Reglas que aplican"
+            --contains "## Pasos de ejecucion"
+            --contains "## Criterio de done"
 ---
 
 Antes de escribir cualquier codigo, crea un task-spec en `.claude/temp/task-spec-{TIMESTAMP}.md`.
@@ -63,6 +78,16 @@ dependen de eso:
 - **Compact Recovery** (PostCompact) re-inyecta **solo las casillas abiertas**.
   Lo ya hecho se descarta del contexto. Si no las marcas, tras una compactacion
   vas a recuperar la lista completa y reharas trabajo terminado.
+
+## El formato lo valida un hook, no la buena voluntad
+
+Esta skill declara en su frontmatter un hook de `Stop` que verifica que el spec
+exista y contenga las cinco secciones obligatorias. Si falta una, no terminas.
+
+Es a proposito: pedirle a un agente en prosa que "genere un archivo con estas
+secciones" es una guideline, y las guidelines se ignoran bajo presion de contexto.
+Los encabezados de arriba son un contrato — `spec-reflection.js` y
+`compact-recovery.js` los leen por nombre. Si los renombras aqui, se rompen alla.
 
 ## Por que
 

@@ -16,6 +16,7 @@ Cualquier cambio aquí afecta a TODOS los proyectos Angular generados futuros, n
 |---|---|---|
 | `templates/.claude/` | Harness Angular (hooks, rules, skills, agents) | Al evolucionar el blueprint agéntico |
 | `templates/.claude/agents/` | Subagentes del proyecto generado | Al agregar o ajustar un rol especializado |
+| `templates/.claude/hooks/validators/` | Validadores genéricos parametrizados (no saben del proyecto) | Al necesitar validar la estructura de un artefacto |
 | `templates/boilerplate/` | Código Angular inicial (src/, scripts/) | Al actualizar el boilerplate base |
 | `templates/docs/` | Documentación inyectada al proyecto | Al actualizar guías para el usuario final |
 | `templates/indices/` | Índices vacíos para el proyecto generado | Al agregar nuevos tipos de índices |
@@ -34,12 +35,28 @@ Antes de modificar uno, verifica qué otros dependen de él.
 | `spec-diff-check.js` | `session-writes.json` |
 | `spec-reflection.js` | task-spec que genera la skill `/plan` + `session-writes.json` |
 | `compact-recovery.js` (bloque pendiente) | mismas casillas `- [ ]` del task-spec |
+| `prompt-context.js` | mismas casillas + sección `## Out of scope` de `context/brief.md` |
+| `session-start.js` | escribe el mismo discovery flag que `discovery-tracker.js` |
+| `/plan` (hook en su frontmatter) | encabezados `##` exactos del task-spec |
 
-**Contrato del task-spec**: la skill `/plan`, `spec-reflection.js` y `compact-recovery.js`
-comparten el formato de nombre `task-spec-YYYYMMDD-HHMMSS.md` y las casillas markdown
-`- [ ]` / `- [x]`. Los dos hooks toman el spec **más reciente por orden alfabético**, lo
-que solo coincide con el orden cronológico si el timestamp mantiene ese formato. Si
-cambias el naming en `/plan`, cambia los dos hooks a la vez.
+**Contrato del task-spec** — lo comparten cinco piezas:
+
+- Nombre `task-spec-YYYYMMDD-HHMMSS.md`. Los hooks toman el spec **más reciente por
+  orden alfabético**, lo que solo coincide con el orden cronológico si el timestamp
+  mantiene ese formato.
+- Casillas markdown `- [ ]` / `- [x]` — las leen `spec-reflection.js`,
+  `prompt-context.js` y `compact-recovery.js`.
+- Encabezados `##` exactos (`## Objetivo`, `## Artefactos afectados`,
+  `## Reglas que aplican`, `## Pasos de ejecucion`, `## Criterio de done`) — los
+  valida el hook declarado en el frontmatter de `/plan`.
+
+Si cambias el naming o un encabezado en `/plan`, cambia los cuatro consumidores a la vez.
+
+**Contrato del discovery flag**: `discovery-tracker.js` y `session-start.js` escriben
+ambos en `$TMPDIR/koa-discovery-{sessionId}.flag`, y `pre-write-guard.js` (Gate) y
+`compact-recovery.js` lo leen. El formato de línea debe seguir conteniendo
+`indices/NOMBRE.md`: `compact-recovery.js` parsea justamente eso para decidir qué
+índices re-inyectar.
 
 ## Los hooks tienen tests — corrígelos ahí
 

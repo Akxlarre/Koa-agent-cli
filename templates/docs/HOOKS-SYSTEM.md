@@ -1,4 +1,4 @@
-# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.5)
+# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.6)
 
 > Este documento explica cómo el sistema de hooks convierte las reglas arquitectónicas
 > en **constraints** reales que Claude no puede ignorar.
@@ -44,6 +44,39 @@ Claude recibe un prompt del humano
 ```
 
 ## Hooks Activos
+
+### 0. Session Start (`session-start.js`) y Prompt Context (`prompt-context.js`)
+
+Los dos primeros hooks del ciclo. Existen para volver **proactivo** lo que antes
+era reactivo.
+
+Antes: el agente arrancaba a ciegas, intentaba escribir, el Discovery Gate lo
+bloqueaba y recién ahí leía los índices. El bloqueo funcionaba, pero costaba una
+ronda entera y llegaba después de que el agente ya había decidido qué hacer.
+
+| Hook | Evento | Qué inyecta |
+|---|---|---|
+| `session-start.js` | SessionStart | Índices core (Quick Reference), objetivo de `context/brief.md`, pendientes del último task-spec |
+| `prompt-context.js` | UserPromptSubmit | El "Out of scope" del brief y las casillas abiertas del spec |
+
+**Session Start levanta el Discovery Gate.** Escribe el mismo flag que
+`discovery-tracker.js`, marcado como `SESSION-START`. Es deliberado: si el agente
+ya tiene los índices en contexto, bloquearlo por "no haberlos leído" sería falso —
+la condición que el Gate protege está satisfecha. Si no hay índices que inyectar,
+el flag no se escribe y el Gate sigue activo como red de seguridad.
+
+**Prompt Context no repite lo de Session Start.** Corre en *cada* prompt, así que
+reinyectar 2 KB de índices por turno sería la forma más cara posible de no aportar
+nada. Solo lleva lo que se degrada dentro de una misma sesión: la restricción de
+alcance (lo primero que el agente olvida, porque nada en la conversación se la
+repite) y dónde iba el trabajo.
+
+Con dedup: un bloque se reinyecta solo si su contenido cambió, o cada 8 prompts.
+Un recordatorio que aparece en todos los turnos deja de leerse.
+
+**Frescura del brief:** se audita en Session Start, no en el Stop hook. Avisar al
+cerrar que el brief estaba viejo llega después de que el agente ya codeó contra el
+objetivo equivocado.
 
 ### 1. Pre-Write Guard (`pre-write-guard.js`)
 - **Evento**: PreToolUse
@@ -290,3 +323,57 @@ Lo que ningún hook atrapa es el **diseño**: una facade que no respeta su contr
 Repository saltado, un Smart component disfrazado de Dumb, un nombre que contradice
 `context/domain.md`. Para eso hace falta un modelo leyendo la rúbrica, y por eso
 `/review` existe además de `npm run lint:arch`.
+
+---
+
+## Validadores genéricos (`.claude/hooks/validators/`)
+
+A diferencia del resto de los hooks, `validate-file-contains.js` no sabe nada del
+proyecto: recibe qué buscar por flags. Un validador, muchos usos.
+
+```bash
+node .claude/hooks/validators/validate-file-contains.js \
+  --directory .claude/temp \
+  --pattern "task-spec-*.md" \
+  --max-age 60 \
+  --require-file \
+  --contains "## Objetivo" \
+  --contains "## Criterio de done"
+```
+
+| Flag | Qué hace |
+|---|---|
+| `--directory` | Dónde buscar (relativo a la raíz del proyecto). Requerido. |
+| `--pattern` | Glob simple sobre el nombre (`*`, `?`). Default `*.md` |
+| `--contains` | Substring requerido. Repetible. |
+| `--max-age` | Solo archivos modificados en los últimos N minutos |
+| `--require-file` | Fallar si no existe ningún archivo que coincida |
+
+Sin `--require-file`, "no hay archivo" significa "nada que validar" y sale con 0.
+Mal configurado (sin `--contains`) tampoco bloquea: un validador roto no debe
+frenar al agente.
+
+### Hooks declarados en el frontmatter de una skill
+
+Las skills pueden declarar sus propios hooks, que corren solo mientras esa skill
+está activa. `/plan` lo usa para validar su propia salida:
+
+```yaml
+---
+name: plan
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory .claude/temp --pattern "task-spec-*.md"
+            --require-file --contains "## Objetivo" --contains "## Criterio de done"
+---
+```
+
+Por qué importa: pedirle a un agente en prosa que "genere un archivo con estas
+secciones" es una *guideline*, y las guidelines se ignoran bajo presión de
+contexto. Esto la convierte en *guardrail*. Y los encabezados no son decorativos —
+`spec-reflection.js`, `prompt-context.js` y `compact-recovery.js` los leen por
+nombre, así que renombrarlos en `/plan` rompe tres hooks.

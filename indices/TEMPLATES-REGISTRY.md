@@ -33,7 +33,7 @@
 | `templates/.claude/rules/` | `.claude/rules/` | 14 reglas arquitectónicas path-scoped. |
 | `templates/.claude/skills/` | `.claude/skills/` | 9 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices, plan, review). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
-| `templates/.claude/tests/` | `.claude/tests/` | 7 archivos de tests de contrato de los hooks (`node --test`). 91 tests. |
+| `templates/.claude/tests/` | `.claude/tests/` | 8 archivos de tests de contrato (`node --test`). 110 tests. Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada. |
 
 ## Adapters de AI tools (condicional)
 

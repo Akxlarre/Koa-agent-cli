@@ -6,6 +6,48 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.9.1] — 2026-08-19
+
+Enlaces de documentación rotos y reglas sin documentar. Nada de esto rompe un
+build, que es exactamente por qué llevaba tiempo pasando desapercibido.
+
+### Fixed
+- **Dos anclas rotas**, ambas introducidas en 6.9.0 al agregar los checks de RLS:
+  `docs/TECH-STACK-RULES.md#database` y `indices/ANTI-PATTERNS.md#ap-012`. Cada
+  mensaje de error del linter termina en una línea `Doc:` — si el ancla no existe,
+  el agente recibe una instrucción que no lleva a ninguna parte.
+- **9 reglas se emitían sin estar documentadas** en el archivo al que el propio
+  mensaje de error apunta: `ARCH-11`, `ARCH-12`, `A11Y-01/02`, `LLM-01/02` y los
+  tres `SEC-RLS-*`. Ahora tienen sección propia en `docs/TECH-STACK-RULES.md`.
+- **`.claude/rules/database.md`** decía "activar RLS" y nada más. Ahora explica por
+  qué activar RLS sin policies deja la tabla *inaccesible*, por qué `USING (true)`
+  no es el arreglo, y qué check salta en cada caso — con SQL de los dos lados.
+
+### Added
+- **`doc-links.test.js`** — el fix real. Recorre todo el payload, junta cada
+  referencia `archivo.md#ancla` y verifica que resuelva; además comprueba que toda
+  regla que los hooks o el linter **emiten** tenga sección documentada, y que su
+  ancla sea explícita (`<a id="…">`) en vez de un slug derivado del título, que se
+  rompe en silencio si alguien reescribe el encabezado.
+
+  Se verificó que el test falla de verdad: renombrando un ancla y simulando una
+  regla nueva sin documentar, ambos casos quedan en rojo.
+
+- **Anclas explícitas en los 12 anti-patrones** de `indices/ANTI-PATTERNS.md`.
+
+### Nota
+En el proceso reporté "12 anclas rotas". Era un error de mi verificación, que solo
+miraba slugs de encabezados e ignoraba las etiquetas `<a id>` que ya existían. Las
+rotas de verdad eran 2, y las dos las había introducido yo en 6.9.0. El test nuevo
+usa el criterio correcto.
+
+### Migración desde 6.9.0
+1. Reemplazar `docs/TECH-STACK-RULES.md`, `.claude/rules/database.md` e
+   `indices/ANTI-PATTERNS.md` (si no lo personalizaste).
+2. Copiar `.claude/tests/doc-links.test.js` y correr `npm run claude:test-hooks`.
+
+---
+
 ## [6.9.0] — 2026-08-19
 
 Cierra el punto que 6.8 dejó documentado como sabido-y-no-resuelto: no había

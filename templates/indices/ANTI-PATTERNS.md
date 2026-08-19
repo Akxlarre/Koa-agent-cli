@@ -29,25 +29,37 @@ entrada aquí se convierte en algo que se revisa en cada `/review`.
 
 ## Grupo 1 — Bloqueados automáticamente por el Architect Guard
 
+<a id="ap-001"></a>
+
 ## AP-001 — `[ngClass]` (evitar)
 - **NO** uses `[ngClass]`.
 - **Sí** usa binding directo: `[class.active]="isActive()"`, `[class.foo]="cond()"`.
+
+<a id="ap-002"></a>
 
 ## AP-002 — `@Input()` / `@Output()` (evitar)
 - **NO** uses `@Input()` / `@Output()`.
 - **Sí** usa Signal Inputs/Outputs: `input()`, `output()`.
 
+<a id="ap-003"></a>
+
 ## AP-003 — `inject(SupabaseService)` en componentes (evitar)
 - **NO** inyectes `SupabaseService` ni importes `@supabase/supabase-js` en `features/` o `shared/`.
 - **Sí** usa un `*FacadeService` para datos/estado y expón Signals al template.
+
+<a id="ap-004"></a>
 
 ## AP-004 — Colores Tailwind hardcodeados (evitar)
 - **NO** uses `text-red-500`, `bg-blue-200`, etc.
 - **Sí** usa tokens semánticos (`text-primary`, `text-muted`, `bg-surface`, `bg-base`, `var(--ds-brand)`).
 
+<a id="ap-005"></a>
+
 ## AP-005 — `@angular/animations` (evitar)
 - **NO** uses `@angular/animations`.
 - **Sí** usa GSAP vía `GsapAnimationsService` (y View Transitions para navegación).
+
+<a id="ap-006"></a>
 
 ## AP-006 — `.db.from()` en un Facade (evitar)
 - **NO** llames `inject(SupabaseService).db.from('tabla')` dentro de un Facade.
@@ -62,6 +74,8 @@ entrada aquí se convierte en algo que se revisa en cada `/review`.
 Estos compilan, pasan el linter y pasan los hooks. Solo los ve alguien que
 entiende el diseño.
 
+<a id="ap-007"></a>
+
 ## AP-007 — Smart component disfrazado de Dumb
 
 - **NO** pongas en `shared/` un componente que decide *qué* datos mostrar.
@@ -73,6 +87,8 @@ entiende el diseño.
 - Por qué no lo atrapa el guard: `inject(Facade)` sí se detecta por regex, pero
   "recibe un id y lo resuelve" es una decisión de diseño.
 
+<a id="ap-008"></a>
+
 ## AP-008 — `effect()` para estado derivado
 
 - **NO** uses `effect()` para calcular un signal a partir de otros.
@@ -82,6 +98,8 @@ entiende el diseño.
 - **Sí**: `readonly total = computed(() => this.items().length)`.
 - `effect()` es para efectos de *salida* del grafo reactivo: DOM imperativo,
   logging, `localStorage`. Si el resultado es otro signal, es `computed()`.
+
+<a id="ap-009"></a>
 
 ## AP-009 — Facade que expone el signal escribible
 
@@ -93,6 +111,8 @@ entiende el diseño.
 - Por qué no lo atrapa el guard: es una línea válida y frecuente. Solo se nota
   cuando alguien muta el estado desde la UI y nadie sabe por qué.
 
+<a id="ap-010"></a>
+
 ## AP-010 — Repository que devuelve la respuesta cruda de Supabase
 
 - **NO** retornes `{ data, error }` desde un Repository.
@@ -101,6 +121,8 @@ entiende el diseño.
   toda la app en vez de una carpeta.
 - **Sí**: el Repository desestructura, lanza o devuelve `null` en error, y retorna
   datos ya tipados con la interfaz del dominio.
+
+<a id="ap-011"></a>
 
 ## AP-011 — Nombre que contradice `context/domain.md`
 
@@ -112,6 +134,8 @@ entiende el diseño.
   refactoriza el código y se actualiza `context/domain.md` en el mismo cambio.
 - Por qué no lo atrapa el guard: es un identificador válido. Lo detecta
   `code-judge` (criterio C10) o una persona que conozca el dominio.
+
+<a id="ap-012"></a>
 
 ## AP-012 — Tabla sin políticas, o con una política permisiva
 

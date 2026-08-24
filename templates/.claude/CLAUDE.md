@@ -17,6 +17,7 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Circuit Breaker** — Si el mismo Edit se bloquea 3 veces por la misma violación, el guard deja de explicar el arreglo y te ordena parar y escalar al humano. No intentes rodearlo.
 - **Approval Gate** — Las operaciones irreversibles de base de datos (`supabase db push`, `db reset`, `migration repair`, `link`, SQL destructivo) las ejecuta un humano, no tú. Escribe la migración y pide que la corran.
 - **Spec Reflection** — Al terminar de responder, se revisa el "Criterio de done" del task-spec activo y se te devuelven los puntos sin cerrar.
+- **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script.
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
 - **Context Guardian** — Al terminar de responder, pregunta si algo de esta sesión merece quedar en `context/learnings.md` (avisa si lleva más de 14 días sin crecer). La frescura del brief se audita al **arrancar**, no al cerrar.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
@@ -48,6 +49,7 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 | `/angular-component` | Crear o refactorizar un componente Angular |
 | `/angular-signals` | Implementar estado reactivo con Signals |
 | `/sync-indices` | Sincronizar índices al cerrar sesión |
+| `/harness-feedback` | Reportar fricción con el harness (hooks/rules/skills) al cerrar sesión — distinto de sync-indices |
 
 ## Subagentes disponibles
 

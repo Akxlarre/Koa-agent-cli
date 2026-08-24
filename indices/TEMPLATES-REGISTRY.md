@@ -27,11 +27,11 @@
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
 | `templates/.claude/settings.json` | `.claude/settings.json` | Cableado de hooks. 7 eventos: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostCompact, Stop. |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 12 hooks de guardrails (ver tabla abajo). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 13 hooks de guardrails (ver tabla abajo). |
 | `templates/.claude/hooks/validators/` | `.claude/hooks/validators/` | Validadores genéricos parametrizados por flags. No saben nada del proyecto. Trae su `package.json` que fuerza CommonJS. |
 | `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 14 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 9 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices, plan, review). |
+| `templates/.claude/skills/` | `.claude/skills/` | 10 skills (angular-component, angular-signals, angular-forms, angular-primeng, design-system, supabase-data-model, sync-indices, plan, review, harness-feedback). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
 | `templates/.claude/tests/` | `.claude/tests/` | 8 archivos de tests de contrato (`node --test`). 110 tests. Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada. |
 
@@ -72,6 +72,7 @@
 | `session-start.js` | SessionStart | Inyecta índices core, objetivo del brief y pendientes del último task-spec. Audita frescura del brief. **Escribe el discovery flag** | indices/, context/brief.md, task-spec |
 | `prompt-context.js` | UserPromptSubmit | Reinyecta el `## Out of scope` del brief y las casillas abiertas del spec. Dedup por contenido, refresco cada 8 prompts | context/brief.md, task-spec |
 | `pre-write-guard.js` | PreToolUse (Edit/Write) | 4 capas: File Protection, Discovery Gate, Architect Guard (ARCH-01→12, A11Y, LLM, SEC, **SEC-RLS-01/02**), Context Injection. Incluye **Circuit Breaker** (3 bloqueos idénticos → escalar al humano) | discovery flag, blueprint.json |
+| `harness-gate.js` | PreToolUse (Edit/Write) | Generalization Gate + Placement Guard sobre el harness mismo (rules/, learnings.md, ANTI-PATTERNS.md, CLAUDE.md, scripts/) — ver HOOKS-SYSTEM.md §8 | — |
 | `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de fuentes via Bash (`>`, `touch`, `cp`, `mv`, `ng generate`), destructivos sobre dirs críticos, y **Approval Gate** de operaciones DB irreversibles | — |
 | `spec-diff-check.js` | PreToolUse (Bash → git commit) | Bloquea el commit si hay componentes/facades nuevos sin registrar en índices | session-writes.json |
 | `discovery-tracker.js` | PostToolUse (Read) | Crea/appendea el flag cuando se leen `indices/` o `context/` | — |

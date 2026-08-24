@@ -266,11 +266,12 @@ frontmatter o el hook bloqueará el cierre de cada tarea.
 
 ---
 
-## [6.5.0] — 2026-08-18
+## [6.5.0] — 2026-08-19
 
 Esta versión cierra los huecos agénticos del harness: hasta ahora los guardrails
-detectaban **sintaxis** pero nada revisaba **diseño**, un agente bloqueado podía
-reintentar sin límite, y el criterio de done que generaba `/plan` no lo verificaba nadie.
+detectaban **sintaxis** pero nada revisaba **diseño** ni gobernaba el harness mismo,
+un agente bloqueado podía reintentar sin límite, y el criterio de done que generaba
+`/plan` no lo verificaba nadie.
 
 ### Fixed
 - **`compact-recovery.js` no compilaba.** Tenía saltos de línea literales dentro de
@@ -308,6 +309,20 @@ reintentar sin límite, y el criterio de done que generaba `/plan` no lo verific
   mismo estado del spec no se reporta dos veces.
 - **Context Offloading activo** — `compact-recovery.js` re-inyecta solo las casillas
   `- [ ]` pendientes del task-spec; lo completado se descarta del contexto.
+- **`harness-gate.js`** (nuevo hook, PreToolUse Edit/Write/MultiEdit): Generalization Gate +
+  Placement Guard sobre el harness mismo. Bloquea ediciones a `.claude/rules/*.md`,
+  `context/learnings.md`, `indices/ANTI-PATTERNS.md` y `CLAUDE.md` que citan un track ID
+  (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin un criterio de aplicabilidad explícito,
+  o que contienen snippets de despacho por keyword-matching literal / código ejecutable
+  colado en un archivo de guía. También bloquea ediciones a `scripts/*.js` que solo agregan
+  un mensaje consultivo sin ningún `process.exit(2)` que lo respalde. Inspirado en el
+  "Generalization Gate" y la regla de placement capacidad/guía de HarnessCompass
+  (arXiv:2608.01918).
+- **`/harness-feedback`** (nuevo skill, user-invocable): reporte proactivo de fricción con
+  el harness en dos pasadas (ciega, luego con hindsight tras correr `lint:arch`/`test:ci`),
+  con grounding obligatorio contra evidencia de la sesión y enrutamiento a track
+  estructural (hook/script) o guía (`rules/`/`learnings.md`/`ANTI-PATTERNS.md`), gateado
+  por `harness-gate.js`.
 - **Tests nuevos** — `spec-reflection.test.js` y `compact-recovery.test.js` (el hook que
   estuvo roto sin que nadie lo notara ahora tiene un test que verifica que simplemente corre).
 
@@ -330,16 +345,20 @@ reintentar sin límite, y el criterio de done que generaba `/plan` no lo verific
    dentro de `Stop`, **antes** de `sync-check.js`.
 4. Mover `.claude/skills/plan.md` a `.claude/skills/plan/SKILL.md` y copiar
    `.claude/skills/review/SKILL.md`.
-5. **Revisar `.mcp.json`**: si ya pegaste un PAT inline, rótalo en
+5. Copiar `.claude/hooks/harness-gate.js` y registrarlo en `.claude/settings.json`
+   (matcher `Edit|Write|MultiEdit`, junto a `pre-write-guard.js`); copiar
+   `.claude/skills/harness-feedback/SKILL.md`.
+6. **Revisar `.mcp.json`**: si ya pegaste un PAT inline, rótalo en
    supabase.com/dashboard/account/tokens — quedó en el historial de git — y pasa a
    `SUPABASE_ACCESS_TOKEN` + `--read-only` + `--project-ref`.
-6. Copiar los tests nuevos y correr `npm run claude:test-hooks`.
+7. Copiar los tests nuevos y correr `npm run claude:test-hooks`.
 
 **Nota sobre el Approval Gate**: si tu flujo dependía de que el agente corriera
 `supabase db push`, ahora queda bloqueado a propósito. El agente escribe la migración
 e informa el comando; lo aplica una persona.
 
 ---
+
 
 ## [6.1.0] — 2026-03-26
 

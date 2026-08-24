@@ -33,6 +33,11 @@ Claude recibe un prompt del humano
     ├─ Intenta Bash("echo > src/app/nuevo.ts")
     │   └─ PreToolUse → bash-guard.js → BLOQUEADO "Usa Edit/Write"
     │
+    ├─ Intenta Edit(".claude/rules/visual-system.md")
+    │   └─ PreToolUse → harness-gate.js
+    │       ├─ ¿Cita un fix-NNN sin criterio de aplicabilidad? → BLOQUEADO "Reescribe como regla"
+    │       └─ Todo OK → PERMITIDO (esto es guía, no código de la app: pre-write-guard.js no aplica)
+    │
     ├─ Claude termina de responder
     │   └─ Stop → prompt hook → "¿Actualizaste los índices?" → si no → sigue trabajando
     │
@@ -232,6 +237,34 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
 - **Evento**: PostToolUse
 - **Matcher**: `Edit|Write|MultiEdit`
 - **Función**: Formatea automáticamente con Prettier cada archivo editado.
+
+### 10. Harness Gate (`harness-gate.js`)
+- **Evento**: PreToolUse
+- **Matcher**: `Edit|Write|MultiEdit`
+- **Función**: Gobierna las ediciones al harness mismo (no al código de la app). Se activa
+  solo sobre dos familias de superficies:
+
+  | Superficie | Archivos | Rol |
+  |---|---|---|
+  | Guía | `.claude/rules/*.md`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` | Memoria/prosa que el agente lee |
+  | Capacidad | `scripts/*.js`, `.claude/scripts/*.js` (excepto `scripts/architect.js`, ya protegido) | Código que corre y decide |
+
+  Aplica dos disciplinas, inspiradas en el paper *HarnessCompass* (arXiv:2608.01918)
+  sobre evolución automática de harnesses de agentes:
+
+  | Chequeo | Superficie | Qué bloquea |
+  |---|---|---|
+  | GATE-A1 | Guía | Cita un track (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin ningún criterio de aplicabilidad cerca — receta memorizada en vez de regla reusable |
+  | GATE-A2 | Guía | Snippet de despacho por keyword-matching literal (`if ("token" in text)`) — ni siquiera como prosa/pseudo-código |
+  | GATE-B1 | Guía | Lógica ejecutable real (`require`/`process.exit`/`fs.*`) colada en un archivo que debería ser solo prosa |
+  | GATE-B2 | Capacidad | `console.log`/`console.warn` con tono de consejo y sin ningún `process.exit(2)` que lo respalde — guía disfrazada de script |
+
+  La intuición: una lección que sobrevive a una sesión debe quedar escrita como un
+  **principio + criterio de cuándo aplica**, nunca como la respuesta memorizada a un
+  track puntual; y la separación capacidad/guía evita que el harness acumule "consejo"
+  en lugares donde nadie lo hace cumplir, o código real donde nadie lo lee como tal.
+  Ver también el skill `/harness-feedback`, que alimenta estas superficies de guía con
+  fricción real reportada por el propio agente al cerrar sesión.
 
 ## Linter Arquitectónico Completo (`architect.js` v2.0)
 

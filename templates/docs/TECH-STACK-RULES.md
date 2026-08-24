@@ -52,18 +52,18 @@
 - Warning si un `*.facade.ts` es demasiado complejo (recomendación: \(\le 5\) `inject()` y métodos \(\le 50\) líneas).
 - Solución: extraer lógica a services/helpers y mantener la Facade como orquestador de estado/errores.
 
-<a id="arch-11"></a>
-### ARCH-11: `supabase.types.ts` es auto-generado
-- Prohibido editar `src/app/core/models/supabase.types.ts` a mano.
-- Solución: `npm run supabase:types` lo regenera. Las interfaces de `dto/` deben **extender** de ahí, no duplicar sus campos.
-- Por qué: cualquier edición manual se pierde en la próxima regeneración, y el tipo deja de reflejar el esquema real.
-
 <a id="arch-12"></a>
 ### ARCH-12: Repository boundary
 - Prohibido llamar `.db.from()` o `.client.from()` dentro de un Facade.
 - Solución: crear o reutilizar un Repository en `core/repositories/` e inyectarlo.
 - Cadena canónica: `UI → Facade → Repository → SupabaseService.db`.
 - Por qué: el getter `.db` existe solo para Repositories. Si el Facade consulta directo, la forma del cliente Supabase se filtra hacia arriba y cambiar de proveedor pasa a tocar toda la app.
+
+<a id="arch-13"></a>
+### ARCH-13: `supabase.types.ts` es auto-generado
+- Prohibido editar `src/app/core/models/supabase.types.ts` a mano.
+- Solución: `npm run supabase:types` lo regenera. Las interfaces de `dto/` deben **extender** de ahí, no duplicar sus campos.
+- Por qué: cualquier edición manual se pierde en la próxima regeneración, y el tipo deja de reflejar el esquema real.
 
 <a id="a11y-01"></a>
 ### A11Y-01: `<app-icon>` sin `aria-label`

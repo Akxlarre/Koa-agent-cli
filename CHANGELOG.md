@@ -46,12 +46,14 @@ Circuit Breaker, Approval Gate, guardrails RLS) se perdió al integrar esto.
   `<a id>` explícito; las que no tenían ninguna cobertura (`ARCH-11/15/16/17/18/19/22`,
   `NAV-01`, `ICON-01`) suman una sección mínima nueva.
 
-### Conocido y sin resolver
-- **Colisión de IDs**: `ARCH-11` significa dos reglas distintas según quién lo emite —
-  `pre-write-guard.js` ("`supabase.types.ts` es auto-generado") vs `architect.js` ("clases de
-  token muertas"). Ambas numeraciones se desarrollaron en paralelo sin verse. Requiere
-  decidir cuál se renumera; toca ~8 archivos entre tests, docs e índices. No se resolvió acá
-  para no tomar esa decisión unilateralmente.
+- **Colisión de IDs resuelta**: `ARCH-11` significaba dos reglas distintas según quién lo
+  emitía — `pre-write-guard.js` ("`supabase.types.ts` es auto-generado") vs `architect.js`
+  ("clases de token muertas"), desarrolladas en paralelo sin verse. Se renumeró la de
+  `pre-write-guard.js` a **`ARCH-13`** (la menos referenciada de las dos: `architect.js` ya
+  tenía toda la documentación nueva de este release construida alrededor de su ARCH-11).
+  `ARCH-12` (Repository boundary) no colisionaba y queda igual. Actualizado en
+  `pre-write-guard.js`, su test, `docs/TECH-STACK-RULES.md` (reordenado a ARCH-10→12→13),
+  `.claude/rules/database.md` y `docs/KOA-AGENT-CLI-DOCUMENTO-COMPLETO.md`.
 
 ### Migración desde 6.9.1
 1. Copiar `.claude/hooks/sdd/`, `.claude/skills/sdd/`, `.claude/commands/` completos.

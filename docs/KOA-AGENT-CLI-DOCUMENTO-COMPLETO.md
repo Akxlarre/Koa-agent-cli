@@ -481,7 +481,7 @@ SCRIPTS NPM INYECTADOS EN PROYECTO GENERADO:
 - `ANTI-PATTERNS.md` con 5 anti-patrones documentados
 
 **En desarrollo (v7.0 planificado):**
-- WI 7-02: Facades delgadas (ARCH-11/12 warnings adicionales)
+- WI 7-02: Facades delgadas (ARCH-12/13 warnings adicionales)
 - WI 7-03: Custom rules via archivos `.yml`
 - WI 7-04: Pipeline automático LESSONS → ANTI-PATTERNS
 - WI 7-05: RAG boilerplate (`--with-rag`): migración SQL pgvector, Edge Function, RagFacade

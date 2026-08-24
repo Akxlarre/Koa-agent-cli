@@ -3,28 +3,29 @@
   "mcpServers": {
     "typescript": {
       "command": "npx",
-      "args": [
-        "-y",
-        "ts-lsp-mcp"
-      ]
+      "args": ["-y", "ts-lsp-mcp"]
     },
     "angular": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@angular/cli@latest",
-        "mcp"
-      ]
+      "args": ["-y", "@angular/cli@latest", "mcp"]
     },
     "supabase": {
       "command": "npx",
       "args": [
         "-y",
         "@supabase/mcp-server-supabase@latest",
-        "--access-token",
-        "YOUR_SUPABASE_PERSONAL_ACCESS_TOKEN"
+        "--read-only",
+        "--project-ref",
+        "YOUR_SUPABASE_PROJECT_REF"
       ],
-      "_comment": "Obtén tu Personal Access Token en: https://supabase.com/dashboard/account/tokens"
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+      },
+      "_comment": "MINIMO PRIVILEGIO — leer antes de cambiar nada de este bloque.",
+      "_comment_readonly": "--read-only: el agente puede inspeccionar el esquema pero NO ejecutar DDL/DML. Quitarlo le da escritura sobre la base de datos real.",
+      "_comment_project_ref": "--project-ref: acota el acceso a UN proyecto. Sin este flag el token alcanza TODOS tus proyectos Supabase, produccion incluida. Tu ref esta en la URL del dashboard: supabase.com/dashboard/project/<ref>",
+      "_comment_token": "El Personal Access Token NUNCA va inline en este archivo (se commitea). Exportalo en tu shell: export SUPABASE_ACCESS_TOKEN=sbp_xxx — generalo en supabase.com/dashboard/account/tokens",
+      "_comment_writes": "Para aplicar cambios de esquema usa migraciones versionadas en supabase/migrations/ + supabase db push ejecutado por un humano. No le des escritura al agente para saltarte ese flujo."
     }
   }
 }

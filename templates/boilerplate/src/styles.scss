@@ -11,6 +11,11 @@
 /* Motion — View Transitions API (page navigation) */
 @use "./styles/motion/view-transitions";
 
+/* Animaciones CSS de entrada — .animate-fade-in-up / .animate-fade-in / .animate-stagger.
+   El harness recomienda estas clases a los proyectos SIN GSAP, que es el default:
+   sin este @use existian solo en la documentacion. */
+@use "./styles/animations";
+
 /* Typography — Bricolage Grotesque
    Loaded via <link preconnect> in index.html (NOT @import — avoids render-blocking).
    Referenced in --font-display / --font-body tokens in _variables.scss. */

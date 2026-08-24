@@ -1,0 +1,7 @@
+{
+  "name": "koa-hook-validators",
+  "version": "1.0.0",
+  "description": "Generic parameterized validators for Koa hooks",
+  "type": "commonjs",
+  "private": true
+}

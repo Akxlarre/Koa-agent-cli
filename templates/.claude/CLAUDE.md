@@ -6,15 +6,20 @@ Tu stack: **Angular + Tailwind v4 + PrimeNG + Supabase + GSAP**.
 
 Este proyecto tiene guardrails automáticos que se ejecutan sin intervención humana:
 
-- **Discovery Gate** — NO puedes escribir código en `src/app/` sin antes leer al menos un archivo de `indices/`. Serás bloqueado automáticamente.
-- **Architect Guard** — Cada Edit/Write es validado en tiempo real. Se bloquean: `*ngIf`, `@Input()`, colores hardcodeados, imports de Supabase en UI, `@angular/animations`, `@keyframes`.
+- **Session Start** — Al abrir la sesión se te inyectan los índices core (COMPONENTS, SERVICES, FACADES), el objetivo de `context/brief.md` y el trabajo pendiente del último task-spec. No arrancas a ciegas.
+- **Prompt Context** — Antes de cada prompt se te recuerda lo que está **fuera de alcance** esta sesión y qué queda pendiente del spec. Es lo primero que se olvida y nada en la conversación lo repite.
+- **Discovery Gate** — NO puedes escribir código en `src/app/` sin antes tener los índices en contexto. Session Start suele resolverlo por ti; si no, serás bloqueado hasta que leas `indices/`.
+- **Architect Guard** — Cada Edit/Write es validado en tiempo real. Se bloquean: `*ngIf`, `@Input()`, colores hardcodeados, imports de Supabase en UI, `@angular/animations`, `@keyframes`, y migraciones con problemas de RLS (`SEC-RLS-01/02`).
 - **File Protector** — No puedes modificar los archivos del sistema de hooks (`.claude/hooks/`, `settings.json`, `architect.js`).
 - **Bash Guard** — No puedes crear archivos `.ts/.html/.scss` via Bash. Usa Edit/Write.
 - **Compact Recovery** — Si el contexto se compacta, los índices se re-inyectan automáticamente (PostCompact).
 - **Failure Tracker** — Los errores de tools se registran en `.claude/temp/LESSONS_LEARNED.md` con dedup y rotación automática (max 20).
+- **Circuit Breaker** — Si el mismo Edit se bloquea 3 veces por la misma violación, el guard deja de explicar el arreglo y te ordena parar y escalar al humano. No intentes rodearlo.
+- **Approval Gate** — Las operaciones irreversibles de base de datos (`supabase db push`, `db reset`, `migration repair`, `link`, SQL destructivo) las ejecuta un humano, no tú. Escribe la migración y pide que la corran.
+- **Spec Reflection** — Al terminar de responder, se revisa el "Criterio de done" del task-spec activo y se te devuelven los puntos sin cerrar.
 - **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script.
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
-- **Context Guardian** — Al terminar de responder, audita la frescura del contexto semántico: avisa si `context/brief.md` tiene más de 7 días sin actualizar o si `context/learnings.md` lleva más de 14 días sin crecer.
+- **Context Guardian** — Al terminar de responder, pregunta si algo de esta sesión merece quedar en `context/learnings.md` (avisa si lleva más de 14 días sin crecer). La frescura del brief se audita al **arrancar**, no al cerrar.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
 
 Detalle completo: @docs/HOOKS-SYSTEM.md
@@ -29,21 +34,46 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 
 ## Flujo obligatorio (5 pasos)
 
-1. **DESCUBRIR** — Lee los índices de `indices/` (COMPONENTS, SERVICES, FACADES, MODELS…) **y** `context/domain.md` + `context/brief.md` si existen. Los índices te dicen qué código hay; el contexto te dice qué es el negocio y qué se está construyendo hoy. **El Discovery Gate te bloqueará si no lees los índices.**
-2. **PLANIFICAR** — Define qué vas a tocar sin violar las reglas de arquitectura.
+1. **DESCUBRIR** — Session Start ya te dio los índices core y el objetivo. Para descubrimiento dirigido ("¿qué existe que pueda reutilizar para X?") delega en `discovery-scout`, que te devuelve un veredicto en vez de volcarte archivos. Lee `context/domain.md` si necesitas el vocabulario del negocio. **El Discovery Gate te bloqueará si escribes sin los índices en contexto.**
+2. **PLANIFICAR** — `/plan` genera el task-spec. Su formato **lo valida un hook**, no tu buena voluntad: si falta una sección obligatoria, no terminas. Marca las casillas `[x]` a medida que avanzas: Spec Reflection, Prompt Context y Compact Recovery dependen de eso.
 3. **EJECUTAR** — Escribe el código. Reutiliza siempre lo existente primero. Los hooks validarán cada escritura en tiempo real.
-4. **VALIDAR** — Corre `npm run lint:arch` para una auditoría completa del proyecto.
-5. **SINCRONIZAR** — Actualiza `indices/*.md` con los componentes/servicios creados. El Stop hook te lo recordará si lo olvidas.
+4. **VALIDAR** — `arch-auditor` corre el linter y el build y te devuelve solo las violaciones. Después `/review` juzga el diseño contra la rúbrica, que es lo que los hooks de regex no pueden ver.
+5. **SINCRONIZAR** — `index-syncer` reconcilia `indices/*.md` con el código real. El Stop hook te lo recordará si lo olvidas.
 
 ## Skills disponibles
 
 | Skill | Cuándo usar |
 |---|---|
 | `/plan` | SIEMPRE antes de una tarea no trivial (>2 archivos). Genera task-spec con artefactos afectados, reglas que aplican y criterio de done. |
+| `/review` | Antes de commitear algo no trivial. Juzga el diseño contra la rúbrica del proyecto — lo que los guardrails de regex no alcanzan. |
 | `/angular-component` | Crear o refactorizar un componente Angular |
 | `/angular-signals` | Implementar estado reactivo con Signals |
 | `/sync-indices` | Sincronizar índices al cerrar sesión |
 | `/harness-feedback` | Reportar fricción con el harness (hooks/rules/skills) al cerrar sesión — distinto de sync-indices |
+
+## Subagentes disponibles
+
+Corren en su propia ventana de contexto y devuelven un resumen. Úsalos para no
+llenar tu contexto principal de output que solo necesitas una vez.
+
+| Subagente | Para qué | Modelo |
+|---|---|---|
+| `discovery-scout` | Qué ya existe que puedas reutilizar (paso DESCUBRIR) | rápido |
+| `arch-auditor` | `lint:arch` + `tsc` comprimidos a violaciones accionables | rápido |
+| `index-syncer` | Reconciliar `indices/*.md` con el código real | rápido |
+| `supabase-schema` | Esquema real de la BD a partir de las migraciones | rápido |
+| `code-judge` | Veredicto de diseño contra la rúbrica (lo invoca `/review`) | razonador |
+
+El juez usa a propósito un modelo más capaz que el que genera el código: un
+evaluador que razona igual que el generador no detecta los errores del generador.
+
+**Delegar no es gratis** — cada subagente es una llamada completa que arranca sin
+nada de lo que ya sabes. `.claude/rules/delegation.md` (se carga sola al editar
+código) dice cuándo vale la pena y cuándo hacerlo tú.
+
+`code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff como archivo
+(`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría escribir
+usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un hecho.
 
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 
@@ -58,6 +88,7 @@ Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las i
 | `src/app/**/*.html` + `shared/**` + `styles/**` | `visual-system`, `ai-readability` |
 | `src/app/features/**` + `layout/**` | `notifications`, `layout-blueprints` |
 | `supabase/**` + `core/services/**` | `database` |
+| `src/app/**/*.ts` + `.html` + `supabase/migrations/**` | `delegation` (cuándo usar un subagente y cuándo no) |
 
 ## Referencias (leer bajo demanda — no cargadas automáticamente)
 

@@ -32,3 +32,9 @@
 | Directiva | Selector | Propósito | Inputs | Estado |
 |-----------|----------|-----------|--------|--------|
 | `ModalOverlayDirective` | `[appModalOverlay]` | Teleporta el modal al overlay container (z-index > topbar) | `appModalOverlay: boolean` | ✅ Estable |
+
+## Auto-Index — Detectado por AST (generado automáticamente)
+
+<!-- AUTO-GENERATED:BEGIN -->
+_Sin entradas auto-detectadas aún. Ejecuta `npm run indices:sync` para poblar._
+<!-- AUTO-GENERATED:END -->

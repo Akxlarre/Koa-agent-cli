@@ -1,4 +1,10 @@
-import { ApplicationConfig, importProvidersFrom } from "@angular/core";
+import { ApplicationConfig, ErrorHandler, LOCALE_ID, importProvidersFrom } from "@angular/core";
+import { registerLocaleData } from "@angular/common";
+import localeEs from "@angular/common/locales/es";
+
+// Angular NO trae los datos de locale cargados: usar `| date: ... : 'es'` sin
+// registrarlo lanza NG0701 en cada render. Se registra una sola vez, acá.
+registerLocaleData(localeEs);
 import {
   provideRouter,
   withComponentInputBinding,
@@ -19,6 +25,7 @@ import {
   CheckCircle,
   ChevronRight,
   Download,
+  Lock,
   LayoutDashboard,
   Plus,
   Settings,
@@ -81,6 +88,7 @@ import {
 
 import { routes } from "./app.routes";
 import { provideCoreAuth } from "@core/auth/provide-core-auth";
+import { GlobalErrorHandler } from "@core/errors/global-error-handler";
 
 /**
  * Configuración principal de la aplicación.
@@ -105,6 +113,10 @@ export const appConfig: ApplicationConfig = {
       },
     }),
     provideCoreAuth(),
+    { provide: LOCALE_ID, useValue: "es" },
+    // Atrapa excepciones no manejadas y las muestra saneadas en un toast,
+    // en vez de dejar la app congelada sin señal para el usuario.
+    { provide: ErrorHandler, useClass: GlobalErrorHandler },
     MessageService,
     ConfirmationService,
     /**
@@ -126,6 +138,7 @@ export const appConfig: ApplicationConfig = {
         CheckCircle,
         ChevronRight,
         Download,
+        Lock,
         LayoutDashboard,
         Plus,
         Settings,

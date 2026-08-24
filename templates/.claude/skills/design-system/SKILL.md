@@ -127,6 +127,12 @@ Reglas GSAP:
 
 Para usar un ícono adicional: importarlo de `'lucide-angular'` con PascalCase y agregarlo al objeto `provideIcons()` en `app.config.ts`. Referencia completa: lucide.dev/icons
 
+<a id="icon-01"></a>
+**ICON-01** (`npm run lint:arch`): compara los íconos usados en templates contra los
+registrados en `provideIcons()`. Uno usado y no registrado **no rompe el build** —
+Angular compila sin quejarse y lucide-angular lanza recién en **runtime**, al renderizar
+ese `<app-icon>` por primera vez. El linter lo atrapa antes de que llegue a producción.
+
 ## Utilidades Semánticas — Nuevos Constructos
 
 ### KPI — Componente (OBLIGATORIO usar app-kpi-card)
@@ -149,12 +155,14 @@ Para usar un ícono adicional: importarlo de `'lucide-angular'` con PascalCase y
   [accent]="true"
 />
 
-<!-- Con skeleton mientras carga (patrón loading) -->
-@if (facade.loading()) {
-  <app-kpi-card-skeleton />
-} @else {
-  <app-kpi-card [value]="facade.revenue()" label="Ingresos" prefix="$" [appAnimateIn] />
-}
+<!-- Con skeleton mientras carga — INTERNO, no un componente aparte -->
+<app-kpi-card
+  [value]="facade.revenue()"
+  label="Ingresos"
+  prefix="$"
+  [loading]="facade.loading()"
+  appAnimateIn
+/>
 ```
 
 **Inputs de app-kpi-card:**
@@ -167,9 +175,15 @@ Para usar un ícono adicional: importarlo de `'lucide-angular'` con PascalCase y
 | `trend` | `number\|undefined` | `undefined` | Variación %. Positivo=verde↑, negativo=rojo↓ |
 | `trendLabel` | `string` | `''` | Contexto del trend (ej: `'vs. mes anterior'`) |
 | `accent` | `boolean` | `false` | Borde brand. Máx 1 por sección bento. |
+| `loading` | `boolean` | `false` | Renderiza el skeleton interno en vez del contenido |
 
-**PROHIBIDO** recrear la composición KPI manualmente con `.kpi-value` y `.kpi-label` si `app-kpi-card` cubre la necesidad.
-Las clases `.kpi-value` / `.kpi-label` solo se usan directamente en composiciones custom que no encajan en app-kpi-card.
+**PROHIBIDO** recrear la composición KPI manualmente con `.kpi-value` y `.micro-label` si `app-kpi-card` cubre la necesidad.
+Esas clases solo se usan directamente en composiciones custom que no encajan en app-kpi-card.
+
+**PROHIBIDO crear un `*-skeleton.component.ts` aparte.** El skeleton vive DENTRO del
+componente, detrás de un input `loading`: si vive aparte se desincroniza en silencio
+cuando el componente real cambia de estructura, y el layout shift vuelve sin que nadie
+lo note. Ver "Skeletons y Estados de Carga" en `visual-system.md`.
 
 ### Empty State — Componente (OBLIGATORIO usar app-empty-state)
 
@@ -280,7 +294,7 @@ Las clases `.kpi-value` / `.kpi-label` solo se usan directamente en composicione
 - [ ] Usa `.card`, `.card-accent` o `.card-tinted` según contexto
 - [ ] 1 solo `.card-accent` por sección
 - [ ] Iconos: `<app-icon>` — cero emojis ni SVG inline
-- [ ] KPIs con `.kpi-value` + `.kpi-label` (no text-4xl plano)
+- [ ] KPIs con `.kpi-value` + `.micro-label` (no text-4xl plano)
 - [ ] GSAP en `ngAfterViewInit` para entrada
 - [ ] Funciona en modo claro y oscuro
 - [ ] Contraste WCAG AA (mínimo 4.5:1 en texto normal)

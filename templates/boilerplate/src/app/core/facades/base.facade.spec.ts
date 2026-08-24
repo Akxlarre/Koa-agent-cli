@@ -62,10 +62,12 @@ describe('BaseFacade', () => {
       expect(facade.isLoading()).toBe(false);
     });
 
-    it('should set error when fetchData throws', async () => {
+    it('should set a sanitized error when fetchData throws', async () => {
       facade.fetchData.mockRejectedValueOnce(new Error('network error'));
       await facade.initialize();
-      expect(facade.error()).toBe('network error');
+      // sanitizeError() nunca expone el mensaje crudo a la UI: lo mapea a un
+      // texto seguro. Ver BaseFacade.sanitizeError().
+      expect(facade.error()).toBe('Error de conexión. Verifica tu internet e intenta de nuevo.');
       expect(facade.data()).toBeNull();
     });
 

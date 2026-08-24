@@ -9,14 +9,21 @@
  * Inspirado en el "Generalization Gate" y la regla de "placement" de
  * HarnessCompass (arXiv:2608.01918): las lecciones que se acumulan en el
  * harness deben ser principios reutilizables (con criterio de aplicabilidad),
- * nunca una respuesta a una tarea puntual; y la lógica determinista vive en
+ * nunca una respuesta a un track puntual; y la lógica determinista vive en
  * código (scripts/hooks), nunca como prosa disfrazada de mecanismo.
+ *
+ * Nota de scope: este blueprint puede traer el motor SDD dormido en
+ * `.claude/hooks/sdd/` (specs/, fix-NNN, spec-NNNN, hotfix-NNN). specs/**
+ * queda deliberadamente FUERA de este gate: ahí los track IDs SON el
+ * contenido legítimo (contratos de spec/fix/hotfix), no una superficie de
+ * guía global. Este hook nunca matchea rutas bajo specs/.
  *
  * Dos familias de chequeos:
  *
  *   A. GENERALIZATION GATE (superficies de guía)
- *      A1. Cita un track ID (fix-NNN/spec-NNN/hotfix-NNN/task-NNN) sin ningún
- *          marcador de generalización cerca → probable "receta" en vez de regla.
+ *      A1. Cita un track ID (fix-NNN/spec-NNNN/hotfix-NNN/task-NNN) sin
+ *          ningún marcador de generalización cerca → probable "receta" en
+ *          vez de regla.
  *      A2. Contiene un snippet de despacho por keyword-matching literal
  *          (`if ("token" in text)`) → exactamente el patrón que HarnessCompass
  *          prohíbe en cualquier superficie, incluida la de guía.
@@ -80,7 +87,7 @@ process.stdin.on('end', () => {
     const violations = [];
 
     // ═══════════════════════════════════════════════════════════════════════
-    // A. GENERALIZATION GATE — solo superficies de guía
+    // A. GENERALIZATION GATE — solo superficies de guía (nunca specs/**)
     // ═══════════════════════════════════════════════════════════════════════
     if (isGuidanceSurface) {
       const TRACK_ID_RE = /\b(?:fix|spec|hotfix|task)-\d{2,4}(?:-[a-z])?\b/i;

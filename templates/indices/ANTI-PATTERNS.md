@@ -51,7 +51,7 @@ entrada aquí se convierte en algo que se revisa en cada `/review`.
 
 ## AP-004 — Colores Tailwind hardcodeados (evitar)
 - **NO** uses `text-red-500`, `bg-blue-200`, etc.
-- **Sí** usa tokens semánticos (`text-primary`, `text-muted`, `bg-surface`, `bg-base`, `var(--ds-brand)`).
+- **Sí** usa tokens semánticos (`text-primary`, `text-muted`, `bg-surface`, `bg-canvas`, `var(--ds-brand)`).
 
 <a id="ap-005"></a>
 

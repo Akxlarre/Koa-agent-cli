@@ -69,13 +69,18 @@ import { IconComponent } from "@shared/components/icon/icon.component";
           [rounded]="true"
           severity="secondary"
           size="small"
-          [icon]="theme.darkMode() ? 'pi pi-sun' : 'pi pi-moon'"
           [ariaLabel]="
             theme.darkMode() ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'
           "
           data-llm-action="toggle-color-mode"
           (onClick)="theme.cycleColorMode($event)"
-        />
+        >
+          <app-icon
+            [name]="theme.darkMode() ? 'sun' : 'moon'"
+            [size]="16"
+            [ariaHidden]="true"
+          />
+        </p-button>
 
         @if (auth.currentUser(); as user) {
           <div class="flex flex-1 items-center gap-2 min-w-0">

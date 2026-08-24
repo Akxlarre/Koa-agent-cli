@@ -6,6 +6,66 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [7.0.0] — 2026-08-24
+
+Cosecha aprendizajes reales de Autoescuela (y de la spec 0002 de "app-familiar") hacia el
+blueprint genérico, desarrollada en paralelo a 6.6.0→6.9.1. Esta versión reconcilia ambas
+líneas de trabajo: nada de lo agregado en 6.5.0→6.9.1 (harness-gate.js, subagentes,
+Circuit Breaker, Approval Gate, guardrails RLS) se perdió al integrar esto.
+
+### Added
+- **Motor SDD completo, dormido por defecto** (`.claude/hooks/sdd/`, `.claude/skills/sdd/`,
+  `.claude/commands/`): `spec-gate.js`, `plan-injector.js`, `hotfix-autoclose.js`, 11 slash
+  commands (`/spec-*`, `/fix-*`, `/hotfix`, `/assign-*`). Sin carpeta `specs/` no bloquea
+  nada — es opt-in.
+- **Patrón App-like (fill-screen)** + reparación del Full Scaffold.
+- **Sistema de reveal del bento** + auto-indexer de 13 índices con caché incremental.
+- **Guardrails nuevos en `architect.js`** (25 → 28 reglas con las `SEC-RLS-*` de 6.9.0):
+  `ARCH-21` (allowlist del bento), `ARCH-23` (contrato App-like como guardrail, no prosa),
+  `NAV-01` (el menú no puede apuntar a rutas inexistentes), `rule-wiring` (audita que toda
+  regla registrada pueda fallar de verdad), integridad de enlaces entre specs.
+- Componentes nuevos del boilerplate: `section-hero`, `tabs`, `badge`, `layout-drawer` con
+  navegación interna (`back()`, inputs por nivel), sanitizador único de errores de BD
+  (`db-error.utils.ts`, `error-sanitizer.service.ts`), `global-error-handler.ts`.
+- Varias entradas de `LESSONS_LEARNED` documentando fricción real encontrada en el camino
+  (migraciones semilla que nunca se pudieron aplicar, CSP bloqueando Supabase local, el CLI
+  destruyendo contexto que no había escrito).
+
+### Fixed
+- **`indices/CLI-MODULES.md`** desactualizado respecto al schema real de `blueprint.json`
+  (`scaffoldMode`, `tier`/`team`/`product` de Wikiflow, `ANGULAR_MAJOR`).
+- **`doc-links.test.js`** asumía que toda regla emitida se documenta en un único archivo
+  (`docs/TECH-STACK-RULES.md`). Ya no es cierto: `architect.js` declara un `doc:` por regla,
+  y varias apuntan a `.claude/rules/visual-system.md`, `indices/STYLES.md`,
+  `.claude/rules/a11y-spec.md`, `.claude/rules/screen-contract.md` o
+  `.claude/skills/design-system/SKILL.md`. El test ahora resuelve el `doc:` real de cada
+  regla en vez de asumir uno solo, y respeta el ancla explícita cuando difiere del ID
+  (`SEC-RLS-01` documentada bajo `#ap-012`, no `#sec-rls-01`).
+- **15 reglas del linter sin sección documentada** (`ARCH-11/15/16/17/18/19/21/22/23/24/25/26`,
+  `A11Y-03`, `NAV-01`, `ICON-01`): la mayoría ya tenían prosa real escrita, solo faltaba el
+  `<a id>` explícito; las que no tenían ninguna cobertura (`ARCH-11/15/16/17/18/19/22`,
+  `NAV-01`, `ICON-01`) suman una sección mínima nueva.
+
+### Conocido y sin resolver
+- **Colisión de IDs**: `ARCH-11` significa dos reglas distintas según quién lo emite —
+  `pre-write-guard.js` ("`supabase.types.ts` es auto-generado") vs `architect.js` ("clases de
+  token muertas"). Ambas numeraciones se desarrollaron en paralelo sin verse. Requiere
+  decidir cuál se renumera; toca ~8 archivos entre tests, docs e índices. No se resolvió acá
+  para no tomar esa decisión unilateralmente.
+
+### Migración desde 6.9.1
+1. Copiar `.claude/hooks/sdd/`, `.claude/skills/sdd/`, `.claude/commands/` completos.
+2. Copiar `.claude/hooks/context-enrichment-guard.js` (opt-in, no se cablea solo).
+3. Reemplazar `scripts/architect.js`, `scripts/indices-sync.js`, `scripts/lib/` completo.
+4. Reemplazar `.claude/rules/visual-system.md`, `a11y-spec.md`, `screen-contract.md` (si no
+   los personalizaste) y `indices/STYLES.md` — traen las anclas nuevas de este release.
+5. Copiar los componentes de boilerplate nuevos (`section-hero`, `tabs`, `badge`,
+   `layout-drawer`, `error-sanitizer.service.ts`, `global-error-handler.ts`) si tu proyecto
+   generado los necesita.
+6. Correr `npm run claude:test-hooks` y `npm test` — ambas suites deben quedar en verde.
+
+---
+
 ## [6.9.1] — 2026-08-19
 
 Enlaces de documentación rotos y reglas sin documentar. Nada de esto rompe un

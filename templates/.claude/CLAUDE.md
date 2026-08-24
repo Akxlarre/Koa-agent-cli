@@ -20,7 +20,12 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script.
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
 - **Context Guardian** — Al terminar de responder, pregunta si algo de esta sesión merece quedar en `context/learnings.md` (avisa si lleva más de 14 días sin crecer). La frescura del brief se audita al **arrancar**, no al cerrar.
+- **Spec Gate (SDD)** — Si el proyecto tiene carpeta `specs/`, no puedes tocar código de producto sin una spec activa con su plan. Sin `specs/`, no bloquea nada.
 - **Prettier** — Cada archivo editado se formatea automáticamente.
+
+> Hook adicional **opt-in**: `context-enrichment-guard.js` (Day 0 Context Guard) bloquea escribir
+> código mientras `context/domain.md` e `indices/DATABASE.md` sigan vacíos. No viene cableado —
+> actívalo en `.claude/settings.json` cuando el dominio lo amerite.
 
 Detalle completo: @docs/HOOKS-SYSTEM.md
 
@@ -50,6 +55,15 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 | `/angular-signals` | Implementar estado reactivo con Signals |
 | `/sync-indices` | Sincronizar índices al cerrar sesión |
 | `/harness-feedback` | Reportar fricción con el harness (hooks/rules/skills) al cerrar sesión — distinto de sync-indices |
+| `sdd` | Ciclo Spec-Driven Development. Comandos: `/spec-new`, `/spec-activate`, `/spec-plan`, `/spec-tasks`, `/spec-verify`, `/fix-new`, `/fix-close`, `/hotfix`, `/assign-new`, `/assign-list`, `/assign-claim` |
+| `verify` | Verificar visualmente en el navegador (Playwright MCP) que un cambio funciona de verdad — no solo que compila |
+| `form-ux` | Diseñar o revisar la UX de un formulario |
+| `grill_me` | Estresar una propuesta con preguntas antes de convertirla en spec |
+
+### SDD — cómo activarlo
+
+El motor SDD viene incluido pero **dormido**: sin carpeta `specs/`, el `spec-gate` deja pasar todo.
+Para activarlo, ver la sección "Activar el SDD en este proyecto" en `.claude/skills/sdd/SKILL.md`.
 
 ## Subagentes disponibles
 

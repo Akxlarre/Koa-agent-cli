@@ -56,7 +56,7 @@ export class BreadcrumbService {
 
   private buildFromMenu(url: string, menu: MenuItem[]): BreadcrumbState {
     const home: MenuItem = {
-      icon: "pi pi-home",
+      icon: "home",
       label: "Inicio",
       routerLink: "/",
     };

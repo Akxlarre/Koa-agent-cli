@@ -106,11 +106,20 @@ describe('DOC LINKS — anclas referenciadas', () => {
 });
 
 describe('DOC LINKS — reglas emitidas vs documentadas', () => {
-  const RULES_DOC = path.join(PAYLOAD, 'docs', 'TECH-STACK-RULES.md');
+  // Fallback para reglas emitidas sin un campo `doc:` propio detectable (p.ej.
+  // pre-write-guard.js, que hardcodea el mensaje sin pasar por un registro RULES).
+  const DEFAULT_RULES_DOC = 'docs/TECH-STACK-RULES.md';
 
-  /** IDs de regla que los hooks y el linter emiten al usuario. */
+  /**
+   * IDs de regla que los hooks y el linter emiten al usuario, junto con el
+   * archivo de documentacion que le corresponde a CADA UNA. No todas viven en
+   * el mismo doc: architect.js declara `doc:` por regla (algunas apuntan a
+   * `.claude/rules/visual-system.md`, otras a `docs/TECH-STACK-RULES.md`), y
+   * eso es intencional — cada regla se documenta cerca de su dominio, no todas
+   * apiladas en un archivo generico.
+   */
   function emittedRuleIds() {
-    const ids = new Set();
+    const ids = new Map(); // ID -> { file, anchor }
     const sources = [
       path.join(PAYLOAD, '.claude', 'hooks'),
       path.join(PAYLOAD, 'boilerplate', 'scripts'),
@@ -119,8 +128,29 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
       if (!fs.existsSync(dir)) continue;
       for (const file of walk(dir)) {
         const txt = fs.readFileSync(file, 'utf-8');
-        for (const m of txt.matchAll(/\[((?:ARCH|A11Y|LLM|SEC-RLS)-\d{2})\]/g)) ids.add(m[1]);
-        for (const m of txt.matchAll(/'((?:ARCH|SEC-RLS)-\d{2})'/g)) ids.add(m[1]);
+
+        // Registro RULES = { 'ARCH-NN': { doc: 'ruta.md#ancla', ... } }: el
+        // `doc:` de cada entrada manda sobre el fallback. Si trae `#ancla`
+        // explicita se respeta tal cual (puede no coincidir con el ID, p.ej.
+        // SEC-RLS-01 documentado bajo `#ap-012`); si no, el ancla esperada es
+        // el propio ID en minuscula.
+        for (const m of txt.matchAll(
+          /'((?:ARCH|A11Y|LLM|SEC-RLS|NAV|ICON)-\d{2})':\s*\{[^}]*?doc:\s*'([^']+)'/gs,
+        )) {
+          const [, id, docRef] = m;
+          const [file, anchor] = docRef.split('#');
+          ids.set(id, { file, anchor: (anchor ?? id).toLowerCase() });
+        }
+
+        // IDs emitidos en mensajes de error que no vinieron de un registro
+        // RULES (p.ej. pre-write-guard.js) — solo se agregan si todavia no
+        // tienen un doc asignado, para no pisar el que sí declaró su target.
+        for (const m of txt.matchAll(/\[((?:ARCH|A11Y|LLM|SEC-RLS)-\d{2})\]/g)) {
+          if (!ids.has(m[1])) ids.set(m[1], { file: DEFAULT_RULES_DOC, anchor: m[1].toLowerCase() });
+        }
+        for (const m of txt.matchAll(/'((?:ARCH|SEC-RLS)-\d{2})'/g)) {
+          if (!ids.has(m[1])) ids.set(m[1], { file: DEFAULT_RULES_DOC, anchor: m[1].toLowerCase() });
+        }
       }
     }
     return ids;
@@ -130,11 +160,16 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
     const ids = emittedRuleIds();
     assert.ok(ids.size > 0, 'no se detecto ningun ID de regla — revisa el regex');
 
-    const anchors = anchorsOf(RULES_DOC);
-    const undocumented = [...ids].filter(id => !anchors.has(id.toLowerCase())).sort();
+    const cache = new Map();
+    const undocumented = [];
+    for (const [id, { file, anchor }] of ids) {
+      const full = path.join(PAYLOAD, file);
+      if (!cache.has(full)) cache.set(full, fs.existsSync(full) ? anchorsOf(full) : new Set());
+      if (!cache.get(full).has(anchor)) undocumented.push(`${id} (${file}#${anchor})`);
+    }
     assert.deepEqual(
-      undocumented, [],
-      `reglas que el harness emite sin seccion en docs/TECH-STACK-RULES.md:\n  ${undocumented.join('\n  ')}\n` +
+      undocumented.sort(), [],
+      `reglas que el harness emite sin seccion en su doc declarado:\n  ${undocumented.join('\n  ')}\n` +
       `Cada mensaje de error incluye un "Doc:" que apunta ahi.`,
     );
   });
@@ -142,11 +177,19 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
   test('las anclas de regla son explicitas, no slugs de titulo', () => {
     // Un slug derivado del titulo cambia si alguien reescribe el encabezado, y
     // el enlace se rompe en silencio. Las anclas <a id> sobreviven al retitulado.
-    const txt = fs.readFileSync(RULES_DOC, 'utf-8');
-    const explicit = new Set(
-      [...txt.matchAll(/<a\s+(?:id|name)=["']([^"']+)["']/gi)].map(m => m[1].toLowerCase()),
-    );
-    const missing = [...emittedRuleIds()].filter(id => !explicit.has(id.toLowerCase())).sort();
-    assert.deepEqual(missing, [], `reglas sin ancla explicita:\n  ${missing.join('\n  ')}`);
+    const ids = emittedRuleIds();
+    const cache = new Map();
+    const missing = [];
+    for (const [id, { file, anchor }] of ids) {
+      const full = path.join(PAYLOAD, file);
+      if (!cache.has(full)) {
+        const txt = fs.existsSync(full) ? fs.readFileSync(full, 'utf-8') : '';
+        cache.set(full, new Set(
+          [...txt.matchAll(/<a\s+(?:id|name)=["']([^"']+)["']/gi)].map(m => m[1].toLowerCase()),
+        ));
+      }
+      if (!cache.get(full).has(anchor)) missing.push(`${id} (${file}#${anchor})`);
+    }
+    assert.deepEqual(missing.sort(), [], `reglas sin ancla explicita:\n  ${missing.join('\n  ')}`);
   });
 });

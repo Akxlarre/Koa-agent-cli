@@ -62,6 +62,9 @@
   --space-16: 64px;
 
   /* Escala tipográfica */
+  --text-2xs: 0.625rem;
+  /* 10px — badges de conteo y micro-etiquetas. Sin line-height propio a
+     propósito: hereda el del contenedor. */
   --text-xs: 0.75rem;
   /* 12px */
   --text-sm: 0.875rem;
@@ -110,6 +113,10 @@
   --duration-login-out: 250ms;
   --duration-login-in: 400ms;
   /* Login → App: transición más dramática que la navegación intra-app */
+  --duration-reveal-cell: 520ms;
+  /* Celdas del bento al revelarse */
+  --stagger-reveal: 60ms;
+  /* Desfase entre celdas del grid */
   --duration-theme: 220ms;
   --duration-toast-life: 3s;
   /* Sincronizado con ToastService duración por defecto */
@@ -146,8 +153,8 @@
   /* Tipografía — jerarquía de texto
      NUNCA usar para fondos ni acciones */
   --text-primary: #09090b;
-  --text-secondary: #52525b;
-  --text-muted: #a1a1aa;
+  --text-secondary: #3f3f46;
+  --text-muted: #52525b;
   --text-disabled: #d4d4d8;
 
   /* Bordes */
@@ -171,15 +178,15 @@
   /* Estados semánticos
      state-* = resultado de acciones del sistema
      ("guardado con éxito", "error de formulario", "información") */
-  --state-success: #16a34a;
+  --state-success: #15803d;
   --state-success-bg: #f0fdf4;
   --state-success-border: #bbf7d0;
 
-  --state-warning: #d97706;
+  --state-warning: #b45309;
   --state-warning-bg: #fffbeb;
   --state-warning-border: #fde68a;
 
-  --state-error: #dc2626;
+  --state-error: #b91c1c;
   --state-error-bg: #fef2f2;
   --state-error-border: #fecaca;
 
@@ -232,8 +239,11 @@
    ────────────────────────────────────────── */
 
   /* ── Botón primario ── */
-  --btn-primary-bg: var(--ds-brand);
-  --btn-primary-bg-hover: var(--color-primary-hover);
+  /* El botón NO usa --ds-brand directo: sky-500 con texto blanco da 2.77:1 y no
+     pasa AA. Usa el tono profundo de la misma marca (5.93:1). --ds-brand queda
+     intacto para iconos, acentos y gradientes, donde no hay texto encima. */
+  --btn-primary-bg: var(--color-primary-dark);
+  --btn-primary-bg-hover: #075985;
   --btn-primary-text: var(--color-primary-text);
   --btn-primary-radius: var(--radius-md);
   --btn-primary-padding-x: var(--space-4);
@@ -362,8 +372,8 @@
 
   /* ── Capa 2: Tipografía ── */
   --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
   --text-disabled: #52525b;
 
   /* ── Capa 2: Bordes ──
@@ -412,6 +422,13 @@
   --accent-border: rgba(56, 189, 248, 0.25);
   --accent-glow: rgba(56, 189, 248, 0.25);
   --shadow-focus: 0 0 0 3px rgba(56, 189, 248, 0.3);
+
+  /* Botón primario en oscuro: se INVIERTE. Un celeste oscuro con texto blanco
+     da 2.77:1; el celeste claro de la marca con texto casi negro da 9.29:1.
+     En un tema oscuro el acento brillante va de fondo, no de texto. */
+  --btn-primary-bg: var(--ds-brand);
+  --btn-primary-bg-hover: var(--color-primary-hover);
+  --btn-primary-text: #09090b;
 
   --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
   --gradient-hero: linear-gradient(
@@ -499,7 +516,7 @@ body {
 
    JERARQUÍA DE SUPERFICIES (dark mode):
    Delta mínimo +2.5% L entre cada nivel.
-   bg-base → bg-surface → bg-elevated → bg-subtle
+   bg-canvas → bg-surface → bg-elevated → bg-subtle
 
    EASING DISPONIBLE:
    --ease-standard  Transiciones generales de UI
@@ -542,6 +559,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* .micro-label — Micro-label uppercase.
+   Label de KPI, cabecera de grupo, título de columna, etiqueta de campo en lectura.
+   NO tiene restricción de alcance: sirve para cualquier micro-label en mayúsculas.
+   Reemplaza a: text-xs uppercase tracking-* font-* text-text-muted */
+.micro-label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Modificadores de estado del micro-label.
+
+   Existen porque `.micro-label` FIJA `color` y estas clases del DS viven fuera de
+   `@layer`, así que le ganan a las utilidades de Tailwind: escribir
+   `class="micro-label text-warning"` no cambia absolutamente nada —el texto sigue
+   gris, no falla el build y ningún linter se queja—. Se descubrió midiendo el
+   color computado en el navegador, no leyendo el código.
+
+   Si un micro-label tiene que señalar estado, va por acá. */
+.micro-label--warning { color: var(--state-warning); }
+.micro-label--error   { color: var(--state-error); }
+.micro-label--success { color: var(--state-success); }
+
+/* DEPRECADO — alias de .micro-label. No usar en código nuevo. */
 .kpi-label {
   font-family: var(--font-body);
   font-size: var(--text-xs);
@@ -550,6 +595,122 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* .badge-count — Badge numérico superpuesto (notificaciones, carrito, etc.).
+   Existe para que nadie tenga que recomponer a mano el cluster
+   `rounded-full + micro-texto + px-` cada vez: eso es lo que ARCH-15 bloquea.
+   Se posiciona desde el contenedor; la clase solo define la forma. */
+.badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1rem;
+  min-width: 1rem;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--state-error);
+  color: var(--color-primary-text);
+  font-family: var(--font-body);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-bold);
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* .item-title — Título de fila / card / ítem de lista.
+   Reemplaza a: text-sm font-semibold text-text-primary */
+.item-title {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-snug);
+  color: var(--text-primary);
+}
+
+/* .row-value — Valor numérico a la derecha de una fila de lista.
+   Existe porque `.kpi-value` es `--text-4xl`: correcto en la banda de un hero,
+   ridículo en una fila, donde el número compite con el título y se come el
+   ancho que el título necesita para no truncar. Lo destapó la pantalla de
+   referencia (spec 0002): con `.kpi-value`, un monto de nueve cifras empujaba
+   el nombre del comercio a una segunda línea.
+   `tabular-nums` alinea las columnas de cifras entre filas. */
+.row-value {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-snug);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* .section-eyebrow — Línea de contexto LEGIBLE antes de un título (sin uppercase).
+   La distinción con .micro-label importa: micro-label etiqueta un dato,
+   section-eyebrow da contexto legible.
+   Reemplaza a: text-sm text-text-secondary */
+.section-eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-regular);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+/* ── Campos de formulario ────────────────────────────────────
+   Los tokens --input-* existían desde el principio, pero sólo se consumían
+   como clusters de utilities escritos a mano: el login tiene una cadena de
+   catorce clases arbitrarias por campo, y el segundo formulario del proyecto
+   iba a copiarla.
+   ─────────────────────────────────────────────────────────── */
+
+/* .field-label — Etiqueta de un campo. Legible, no uppercase: .micro-label
+   etiqueta un dato ya escrito; esto le pide al usuario que escriba. */
+.field-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-snug);
+  color: var(--text-secondary);
+}
+
+/* .field-input — Input, select o textarea de una línea. */
+.field-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--input-padding-y) var(--input-padding-x);
+  border: 1px solid var(--input-border-default);
+  border-radius: var(--input-radius);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  outline: none;
+  transition: var(--transition-input);
+}
+
+.field-input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.field-input:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: var(--input-shadow-focus-neutral);
+}
+
+.field-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Estado inválido. Se aplica sólo cuando el campo ya fue tocado: marcar en rojo
+   un formulario recién abierto es hostil. */
+.field-input--invalid,
+.field-input--invalid:focus {
+  border-color: var(--state-error);
 }
 
 /* ── Jerarquía de Superficies ────────────────────────────────

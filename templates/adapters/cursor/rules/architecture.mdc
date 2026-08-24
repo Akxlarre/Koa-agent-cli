@@ -34,7 +34,7 @@ alwaysApply: false
 
 | NEVER | ALWAYS |
 |---|---|
-| `text-red-500`, `bg-blue-200`, `#hex` | `text-primary`, `text-muted`, `bg-base`, `bg-surface`, `var(--ds-brand)` |
+| `text-red-500`, `bg-blue-200`, `#hex` | `text-primary`, `text-muted`, `bg-canvas`, `bg-surface`, `var(--ds-brand)` |
 | emojis as UI icons | `<app-icon name="kebab-case" [size]="16" />` |
 | `@angular/animations`, `@keyframes` for views | `GsapAnimationsService` in `ngAfterViewInit` |
 

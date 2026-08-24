@@ -97,6 +97,7 @@ async function main() {
     const isFull = answers.action?.includes('Full Scaffold');
     let targetDir = process.cwd();
     let tempDir = null;
+    let tempParentDir = null;
     let finalDir = null;
 
     if (isFull) {
@@ -115,15 +116,21 @@ async function main() {
 
         // SEC-05: Use cryptographically secure random bytes instead of Math.random()
         // to prevent TOCTOU race conditions on shared/CI systems.
-        const tmpName = `.koa-tmp-${answers.projectName}-${randomBytes(8).toString('hex')}`;
-        tempDir = path.join(process.cwd(), tmpName);
+        //
+        // El temporal es el directorio PADRE, no el proyecto: `ng new` toma su
+        // argumento posicional como nombre del proyecto y rechaza nombres que
+        // empiecen con punto. Así el proyecto se llama como corresponde y el
+        // scaffold sigue siendo atómico (se renombra recién al final).
+        tempParentDir = path.join(process.cwd(), `koa-tmp-${randomBytes(8).toString('hex')}`);
+        fs.mkdirSync(tempParentDir, { recursive: true });
+        tempDir = path.join(tempParentDir, answers.projectName);
         targetDir = tempDir;
 
         try {
-            await createAngularProject(answers.projectName, tempDir);
+            await createAngularProject(answers.projectName, tempParentDir);
             await installDependencies(tempDir, stack);
         } catch {
-            try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+            try { fs.rmSync(tempParentDir, { recursive: true, force: true }); } catch { /* ignore */ }
             process.exit(1);
         }
     }
@@ -145,6 +152,8 @@ async function main() {
         if (isFull && tempDir && finalDir) {
             fs.renameSync(tempDir, finalDir);
             targetDir = finalDir;
+            // El padre temporal queda vacío tras mover el proyecto.
+            try { fs.rmSync(tempParentDir, { recursive: true, force: true }); } catch { /* ignore */ }
         }
 
         writeBlueprintJson(targetDir, projectName, isFull, stack);
@@ -152,7 +161,7 @@ async function main() {
     } catch (err) {
         spinnerBlueprint.fail(chalk.red('Error al inyectar Blueprint'));
         console.error(chalk.gray(err.message));
-        try { if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        try { if (tempParentDir) fs.rmSync(tempParentDir, { recursive: true, force: true }); } catch { /* ignore */ }
         process.exit(1);
     }
 }

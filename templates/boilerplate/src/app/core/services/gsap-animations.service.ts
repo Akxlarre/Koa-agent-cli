@@ -2,6 +2,7 @@ import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { CustomEase } from 'gsap/CustomEase';
 
 /**
  * GsapAnimationsService - Centralized GSAP animation patterns
@@ -21,9 +22,19 @@ export class GsapAnimationsService {
   private platformId = inject(PLATFORM_ID);
   private prefersReducedMotion = false;
 
+  /** CustomEase registrado → permite convertir tokens cubic-bezier en eases reales de GSAP. */
+  private customEaseReady = false;
+  /** Cache token → milisegundos, para no releer getComputedStyle en cada animación. */
+  private readonly tokenCache = new Map<string, number>();
+  /** Cache token → nombre de ease GSAP resuelto (evita recrear CustomEase en cada llamada). */
+  private readonly easeCache = new Map<string, string>();
+
   constructor() {
     if (isPlatformBrowser(this.platformId)) {
-      gsap.registerPlugin(ScrollTrigger);
+      // CustomEase (gratuito desde GSAP 3.13) permite traducir los tokens
+      // `cubic-bezier(...)` del design system a eases reales de GSAP.
+      gsap.registerPlugin(ScrollTrigger, CustomEase);
+      this.customEaseReady = true;
 
       // Check user's motion preference
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -39,36 +50,89 @@ export class GsapAnimationsService {
   /**
    * Animación de entrada para celdas bento — stagger desde abajo.
    * Todas las celdas (incl. hero) usan la misma animación.
-   * @param containerEl - Elemento contenedor del bento-grid
+   *
+   * Devuelve el cleanup: registralo en `DestroyRef` o usá `[appBentoReveal]`,
+   * que ya lo hace. Sin cleanup, navegar fuera de la página deja tweens vivos
+   * sobre nodos destruidos.
+   *
+   * @param containerEl        Contenedor del bento-grid
+   * @param options.skipOpacity `true` cuando una View Transition de ruta ya hace
+   *   el fade del contenedor: evita el doble-fade (VT + grid). Koa provee
+   *   `withViewTransitions()` por defecto, así que suele aplicar en navegación.
    */
-  animateBentoGrid(containerEl: HTMLElement): void {
+  animateBentoGrid(
+    containerEl: HTMLElement | null | undefined,
+    options: { skipOpacity?: boolean } = {},
+  ): () => void {
+    if (!containerEl) return () => {};
+
+    // El pre-hide (`.is-reveal-pending`, puesto por [appBentoReveal]) mantiene las
+    // celdas en opacity:0 hasta acá → sin parpadeo. Se retira en cuanto GSAP fija
+    // el estado inicial inline (immediateRender), o de inmediato si no animamos.
+    const clearPending = () => containerEl.classList.remove('is-reveal-pending');
+
     const cells = Array.from(containerEl.children) as HTMLElement[];
 
     if (!this.shouldAnimate()) {
       gsap.set(cells, { opacity: 1, y: 0, scale: 1 });
-      return;
+      clearPending();
+      return () => {};
     }
 
-    gsap.fromTo(
-      cells,
-      { opacity: 0, y: 24, scale: 0.97 },
-      {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        duration: 0.55,
-        ease: 'power3.out',
-        stagger: { amount: 0.25, from: 'start' },
-        clearProps: 'transform',
-      },
-    );
+    const { skipOpacity = false } = options;
+
+    // Tempo desde tokens del design system — no hardcodear motion.
+    const duration = this.getCssDuration('--duration-reveal-cell', 0.52);
+    const staggerEach = this.getTokenMs('--stagger-reveal') / 1000 || 0.06;
+    const ease = this.getCssEase('--ease-spring', 'back.out(1.2)');
+
+    // Promover solo transform/opacity al compositor, y SOLO mientras dura la
+    // animación: dejar `will-change` fijo consume memoria de GPU sin beneficio.
+    cells.forEach((el) => (el.style.willChange = 'transform, opacity'));
+
+    // gsap.context aísla los tweens al contenedor y habilita un revert()
+    // determinista al destruir (deshace también los estilos inline aplicados).
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        onComplete: () => cells.forEach((el) => (el.style.willChange = '')),
+      });
+
+      if (cells.length > 0) {
+        const fromVars: gsap.TweenVars = { y: 30, scale: 0.9 };
+        if (!skipOpacity) fromVars.opacity = 0;
+
+        tl.fromTo(
+          cells,
+          fromVars,
+          {
+            y: 0,
+            scale: 1,
+            opacity: 1,
+            duration,
+            ease,
+            stagger: { each: staggerEach, from: 'start' },
+            overwrite: 'auto',
+            clearProps: 'transform' + (skipOpacity ? '' : ',opacity'),
+          },
+          0,
+        );
+      }
+    }, containerEl);
+
+    // immediateRender ya fijó el estado inicial inline → retirar el pre-hide
+    // ahora es seamless, sin reflasheo.
+    clearPending();
+
+    return () => ctx.revert();
   }
 
   /**
    * Animación del hero card — entrada con blur + scale
    * @param el - Elemento hero
    */
-  animateHero(el: HTMLElement): void {
+  animateHero(el: HTMLElement | null | undefined): void {
+    // Null-safe: el llamador típico es un viewChild() que puede no haber resuelto.
+    if (!el) return;
     if (!this.shouldAnimate()) {
       gsap.set(el, { opacity: 1 });
       return;
@@ -89,19 +153,32 @@ export class GsapAnimationsService {
   }
 
   /**
-   * Números KPI — counter animado
+   * Números KPI — counter animado.
+   *
+   * **Devuelve el tween, y hay que matarlo al destruir el componente.** No es
+   * una cortesía: este tween anima un objeto plano interno, no el elemento, así
+   * que `gsap.killTweensOf(el)` —la forma en que se limpia todo lo demás acá— no
+   * lo alcanza. Sin el handle, un componente que muere durante los 1.2s deja el
+   * tween corriendo y escribiendo sobre un nodo ya desprendido del DOM.
+   *
+   * ```ts
+   * const tween = this.gsap.animateCounter(el, valor);
+   * this.destroyRef.onDestroy(() => tween?.kill());
+   * ```
+   *
    * @param el - Elemento que mostrará el número
    * @param target - Valor objetivo
    * @param suffix - Sufijo opcional (ej: '%', 'hrs')
+   * @returns El tween, o `null` si no se animó (reduced-motion o SSR).
    */
-  animateCounter(el: HTMLElement, target: number, suffix = ''): void {
+  animateCounter(el: HTMLElement, target: number, suffix = ''): gsap.core.Tween | null {
     if (!this.shouldAnimate()) {
       el.textContent = Math.round(target) + suffix;
-      return;
+      return null;
     }
 
     const obj = { val: 0 };
-    gsap.to(obj, {
+    return gsap.to(obj, {
       val: target,
       duration: 1.2,
       ease: 'power2.out',
@@ -157,40 +234,70 @@ export class GsapAnimationsService {
     return tl;
   }
 
+  /** Elementos con hover ya enlazado — evita listeners duplicados. */
+  private readonly _hoverBound = new WeakSet<HTMLElement>();
+
   /**
-   * Hover en cards — sombra elevada sobre fondo claro.
-   * Usa tokens del design system (white-labeling).
-   * @param el - Elemento card
+   * Hover en cards: sombra elevada y elevación en Y.
+   *
+   * Acepta `null`/`undefined` porque el llamador típico es un `viewChild()`, que
+   * puede no haber resuelto todavía.
+   *
+   * Devuelve una función de limpieza. Sin ella los listeners quedan colgados del
+   * elemento después de destruir el componente, y en una lista que se rerenderiza
+   * se acumulan silenciosamente.
    */
-  addCardHover(el: HTMLElement): void {
-    if (!this.shouldAnimate()) return;
+  addCardHover(el: HTMLElement | null | undefined): (() => void) | null {
+    if (!el || !this.shouldAnimate()) return null;
+    // Llamarlo dos veces sobre el mismo elemento duplicaría los listeners y el
+    // hover se sentiría "doble".
+    if (this._hoverBound.has(el)) return null;
+    this._hoverBound.add(el);
 
-    const getToken = (name: string): string => {
-      if (typeof document === 'undefined') return '';
-      return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '';
-    };
+    // Los tokens se leen en cada evento, no una vez: así el hover refleja el
+    // tema activo si el usuario cambia a oscuro con el componente ya montado.
+    const token = (name: string): string =>
+      typeof document === 'undefined'
+        ? ''
+        : getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-    const enter = () =>
+    const enter = () => {
+      gsap.killTweensOf(el);
+      el.style.willChange = 'transform, box-shadow';
       gsap.to(el, {
-        boxShadow: getToken('--card-shadow-hover') || getToken('--shadow-lg'),
-        borderColor: getToken('--border-strong') || getToken('--border-default'),
+        boxShadow: token('--card-shadow-hover') || token('--shadow-lg'),
+        borderColor: token('--border-strong') || token('--border-default'),
         y: -2,
         duration: 0.22,
         ease: 'power2.out',
       });
+    };
 
-    const leave = () =>
+    const leave = () => {
+      gsap.killTweensOf(el);
       gsap.to(el, {
-        boxShadow: getToken('--card-shadow') || getToken('--shadow-md'),
-        borderColor: getToken('--border-default') || getToken('--border-subtle'),
+        boxShadow: token('--card-shadow') || token('--shadow-md'),
+        borderColor: token('--border-default') || token('--border-subtle'),
         y: 0,
         duration: 0.32,
         ease: 'power2.inOut',
         clearProps: 'boxShadow,borderColor,transform',
+        onComplete: () => {
+          el.style.willChange = '';
+        },
       });
+    };
 
     el.addEventListener('mouseenter', enter);
     el.addEventListener('mouseleave', leave);
+
+    return () => {
+      el.removeEventListener('mouseenter', enter);
+      el.removeEventListener('mouseleave', leave);
+      gsap.killTweensOf(el);
+      el.style.willChange = '';
+      this._hoverBound.delete(el);
+    };
   }
 
   /**
@@ -1333,22 +1440,44 @@ export class GsapAnimationsService {
   }
 
   /**
+   * Feedback de éxito en formularios — scale bounce en el botón submit.
+   * Diseñado para usarse cuando loading() pasa de true a false con éxito.
+   * Crea una sensación de "completado" sin requerir cambios en la lógica de negocio.
+   *
+   * @param el - Elemento botón o contenedor del feedback
+   * @param onComplete - Callback al finalizar (ej: resetear el estado del formulario)
+   */
+  animateSuccessFeedback(el: HTMLElement, onComplete?: () => void): void {
+    if (!this.shouldAnimate()) {
+      onComplete?.();
+      return;
+    }
+
+    const tl = gsap.timeline({ onComplete });
+
+    tl.to(el, {
+      scale: 0.94,
+      duration: 0.08,
+      ease: 'power2.in',
+    })
+      .to(el, {
+        scale: 1.06,
+        duration: 0.18,
+        ease: 'back.out(2.5)',
+      })
+      .to(el, {
+        scale: 1,
+        duration: 0.22,
+        ease: 'power2.out',
+        clearProps: 'transform',
+      });
+  }
+
+  /**
    * Check if animations should run based on user preferences
    */
   private shouldAnimate(): boolean {
     return isPlatformBrowser(this.platformId) && !this.prefersReducedMotion;
-  }
-
-  /** Obtiene un token de duración en ms (ej: "250ms" → 250) */
-  private getTokenMs(name: string): number {
-    if (typeof document === 'undefined') return 0;
-    const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    if (!val) return 0;
-    const match = val.match(/^(\d+(?:\.\d+)?)\s*ms$/);
-    if (match) return parseFloat(match[1]);
-    const matchS = val.match(/^(\d+(?:\.\d+)?)\s*s$/);
-    if (matchS) return parseFloat(matchS[1]) * 1000;
-    return 0;
   }
 
   /**
@@ -1362,9 +1491,145 @@ export class GsapAnimationsService {
   /**
    * Kill all active GSAP animations (cleanup)
    */
-  killAll(): void {
-    if (isPlatformBrowser(this.platformId)) {
-      gsap.killTweensOf('*');
+  /**
+   * Lee un token de duración del design system (`--duration-*`) en segundos.
+   * El motion se maneja desde tokens CSS, no con números hardcodeados: así un
+   * cambio de tempo en `_variables.scss` se propaga a las animaciones JS.
+   */
+  private getCssDuration(token: string, fallbackSeconds: number): number {
+    return this.getTokenMs(token) / 1000 || fallbackSeconds;
+  }
+
+  /**
+   * Lee un token de tiempo (`--duration-*`, `--stagger-*`) y lo devuelve en ms.
+   * Acepta valores en `ms` o `s`. Cachea por token: `getComputedStyle` fuerza
+   * un reflow y estas animaciones corren en cada montaje de página.
+   */
+  private getTokenMs(token: string): number {
+    if (!isPlatformBrowser(this.platformId)) return 0;
+
+    const cached = this.tokenCache.get(token);
+    if (cached !== undefined) return cached;
+
+    const val = getComputedStyle(document.documentElement)
+      .getPropertyValue(token)
+      .trim();
+
+    let result = 0;
+    const inMs = val.match(/^(\d+(?:\.\d+)?)\s*ms$/);
+    const inS = val.match(/^(\d+(?:\.\d+)?)\s*s$/);
+    if (inMs) result = parseFloat(inMs[1]);
+    else if (inS) result = parseFloat(inS[1]) * 1000;
+
+    this.tokenCache.set(token, result);
+    return result;
+  }
+
+  /**
+   * Traduce un token de easing del design system a un ease usable por GSAP.
+   *
+   * GSAP no entiende `cubic-bezier(...)` nativamente, así que los tokens
+   * `--ease-*` se convierten a un CustomEase equivalente, registrado y cacheado
+   * por token. Así el motion de JS y el de CSS comparten una única fuente.
+   */
+  private getCssEase(token: string, fallback: string): string {
+    if (!isPlatformBrowser(this.platformId)) return fallback;
+
+    const cached = this.easeCache.get(token);
+    if (cached) return cached;
+
+    const val = getComputedStyle(document.documentElement)
+      .getPropertyValue(token)
+      .trim();
+    let result = fallback;
+
+    const bezier = val.match(
+      /cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/,
+    );
+    if (bezier && this.customEaseReady) {
+      const name = `cssease-${token}`;
+      try {
+        CustomEase.create(name, `M0,0 C${bezier[1]},${bezier[2]} ${bezier[3]},${bezier[4]} 1,1`);
+        result = name;
+      } catch {
+        result = fallback;
+      }
+    } else if (val && /^[a-z]/i.test(val)) {
+      // El token ya contiene un nombre de ease nativo de GSAP.
+      result = val;
     }
+
+    this.easeCache.set(token, result);
+    return result;
+  }
+
+  /**
+   * Revela un elemento al entrar en viewport (ScrollTrigger, una sola vez).
+   * Devuelve el cleanup para registrar en `DestroyRef`.
+   *
+   * @param options.y         desplazamiento inicial en px (default 32)
+   * @param options.delay     retardo en segundos (default 0)
+   * @param options.threshold porción del elemento visible para disparar (default 0.15)
+   */
+  animateScrollReveal(
+    el: HTMLElement,
+    options?: { y?: number; delay?: number; threshold?: number },
+  ): () => void {
+    if (!isPlatformBrowser(this.platformId)) return () => {};
+
+    const y = options?.y ?? 32;
+    const delay = options?.delay ?? 0;
+    const threshold = options?.threshold ?? 0.15;
+
+    // Reduced motion: mostrar de inmediato, sin animar.
+    if (!this.shouldAnimate()) {
+      gsap.set(el, { opacity: 1, y: 0 });
+      return () => {};
+    }
+
+    gsap.set(el, { opacity: 0, y });
+
+    const st = ScrollTrigger.create({
+      trigger: el,
+      start: `top ${Math.round((1 - threshold) * 100)}%`,
+      once: true,
+      onEnter: () => {
+        gsap.to(el, {
+          opacity: 1,
+          y: 0,
+          duration: this.getCssDuration('--duration-slow', 0.55),
+          delay,
+          ease: 'power3.out',
+          clearProps: 'transform',
+        });
+      },
+    });
+
+    return () => st.kill();
+  }
+
+  /**
+   * Mata los tweens de un elemento concreto. Es lo que un componente llama en su
+   * `DestroyRef.onDestroy`: sin esto, una animación de entrada de 0.7s sigue
+   * corriendo sobre un nodo ya desprendido del DOM (AC12, spec 0002).
+   *
+   * Existe para que los componentes NO importen `gsap` directamente — todo el
+   * movimiento pasa por este servicio, incluida su limpieza.
+   *
+   * Ojo: sólo alcanza tweens cuyo target es el elemento. `animateCounter` anima
+   * un objeto plano y devuelve su propio handle por esa razón.
+   */
+  killTweensOf(el: HTMLElement | null | undefined): void {
+    if (!el || !isPlatformBrowser(this.platformId)) return;
+    gsap.killTweensOf(el);
+  }
+
+  killAll(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    gsap.killTweensOf('*');
+    // `killTweensOf('*')` sólo alcanza targets que son elementos del DOM. Los
+    // tweens sobre objetos planos —el contador de KPI es uno— sobreviven. Vaciar
+    // el timeline global es lo único que los mata de verdad.
+    gsap.globalTimeline.clear();
   }
 }

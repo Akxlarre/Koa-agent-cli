@@ -97,7 +97,7 @@ describe("AuthFacade", () => {
     expect(service.isAuthenticated()).toBe(false);
   });
 
-  it("logout() should clear the current user", () => {
+  it("logout() should clear the current user", async () => {
     const user: User = {
       id: "u1",
       name: "Test",
@@ -106,13 +106,13 @@ describe("AuthFacade", () => {
       initials: "T",
     };
     service.setUser(user);
-    service.logout();
+    await service.logout();
     expect(service.currentUser()).toBeNull();
   });
 
-  it("logout() should navigate to '/'", () => {
+  it("logout() should navigate to '/'", async () => {
     const navigateSpy = vi.spyOn(router, "navigate");
-    service.logout();
+    await service.logout();
     expect(navigateSpy).toHaveBeenCalledWith(["/"]);
   });
 
@@ -147,6 +147,6 @@ describe("AuthFacade", () => {
   });
 
   it("whenReady should resolve after getUser() completes", async () => {
-    await expect(service.whenReady).resolves.toBeDefined();
+    await expect(service.whenReady).resolves.toBeUndefined();
   });
 });

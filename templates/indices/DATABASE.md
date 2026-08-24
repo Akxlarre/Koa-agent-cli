@@ -19,3 +19,9 @@
 | Tabla / Colección | Core / Dominio | Columnas Clave | Relaciones (FKs) | Restricciones RLS (Policies) | Estado |
 |-------------------|----------------|----------------|------------------|------------------------------|--------|
 | `profiles` | Auth | `id`, `household_id` | N/A (id vinculada a `auth.users`) | `SELECT` public, `UPDATE` own id | ✅ Estable |
+
+## Auto-Index — Detectado por AST (generado automáticamente)
+
+<!-- AUTO-GENERATED:BEGIN -->
+_Sin entradas auto-detectadas aún. Ejecuta `npm run indices:sync` para poblar._
+<!-- AUTO-GENERATED:END -->

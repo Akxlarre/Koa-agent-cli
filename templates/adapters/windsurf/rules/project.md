@@ -31,7 +31,7 @@ ALWAYS: `@if`, `@for`, `input()`, `output()`, `[class.name]="expr()"`, `[style.p
 ## Visual System
 
 - NEVER hardcode colors: no `text-red-500`, `bg-blue-200`, `#hex` values
-- ALWAYS use semantic tokens: `text-primary`, `text-muted`, `bg-base`, `bg-surface`, `var(--ds-brand)`
+- ALWAYS use semantic tokens: `text-primary`, `text-muted`, `bg-canvas`, `bg-surface`, `var(--ds-brand)`
 - NEVER use emojis as icons — ALWAYS use `<app-icon name="kebab-case" [size]="16" />`
 - NEVER use `@angular/animations` — ALWAYS use `GsapAnimationsService` in `ngAfterViewInit`
 

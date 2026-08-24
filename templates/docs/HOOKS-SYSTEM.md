@@ -113,6 +113,15 @@ objetivo equivocado.
 | `SEC-RLS-01` | .sql con CREATE TABLE | RLS activado sin ninguna `CREATE POLICY` — la tabla queda inaccesible |
 | `SEC-RLS-02` | .sql con CREATE POLICY | `USING (true)` / `WITH CHECK (true)` en ALL/INSERT/UPDATE/DELETE. Permitido en FOR SELECT |
 
+### Hooks del harness y del SDD
+
+| Hook | Evento | Función |
+|------|--------|---------|
+| `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escribir código de producto sin una spec activa con su plan. **Fail-open**: sin carpeta `specs/` no bloquea nada. |
+| `sdd/plan-injector.js` | PreToolUse (Edit/Write) | Inyecta la spec y el plan activos como contexto en cada edición. |
+| `sdd/hotfix-autoclose.js` | Stop | Cierra los tracks `hotfix-*` al terminar la sesión. |
+| `context-enrichment-guard.js` | — (**OPT-IN**) | Day 0 Context Guard: impide escribir código mientras `context/domain.md` e `indices/DATABASE.md` sigan vacíos. **No viene cableado**: un proyecto recién generado los trae como plantilla, así que activarlo por defecto bloquearía todo desde el minuto cero. |
+
 **Contexto inyectado por tipo de archivo (Context Injection):**
 
 Cuando una escritura pasa todas las validaciones, el hook inyecta reglas relevantes
@@ -268,34 +277,117 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
 
 ## Linter Arquitectónico Completo (`architect.js` v2.0)
 
-El linter AST se ejecuta con `npm run lint:arch` y valida **8 reglas**:
+El linter AST se ejecuta con `npm run lint:arch` y valida **28 reglas**.
 
-| # | Regla | Método |
-|---|-------|--------|
-| 1 | Sin @supabase/supabase-js en UI | AST (import declaration) |
-| 2 | Sin inject(*Service) en componentes vista | AST (call expression) |
-| 3 | TDD: .spec.ts para facades/services en core/ | File existence check |
-| 4 | OnPush en todos los componentes | AST (decorator) + text search |
-| 5 | Sin @angular/animations | AST (import declaration) |
-| 6 | Sin *ngIf/*ngFor/[ngClass]/[ngStyle] | Regex en .html |
-| 7 | Sin @keyframes en SCSS | Regex en .scss/.css |
-| 8 | Sin colores Tailwind hardcodeados | Regex en .ts/.html |
-| SEC-RLS-01 | Tabla sin políticas RLS | Agregado **entre todas** las migraciones |
-| SEC-RLS-02 | Política permisiva en operación de escritura | Regex por sentencia |
-| SEC-RLS-03 | Tabla sin RLS activado | Agregado entre todas las migraciones |
+Analiza los `.ts`, los `.scss` y **los templates `template:` inline**, no solo los
+`.html`: el boilerplate no tiene un solo archivo `.html`, así que sin eso las reglas
+de markup no auditarían nada.
+
+**Arquitectura (AST + regex):**
+
+| Regla | Qué detecta | Método |
+|---|---|---|
+| ARCH-01 | `@supabase/supabase-js` en UI | AST (import declaration) |
+| ARCH-02 | `inject(*Service)` en componentes vista | AST (call expression) |
+| ARCH-03 | Falta `.spec.ts` para facades/services de `core/` | File existence |
+| ARCH-04 | Falta OnPush | AST (decorator) |
+| ARCH-05 | `@angular/animations` | AST (import declaration) |
+| ARCH-06 | `*ngIf` / `*ngFor` / `[ngClass]` / `[ngStyle]` | Regex en markup |
+| ARCH-07 | `@keyframes` en estilos de componente | Regex en .scss/.css |
+| ARCH-08 | Colores Tailwind hardcodeados | Regex en markup |
+| ARCH-09 / ARCH-10 | Complejidad (componentes shared, facades) | AST (line span) |
+
+**Design system:**
+
+| Regla | Qué detecta |
+|---|---|
+| ARCH-11 | Clases de token muertas: no existen en `@theme`, Tailwind no genera CSS y la clase no hace nada |
+| ARCH-18 | Alias prohibidos dentro del propio `@theme` |
+| ARCH-21 | Clase `.bento-*` definida sin aprobar en `scripts/lib/bento-classes.allowlist.json`. Freno contra el sprawl del grid — ver el árbol de decisión en `indices/STYLES.md` |
+| ARCH-22 | Una clase del DS con el nombre de una utilidad "pelada" de Tailwind. Tailwind genera SU regla homónima en `@layer utilities` y **se suma** a la tuya en vez de reemplazarla |
+| ARCH-23 | Celda hija de un grid `.bento-grid--fill-screen*` que ocupa 2 filas (`.bento-hero`/`.bento-feature`/`.bento-tall` o `data-row-span="2"`). Desborda el `grid-template-rows` explícito: las filas implícitas se superponen sin lanzar ningún error — ver el patrón App-like en `.claude/rules/visual-system.md` |
+| ARCH-25 | Par texto/fondo por debajo de WCAG AA, **en cualquiera de los dos temas**. Compone los fondos semi-transparentes antes de medir. Ratcheado con `scripts/lib/contrast.baseline.json` |
+| ARCH-26 | Token del `@theme` con el nombre de un valor de escala nativa. `--color-base` genera `text-base` como utilidad de **color**, que le gana a la de tamaño: es el bug que dejó los inputs del login en 1.15:1, invisibles en producción |
+
+**Disciplina de clases (con ratchet):**
+
+| Regla | Qué detecta |
+|---|---|
+| ARCH-15 | Pill/badge ad-hoc (`rounded-full` + micro-texto + `px-`) en vez de `.badge-count` |
+| ARCH-16 | Utilities de tamaño pisando un `.btn-*` |
+| ARCH-17 | Tamaño de fuente arbitrario `text-[NNpx]` fuera de la escala |
+| ARCH-19 | Cluster tipográfico ad-hoc en vez de `.micro-label` / `.item-title` / `.section-eyebrow` |
+| ARCH-24 | Cluster de input ad-hoc (borde + fondo + padding + radio sobre un campo) en vez de `.field-input` / `.field-label` |
+
+Estas cinco usan un **ratchet**: `scripts/lib/class-discipline.baseline.json` registra la
+deuda tolerada por archivo y solo se reporta una **regresión** (un archivo supera su cuota).
+El proyecto solo puede mejorar. Tras limpiar deuda, fijá la mejora con
+`npm run lint:arch -- --update-ds-baseline`. Koa arranca **sin baseline**, es decir con
+tolerancia cero.
+
+**Accesibilidad e iconos:**
+
+| Regla | Qué detecta |
+|---|---|
+| A11Y-03 | Botón cuyo único contenido es un icono y no tiene nombre accesible |
+| ICON-01 | Icono usado en un template pero **no registrado** en el `LucideAngularModule.pick()` de `app.config.ts`. No rompe el build: lucide lanza en **runtime** |
+| NAV-01 | Entrada del menú que no resuelve a ninguna ruta de `app.routes.ts`. El usuario hace clic y cae en el not-found, y nada en el build lo delata. Koa mismo nacía con una: `/app/settings` estaba en el menú sin existir como ruta |
+
+Los guardrails viven en `scripts/lib/` con sus propios tests: `npm run lint:arch:test`.
+
+**Seguridad de datos (RLS), sobre el estado acumulado de `supabase/migrations/`:**
+
+| Regla | Qué detecta | Método |
+|---|---|---|
+| SEC-RLS-01 | Tabla con RLS activado pero **ninguna** `CREATE POLICY` en todas las migraciones juntas | Agregado entre todas las migraciones |
+| SEC-RLS-02 | Política permisiva (`USING (true)` / `WITH CHECK (true)`) en `FOR ALL/INSERT/UPDATE/DELETE` (o sin cláusula `FOR`, que Postgres interpreta como `ALL`) | Regex por sentencia `CREATE POLICY` |
+| SEC-RLS-03 | Tabla creada sin `ENABLE ROW LEVEL SECURITY` en ninguna migración | Agregado entre todas las migraciones |
 
 ### RLS: por qué el hook y el linter no son redundantes
 
 Es el único caso donde los dos miran lo mismo con criterios distintos, y es a propósito:
 
-- **El hook** ve un archivo en el momento de escribirlo. Exige el par tabla+política
-  **juntos**, que es la convención del blueprint (sus propias migraciones lo hacen así).
+- **El hook** (`pre-write-guard.js`, ARCH Guard) ve un archivo en el momento de escribirlo.
+  Exige el par tabla+política **juntos**, que es la convención del blueprint (sus propias
+  migraciones lo hacen así).
 - **El linter** ve todas las migraciones a la vez. Reconstruye el esquema acumulado y
   detecta el agujero real: una tabla que, sumadas todas las migraciones, sigue sin
-  políticas. Una tabla creada en la migración 3 con políticas en la 7 le parece bien.
+  políticas. Una tabla creada en la migración 3 con políticas en la 7 le parece bien al
+  hook (cada archivo por separado está OK), pero deja la tabla inaccesible entre medio.
 
 Por eso el linter es más permisivo en un eje y más completo en el otro. Ninguno de los
-dos solo alcanza: el hook no puede ver los otros archivos, y el linter corre después.
+dos solo alcanza: el hook no puede ver los otros archivos, y el linter corre después de
+que el código ya se escribió.
+
+### La invariante: toda regla registrada tiene que poder fallar
+
+`scripts/lib/rule-wiring.js` audita el linter a sí mismo. No busca violaciones en tu código:
+busca **reglas desconectadas** en `architect.js`.
+
+Existe porque el mismo fallo ocurrió dos veces con distinto disfraz:
+
+- **ARCH-24** tenía detector, tests y su llamada — y estaba fuera de `DS_RULES`, la lista fija
+  que decide qué se compara contra el baseline. Encontraba 3 hits y reportaba 0.
+- **ARCH-26** tenía detector y tests, y **no lo llamaba nadie**. Es el detector del token que
+  dejó los inputs del login ilegibles en producción.
+
+En los dos casos el linter dio verde, porque **una regla desconectada se ve exactamente igual
+que una regla que pasa**: cero hallazgos, build limpio. Esa ambigüedad es el bug.
+
+El test verifica tres cosas contra el `architect.js` real:
+
+| Falla | Qué significa |
+|---|---|
+| **Huérfana** | Está en `RULES` y no tiene ningún camino a un `reportError`. No puede fallar nunca |
+| **Fantasma** | Se reporta un ID que no está en `RULES`. El usuario ve un código sin nombre, sin doc y sin fix |
+| **Ratchet incompleto** | La regla asoma en el circuito del ratchet (`add()` → `dsCounts` → `DS_RULES`) con un eslabón roto. Cuenta en silencio |
+
+**Al agregar una regla nueva**, este test se rompe hasta que esté enchufada de punta a punta.
+Es intencional: es la única señal que distingue "no hay violaciones" de "la regla no corre".
+
+> Lo que **no** prueba: que el detector detecte bien. De eso se encarga la micro-suite de cada
+> módulo. La división es deliberada — el fallo nunca fue "el detector está mal", siempre fue
+> "el detector no está enchufado".
 
 ## Diferencia entre Hooks y Linter
 

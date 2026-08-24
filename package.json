@@ -4,7 +4,7 @@
   "description": "Scaffold Angular projects that are native to AI agents — agentic harness, real-time guardrails, and living indexes out of the box.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/*.test.mjs"
   },
   "keywords": [
     "angular",

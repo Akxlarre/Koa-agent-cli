@@ -1,65 +1,55 @@
-import { TestBed } from "@angular/core/testing";
-import { MessageService } from "primeng/api";
-import { ToastService } from "./toast.service";
+import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
+import { MessageService } from 'primeng/api';
+import { ToastService } from './toast.service';
 
-describe("ToastService", () => {
+describe('ToastService', () => {
   let service: ToastService;
-  let messageService: { add: ReturnType<typeof vi.fn> };
+  const messageMock = { add: vi.fn() };
 
   beforeEach(() => {
-    messageService = { add: vi.fn() };
+    messageMock.add.mockClear();
     TestBed.configureTestingModule({
-      providers: [{ provide: MessageService, useValue: messageService }],
+      providers: [{ provide: MessageService, useValue: messageMock }],
     });
     service = TestBed.inject(ToastService);
   });
 
-  it("should be created", () => {
+  it('should be created', () => {
     expect(service).toBeTruthy();
   });
 
-  it("success() should use severity success", () => {
-    service.success("Guardado");
-    expect(messageService.add).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "success", summary: "Guardado" }),
+  it('success() usa severity success y vida corta', () => {
+    service.success('Guardado');
+    expect(messageMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'success', summary: 'Guardado', life: 3000 }),
     );
   });
 
-  it("error() should use severity error", () => {
-    service.error("Fallo", "detalle");
-    expect(messageService.add).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "error", summary: "Fallo", detail: "detalle" }),
+  it('error() vive más que el resto — el usuario necesita leerlo', () => {
+    service.error('Falló', 'Detalle');
+    const arg = messageMock.add.mock.calls[0][0];
+    expect(arg.severity).toBe('error');
+    expect(arg.detail).toBe('Detalle');
+    expect(arg.life).toBeGreaterThan(3000);
+  });
+
+  it('warning() mapea a la severity "warn" de PrimeNG, no "warning"', () => {
+    service.warning('Ojo');
+    expect(messageMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warn' }),
     );
   });
 
-  it("warning() should map to severity warn (not 'warning')", () => {
-    service.warning("Cuidado");
-    expect(messageService.add).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "warn" }),
+  it('info() usa severity info', () => {
+    service.info('Dato');
+    expect(messageMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'info' }),
     );
   });
 
-  it("info() should use severity info", () => {
-    service.info("Dato");
-    expect(messageService.add).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "info" }),
-    );
-  });
-
-  it("should give errors a longer life than the rest", () => {
-    // Un error necesita mas tiempo en pantalla que una confirmacion: el usuario
-    // tiene que leerlo y decidir. Si las duraciones se igualan, se pierde.
-    service.error("Fallo");
-    const errorLife = messageService.add.mock.calls[0][0].life;
-    service.success("Ok");
-    const successLife = messageService.add.mock.calls[1][0].life;
-    expect(errorLife).toBeGreaterThan(successLife);
-  });
-
-  it("should default detail to empty string", () => {
-    service.success("Solo summary");
-    expect(messageService.add).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: "" }),
-    );
+  it('detail es opcional y por defecto vacío', () => {
+    service.success('Solo summary');
+    expect(messageMock.add.mock.calls[0][0].detail).toBe('');
   });
 });

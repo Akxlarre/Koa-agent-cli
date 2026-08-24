@@ -1,55 +1,49 @@
-import { TestBed } from "@angular/core/testing";
-import { Component } from "@angular/core";
-import { LayoutDrawerFacadeService } from "./layout-drawer.facade.service";
-import { LayoutDrawerService } from "./layout-drawer.service";
+import { TestBed } from '@angular/core/testing';
+import { Component } from '@angular/core';
+import { LayoutDrawerFacadeService } from './layout-drawer.facade.service';
+import { LayoutDrawerService } from './layout-drawer.service';
 
-@Component({ standalone: true, template: "" })
-class DummyPanelComponent {}
+@Component({ standalone: true, template: '' })
+class StubPanel {}
 
-describe("LayoutDrawerFacadeService", () => {
+describe('LayoutDrawerFacadeService', () => {
   let facade: LayoutDrawerFacadeService;
-  let drawer: LayoutDrawerService;
+  let service: LayoutDrawerService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
     facade = TestBed.inject(LayoutDrawerFacadeService);
-    drawer = TestBed.inject(LayoutDrawerService);
+    service = TestBed.inject(LayoutDrawerService);
   });
 
-  it("should be created", () => {
-    expect(facade).toBeTruthy();
-  });
-
-  it("should expose the service state through its own signals", () => {
-    drawer.open(DummyPanelComponent, "Detalle", "info");
+  it('expone el estado del service subyacente', () => {
+    service.open(StubPanel, 'Título');
     expect(facade.isOpen()).toBe(true);
-    expect(facade.component()).toBe(DummyPanelComponent);
-    expect(facade.title()).toBe("Detalle");
-    expect(facade.icon()).toBe("info");
+    expect(facade.title()).toBe('Título');
   });
 
-  it("open() should delegate to the service", () => {
-    facade.open(DummyPanelComponent, "Detalle");
-    expect(drawer.isOpen()).toBe(true);
-    expect(drawer.component()).toBe(DummyPanelComponent);
+  it('open() delega en el service', () => {
+    facade.open(StubPanel, 'Desde la facade', 'settings');
+    expect(service.isOpen()).toBe(true);
+    expect(service.icon()).toBe('settings');
   });
 
-  it("close() should delegate to the service", () => {
-    facade.open(DummyPanelComponent, "Detalle");
+  it('close() delega en el service', () => {
+    facade.open(StubPanel, 'X');
     facade.close();
-    expect(drawer.isOpen()).toBe(false);
+    expect(service.isOpen()).toBe(false);
   });
 
-  it("setActions() should delegate to the service", () => {
-    facade.open(DummyPanelComponent, "Detalle");
-    facade.setActions([{ label: "Guardar", icon: "save", callback: () => {} }]);
-    expect(drawer.actions()).toHaveLength(1);
+  it('setActions() delega en el service', () => {
+    facade.open(StubPanel, 'X');
+    facade.setActions([{ label: 'A', icon: 'check', callback: () => {} }]);
+    expect(service.actions().length).toBe(1);
   });
 
-  it("should NOT re-expose clear() — that is the drawer component's job", () => {
+  it('NO re-expone clear() — es responsabilidad del componente del drawer', () => {
     // El facade es la superficie que ve la UI. clear() destruye la vista y solo
-    // debe llamarlo el componente del drawer cuando GSAP termino la salida.
-    // Exponerlo aqui invitaria a un componente cualquiera a matar la animacion.
+    // debe llamarlo el componente del drawer cuando GSAP terminó la salida.
+    // Exponerlo acá invitaría a cualquier componente a matar la animación.
     expect((facade as unknown as { clear?: unknown }).clear).toBeUndefined();
   });
 });

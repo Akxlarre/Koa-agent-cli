@@ -10,16 +10,14 @@ import {
   viewChildren,
 } from "@angular/core";
 import { DatePipe } from "@angular/common";
-import { RouterLink } from "@angular/router";
 import { AuthFacade } from "@core/services/auth.facade";
 import { GsapAnimationsService } from "@core/services/gsap-animations.service";
 import { BentoGridLayoutDirective } from "@core/directives/bento-grid-layout.directive";
 import { CardHoverDirective } from "@core/directives/card-hover.directive";
 import { AnimateInDirective } from "@core/directives/animate-in.directive";
+import { BentoRevealDirective } from "@core/directives/bento-reveal.directive";
 import { IconComponent } from "@shared/components/icon/icon.component";
 import { KpiCardComponent } from "@shared/components/kpi-card/kpi-card.component";
-import { KpiCardSkeletonComponent } from "@shared/components/kpi-card/kpi-card-skeleton.component";
-import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skeleton-block.component";
 
 /**
  * DashboardComponent — Página principal de la aplicación.
@@ -34,7 +32,7 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
  * │  app-icon          → iconos Lucide (cero emojis)                   │
  * │  appCardHover    → hover GSAP en todas las cards                 │
  * │  [appBentoGridLayout] → grid con FLIP animation en reflow          │
- * │  animateBentoGrid  → stagger de entrada de las celdas              │
+ * │  appBentoReveal    → stagger de entrada sin flash de las celdas    │
  * │  animateHero       → blur + scale en el banner principal           │
  * │  staggerListItems  → entrada escalonada en listas de actividad     │
  * │  skeleton → content → appAnimateIn en transición de carga        │
@@ -58,14 +56,12 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
-    RouterLink,
     BentoGridLayoutDirective,
+    BentoRevealDirective,
     CardHoverDirective,
     AnimateInDirective,
     IconComponent,
     KpiCardComponent,
-    KpiCardSkeletonComponent,
-    SkeletonBlockComponent,
   ],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════
@@ -75,6 +71,7 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
     <section
       #gridEl
       class="bento-grid"
+      appBentoReveal
       appBentoGridLayout
       aria-label="Panel de control"
     >
@@ -95,7 +92,7 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
               class="m-0 text-sm font-medium"
               style="color: rgba(255,255,255,0.7)"
             >
-              {{ today | date: "EEEE, d MMMM y" : "" : "es" }}
+              {{ today | date: "EEEE, d MMMM y" }}
             </p>
             <h1
               class="m-0 text-3xl font-bold"
@@ -139,25 +136,22 @@ import { SkeletonBlockComponent } from "@shared/components/skeleton-block/skelet
       </div>
 
       <!-- ── KPIs — 4 métricas en celdas square ──────────────────────
-           app-kpi-card encapsula: .kpi-value + .kpi-label + trend + animateCounter()
+           app-kpi-card encapsula: .kpi-value + .micro-label + trend + animateCounter()
            Solo 1 card-accent por sección bento → va en la primera KPI.
       ──────────────────────────────────────────────────────────── -->
       @for (kpi of kpis(); track kpi.id) {
         <div class="bento-square" appCardHover>
-          @if (loading()) {
-            <app-kpi-card-skeleton />
-          } @else {
-            <app-kpi-card
-              [label]="kpi.label"
-              [value]="kpi.value"
-              [suffix]="kpi.suffix ?? ''"
-              [prefix]="kpi.prefix ?? ''"
-              [trend]="kpi.trend"
-              [trendLabel]="kpi.trendLabel ?? ''"
-              [accent]="kpi.accent ?? false"
-              appAnimateIn
-            />
-          }
+          <app-kpi-card
+            [label]="kpi.label"
+            [value]="kpi.value"
+            [suffix]="kpi.suffix ?? ''"
+            [prefix]="kpi.prefix ?? ''"
+            [trend]="kpi.trend"
+            [trendLabel]="kpi.trendLabel ?? ''"
+            [accent]="kpi.accent ?? false"
+            [loading]="loading()"
+            appAnimateIn
+          />
         </div>
       }
 
@@ -313,7 +307,7 @@ export class DashboardComponent implements AfterViewInit {
   readonly today = new Date();
 
   readonly userName = computed(
-    () => this.auth.currentUser()?.displayName?.split(" ")[0] ?? "Equipo",
+    () => this.auth.currentUser()?.name?.split(" ")[0] ?? "Equipo",
   );
 
   // ── Datos de ejemplo — reemplazar con señales del DashboardFacade ─────────
@@ -452,8 +446,8 @@ export class DashboardComponent implements AfterViewInit {
     // 1. Hero — blur + scale (siempre primero, contexto visual inmediato)
     this.gsap.animateHero(this.heroEl().nativeElement);
 
-    // 2. Bento grid — stagger de celdas desde abajo
-    this.gsap.animateBentoGrid(this.gridEl().nativeElement);
+    // 2. El stagger del bento lo maneja [appBentoReveal]: acopla el pre-hide
+    //    pre-paint con el reveal, así no hay parpadeo, y registra su cleanup.
 
     // 3. Lista de actividad — slide desde la izquierda con stagger
     const list = this.activityList()?.nativeElement;

@@ -64,7 +64,7 @@ import { PressFeedbackDirective } from '@core/directives/press-feedback.directiv
 
     <!-- Texto principal -->
     <div class="flex flex-col gap-1.5 max-w-[280px]">
-      <p class="m-0 text-sm font-semibold text-text-primary">{{ message() }}</p>
+      <p class="item-title m-0">{{ message() }}</p>
       @if (subtitle()) {
         <p class="m-0 text-sm" style="color: var(--text-muted)">{{ subtitle() }}</p>
       }

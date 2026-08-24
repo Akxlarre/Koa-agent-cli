@@ -140,6 +140,12 @@
   --p-badge-font-size: var(--text-xs);
   --p-badge-font-weight: var(--font-bold);
 
+  /* Avatar — el boilerplate lo usa en topbar y sidebar. Sin tokenizar queda con
+     el gris por defecto de PrimeNG, ajeno a la marca. */
+  --p-avatar-background: var(--color-primary-muted);
+  --p-avatar-color: var(--ds-brand);
+  --p-avatar-font-weight: var(--font-semibold);
+
   /* Dialog / Popover / Overlay */
   --p-dialog-background: var(--bg-surface);
   --p-dialog-color: var(--text-primary);

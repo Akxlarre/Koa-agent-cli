@@ -1,5 +1,6 @@
 /* Design System Tokens */
 @use "./styles/tokens/variables";
+@use "./styles/tokens/scrollbar";
 
 /* PrimeNG overrides (design system tokens + toast position) */
 @use "./styles/vendors/primeng-overrides";
@@ -10,6 +11,10 @@
 
 /* Motion — View Transitions API (page navigation) */
 @use "./styles/motion/view-transitions";
+// Fallback CSS puro (.animate-fade-in-up / .animate-fade-in / .animate-stagger).
+// Lo referencian visual-system.md y pre-write-guard, así que tiene que existir
+// en el bundle. Es global, no estilo de componente: exento de ARCH-07.
+@use "./styles/animations";
 
 /* Animaciones CSS de entrada — .animate-fade-in-up / .animate-fade-in / .animate-stagger.
    El harness recomienda estas clases a los proyectos SIN GSAP, que es el default:

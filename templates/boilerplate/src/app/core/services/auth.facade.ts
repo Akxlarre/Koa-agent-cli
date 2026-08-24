@@ -34,12 +34,14 @@ export class AuthFacade {
       resolveReady = resolve;
     });
 
-    this.supabase.onAuthStateChange((event, session) => {
+    // El callback debe ser async: supabase-js tipa onAuthStateChange como
+    // `(event, session) => Promise<void>`, y un callback sincrónico no asigna.
+    this.supabase.onAuthStateChange(async (event, session) => {
       if (
         (event === "SIGNED_IN" || event === "INITIAL_SESSION") &&
         session?.user
       ) {
-        this.loadUserFromSession(session.user);
+        await this.loadUserFromSession(session.user);
       } else if (event === "SIGNED_OUT") {
         this._currentUser.set(null);
       }

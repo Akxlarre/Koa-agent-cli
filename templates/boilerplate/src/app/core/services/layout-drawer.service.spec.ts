@@ -1,11 +1,11 @@
-import { TestBed } from "@angular/core/testing";
-import { Component } from "@angular/core";
-import { LayoutDrawerService } from "./layout-drawer.service";
+import { TestBed } from '@angular/core/testing';
+import { Component } from '@angular/core';
+import { LayoutDrawerService } from './layout-drawer.service';
 
-@Component({ standalone: true, template: "" })
-class DummyPanelComponent {}
+@Component({ standalone: true, template: '' })
+class StubPanel {}
 
-describe("LayoutDrawerService", () => {
+describe('LayoutDrawerService', () => {
   let service: LayoutDrawerService;
 
   beforeEach(() => {
@@ -13,50 +13,68 @@ describe("LayoutDrawerService", () => {
     service = TestBed.inject(LayoutDrawerService);
   });
 
-  it("should be created", () => {
-    expect(service).toBeTruthy();
-  });
-
-  it("should start closed and empty", () => {
+  it('arranca cerrado y sin componente', () => {
     expect(service.isOpen()).toBe(false);
     expect(service.component()).toBeNull();
-    expect(service.actions()).toEqual([]);
   });
 
-  it("open() should set component, title and open state", () => {
-    service.open(DummyPanelComponent, "Detalle", "info");
+  it('open() inyecta el componente y abre', () => {
+    service.open(StubPanel, 'Detalle', 'user');
     expect(service.isOpen()).toBe(true);
-    expect(service.component()).toBe(DummyPanelComponent);
-    expect(service.title()).toBe("Detalle");
-    expect(service.icon()).toBe("info");
+    expect(service.component()).toBe(StubPanel);
+    expect(service.title()).toBe('Detalle');
+    expect(service.icon()).toBe('user');
   });
 
-  it("actions() should never be undefined even when open() omits them", () => {
-    service.open(DummyPanelComponent, "Detalle");
-    expect(service.actions()).toEqual([]);
-  });
-
-  it("setActions() should update actions without closing the drawer", () => {
-    service.open(DummyPanelComponent, "Detalle");
-    service.setActions([{ label: "Guardar", icon: "save", callback: () => {} }]);
-    expect(service.actions()).toHaveLength(1);
-    expect(service.isOpen()).toBe(true);
-  });
-
-  it("close() should NOT drop the component — the exit animation still needs it", () => {
-    // Este es el contrato entero del servicio: si close() limpiara el componente,
-    // la vista desapareceria de golpe y la animacion de salida GSAP no tendria
-    // nada que animar. Por eso close() y clear() estan separados.
-    service.open(DummyPanelComponent, "Detalle");
+  it('close() cierra pero MANTIENE el componente montado', () => {
+    // Es intencional: el componente se destruye recién en clear(), después de
+    // la animación de salida. Limpiarlo acá produciría un salto visual.
+    service.open(StubPanel, 'Detalle');
     service.close();
     expect(service.isOpen()).toBe(false);
-    expect(service.component()).toBe(DummyPanelComponent);
+    expect(service.component()).toBe(StubPanel);
   });
 
-  it("clear() should destroy the rendered component", () => {
-    service.open(DummyPanelComponent, "Detalle");
+  it('clear() destruye la vista', () => {
+    service.open(StubPanel, 'Detalle');
     service.close();
     service.clear();
     expect(service.component()).toBeNull();
+    expect(service.title()).toBe('');
+  });
+
+  it('setActions() actualiza acciones sin cerrar el drawer', () => {
+    service.open(StubPanel, 'Detalle');
+    service.setActions([{ label: 'Guardar', icon: 'save', callback: () => {} }]);
+    expect(service.actions().length).toBe(1);
+    expect(service.isOpen()).toBe(true);
+  });
+
+  it('actions() nunca es undefined', () => {
+    expect(service.actions()).toEqual([]);
+  });
+
+  it('pasa inputs al componente renderizado', () => {
+    // Sin esto el drawer solo servía para pantallas sin datos: no había forma de
+    // decirle a un detalle CUÁL registro mostrar.
+    service.open(StubPanel, 'Detalle', 'inbox', [], { id: 'abc' });
+    expect(service.inputs()).toEqual({ id: 'abc' });
+  });
+
+  it('cada nivel de la navegación lleva sus propios inputs', () => {
+    service.open(StubPanel, 'Lista', undefined, [], { id: 'lista' });
+    service.open(StubPanel, 'Detalle', undefined, [], { id: 'detalle' });
+    expect(service.inputs()).toEqual({ id: 'detalle' });
+
+    service.back();
+    expect(service.inputs()).toEqual({ id: 'lista' });
+  });
+
+  it('abrir de cero no arrastra los inputs de la sesión anterior', () => {
+    service.open(StubPanel, 'Detalle', undefined, [], { id: 'abc' });
+    service.close();
+    service.clear();
+    service.open(StubPanel, 'Otro');
+    expect(service.inputs()).toBeUndefined();
   });
 });

@@ -23,3 +23,9 @@
 | `DecimalPipe` | `{{ value \| number:'1.0-2' }}` | Formateo numérico |
 | `TitleCasePipe` | `{{ text \| titlecase }}` | Capitalización |
 | `AsyncPipe` | `{{ obs$ \| async }}` | Suscripción a observables |
+
+## Auto-Index — Detectado por AST (generado automáticamente)
+
+<!-- AUTO-GENERATED:BEGIN -->
+_Sin entradas auto-detectadas aún. Ejecuta `npm run indices:sync` para poblar._
+<!-- AUTO-GENERATED:END -->

@@ -25,13 +25,13 @@
 | Ruta en templates/.claude/ | Destino | Propósito |
 |---|---|---|
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (12 hooks cableados). |
+| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (13 hooks cableados, incl. `harness-gate.js`). |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
 | `templates/.claude/author.local.json.example` | `.claude/author.local.json.example` | Plantilla del código de autor (una letra) para la capa multi-dev del SDD. Se copia a `author.local.json`, que va gitignored. |
 | `templates/.claude/commands/` | `.claude/commands/` | 11 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/assign-*` (3). |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 12 hooks de guardrails, incl. `sdd/` (ver tabla de hooks abajo). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 13 hooks de guardrails, incl. `sdd/` y `harness-gate.js` (ver tabla de hooks abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 12 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 12 skills (ver tabla de skills abajo). |
+| `templates/.claude/skills/` | `.claude/skills/` | 13 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
 | `templates/.claude/tests/` | `.claude/tests/` | Contract tests de los hooks (`npm run claude:test-hooks`). 23 tests. |
 

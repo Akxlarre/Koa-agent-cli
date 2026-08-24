@@ -3,8 +3,8 @@
  * harness-gate.js — PreToolUse Hook (Edit|Write|MultiEdit)
  *
  * Gobierna las ediciones a las superficies de MEMORIA/GUÍA del propio harness
- * (.claude/rules/*.md, indices/ANTI-PATTERNS.md, indices/DOMAIN-GOTCHAS.md,
- * CLAUDE.md) y a los scripts de CAPACIDAD (scripts/*.js, .claude/scripts/*.js).
+ * (.claude/rules/*.md, context/learnings.md, indices/ANTI-PATTERNS.md, CLAUDE.md)
+ * y a los scripts de CAPACIDAD (scripts/*.js, .claude/scripts/*.js).
  *
  * Inspirado en el "Generalization Gate" y la regla de "placement" de
  * HarnessCompass (arXiv:2608.01918): las lecciones que se acumulan en el
@@ -12,33 +12,30 @@
  * nunca una respuesta a un track puntual; y la lógica determinista vive en
  * código (scripts/hooks), nunca como prosa disfrazada de mecanismo.
  *
- * Nota de scope: las superficies de guía son context/learnings.md,
- * indices/ANTI-PATTERNS.md, indices/DOMAIN-GOTCHAS.md (si el proyecto lo usa),
- * .claude/rules/*.md y CLAUDE.md — todas memoria validada por humano.
- * specs/** queda deliberadamente FUERA de este gate: ahí los track IDs SON
- * el contenido legítimo (contratos de spec/fix/hotfix), no una superficie
- * de guía global.
+ * Nota de scope: este blueprint puede traer el motor SDD dormido en
+ * `.claude/hooks/sdd/` (specs/, fix-NNN, spec-NNNN, hotfix-NNN). specs/**
+ * queda deliberadamente FUERA de este gate: ahí los track IDs SON el
+ * contenido legítimo (contratos de spec/fix/hotfix), no una superficie de
+ * guía global. Este hook nunca matchea rutas bajo specs/.
  *
  * Dos familias de chequeos:
  *
  *   A. GENERALIZATION GATE (superficies de guía)
- *      A1. Cita un track ID (fix-NNN/spec-NNNN/hotfix-NNN) sin ningún
- *          marcador de generalización cerca → probable "receta" en vez de
- *          regla. Como este proyecto usa fix-/spec-/hotfix- constantemente
- *          en specs/, este chequeo SOLO corre sobre rules/ANTI-PATTERNS/
- *          DOMAIN-GOTCHAS/CLAUDE.md — nunca sobre specs/**.
+ *      A1. Cita un track ID (fix-NNN/spec-NNNN/hotfix-NNN/task-NNN) sin
+ *          ningún marcador de generalización cerca → probable "receta" en
+ *          vez de regla.
  *      A2. Contiene un snippet de despacho por keyword-matching literal
  *          (`if ("token" in text)`) → exactamente el patrón que HarnessCompass
  *          prohíbe en cualquier superficie, incluida la de guía.
  *
  *   B. PLACEMENT GUARD (separación capacidad vs. guía)
- *      B1. Un archivo de guía mete lógica ejecutable real
- *          (require/process.exit/fs.*) → eso es código, no prosa; debe
- *          vivir en scripts/.
+ *      B1. Un archivo de guía (rules/learnings/ANTI-PATTERNS/CLAUDE.md) mete
+ *          lógica ejecutable real (require/process.exit/fs.*) → eso es código,
+ *          no prosa; debe vivir en scripts/.
  *      B2. Un script de capacidad (scripts/*.js) agrega solo un mensaje
  *          consultivo (console.log/warn con verbo de consejo) sin ningún
- *          mecanismo de bloqueo → eso es guía disfrazada de código; debe
- *          vivir en .claude/rules/ o indices/DOMAIN-GOTCHAS.md.
+ *          mecanismo de bloqueo → eso es guía disfrazada de código; debe vivir
+ *          en .claude/rules/ o context/learnings.md.
  *
  * Exit codes:
  *   0 = permitir la operación
@@ -74,9 +71,8 @@ process.stdin.on('end', () => {
     // Clasificación de superficie
     // ═══════════════════════════════════════════════════════════════════════
     const isGuidanceSurface =
-      normalizedPath.endsWith('indices/ANTI-PATTERNS.md') ||
-      normalizedPath.endsWith('indices/DOMAIN-GOTCHAS.md') ||
       normalizedPath.endsWith('context/learnings.md') ||
+      normalizedPath.endsWith('indices/ANTI-PATTERNS.md') ||
       /\.claude\/rules\/[^/]+\.md$/.test(normalizedPath) ||
       /(^|\/)CLAUDE\.md$/.test(normalizedPath);
 
@@ -94,17 +90,16 @@ process.stdin.on('end', () => {
     // A. GENERALIZATION GATE — solo superficies de guía (nunca specs/**)
     // ═══════════════════════════════════════════════════════════════════════
     if (isGuidanceSurface) {
-      const TRACK_ID_RE = /\b(?:fix|spec|hotfix)-\d{2,4}(?:-[a-z])?\b/i;
+      const TRACK_ID_RE = /\b(?:fix|spec|hotfix|task)-\d{2,4}(?:-[a-z])?\b/i;
       const GENERALIZATION_MARKER_RE =
         /\b(cuando|siempre que|nunca|cada vez que|toda vez que|regla:|criterio|aplicabilidad|aplica cuando|no aplica|excepci[oó]n|independientemente de)\b/i;
 
       if (TRACK_ID_RE.test(newContent) && !GENERALIZATION_MARKER_RE.test(newContent)) {
         violations.push(
-          '[GATE-A1] Citas un track (fix-/spec-/hotfix-NNN) sin ningún criterio de aplicabilidad cerca.\n' +
+          '[GATE-A1] Citas un track (fix-/spec-/hotfix-/task-NNN) sin ningún criterio de aplicabilidad cerca.\n' +
           '     Una lección de guía debe sobrevivir sin el ID: "cuando X, hacer Y; si Z, hacer W".\n' +
-          '     El ID puede quedar como referencia histórica (como fix-078-b en visual-system.md), pero\n' +
-          '     el PRINCIPIO reusable tiene que estar escrito al lado, no solo el número del track.\n' +
-          '     Litmus test: ¿esto seguiría ayudando en un proyecto que nunca vio ese fix/spec?'
+          '     El ID puede quedar como referencia histórica, pero el PRINCIPIO reusable tiene que estar escrito.\n' +
+          '     Litmus test: ¿esto seguiría ayudando en un proyecto que nunca vio ese track?'
         );
       }
 
@@ -114,7 +109,7 @@ process.stdin.on('end', () => {
           '[GATE-A2] Snippet de despacho por keyword-matching literal detectado (ej: if ("token" in text)).\n' +
           '     Ni siquiera como prosa/pseudo-código: una guía nunca debe codificar una rama que\n' +
           '     dispara solo con un token específico. Reescribe como un criterio evaluable en\n' +
-          '     cualquier módulo del proyecto, o si de verdad necesita ser código determinista, va en scripts/.'
+          '     cualquier proyecto, o si de verdad necesita ser código determinista, va en scripts/.'
         );
       }
     }
@@ -127,10 +122,9 @@ process.stdin.on('end', () => {
       if (EXEC_CODE_RE.test(newContent)) {
         violations.push(
           '[GATE-B1] Este archivo de guía contiene lógica ejecutable real (require/process.exit/fs.*).\n' +
-          '     Las superficies de guía (.claude/rules/, indices/ANTI-PATTERNS.md, indices/DOMAIN-GOTCHAS.md,\n' +
-          '     CLAUDE.md) son prosa que el agente lee — no código que corre. Si necesitas un chequeo\n' +
-          '     determinista, créalo como script real en scripts/ (o .claude/scripts/) y referencia el\n' +
-          '     resultado desde aquí.'
+          '     Las superficies de guía (.claude/rules/, context/learnings.md, ANTI-PATTERNS.md, CLAUDE.md)\n' +
+          '     son prosa que el agente lee — no código que corre. Si necesitas un chequeo determinista,\n' +
+          '     créalo como script real en scripts/ (o .claude/scripts/) y referencia el resultado desde aquí.'
         );
       }
     }
@@ -148,7 +142,7 @@ process.stdin.on('end', () => {
           '[GATE-B2] Agregaste un console.log/warn con tono de consejo pero sin ningún process.exit(2)\n' +
           '     que lo respalde. Un script de capacidad debe DETECTAR algo observable y actuar\n' +
           '     (bloquear, inyectar contexto, escribir un archivo) — no solo narrar una recomendación.\n' +
-          '     Si es puro consejo, esa lección va en .claude/rules/ o indices/DOMAIN-GOTCHAS.md, no en scripts/.'
+          '     Si es puro consejo, esa lección va en .claude/rules/ o context/learnings.md, no en scripts/.'
         );
       }
     }

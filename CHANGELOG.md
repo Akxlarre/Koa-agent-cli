@@ -6,6 +6,34 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [6.5.0] — 2026-08-05
+
+### Added
+- **`harness-gate.js`** (nuevo hook, PreToolUse Edit/Write/MultiEdit): Generalization Gate +
+  Placement Guard sobre el harness mismo. Bloquea ediciones a `.claude/rules/*.md`,
+  `context/learnings.md`, `indices/ANTI-PATTERNS.md` y `CLAUDE.md` que citan un track ID
+  (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin un criterio de aplicabilidad explícito,
+  o que contienen snippets de despacho por keyword-matching literal / código ejecutable
+  colado en un archivo de guía. También bloquea ediciones a `scripts/*.js` que solo agregan
+  un mensaje consultivo sin ningún `process.exit(2)` que lo respalde. Inspirado en el
+  "Generalization Gate" y la regla de placement capacidad/guía de HarnessCompass
+  (arXiv:2608.01918).
+- **`/harness-feedback`** (nuevo skill, user-invocable): reporte proactivo de fricción con
+  el harness en dos pasadas (ciega, luego con hindsight tras correr `lint:arch`/`test:ci`),
+  con grounding obligatorio contra evidencia de la sesión y enrutamiento a track
+  estructural (hook/script) o guía (`rules/`/`learnings.md`/`ANTI-PATTERNS.md`), gateado
+  por `harness-gate.js`.
+
+### Migración desde 6.4
+1. Copiar `templates/.claude/hooks/harness-gate.js` a `.claude/hooks/harness-gate.js`
+2. Agregar la entrada de `harness-gate.js` en `.claude/settings.json` (matcher
+   `Edit|Write|MultiEdit`, junto a `pre-write-guard.js`)
+3. Copiar `templates/.claude/skills/harness-feedback/SKILL.md` a
+   `.claude/skills/harness-feedback/SKILL.md`
+4. No hay breaking changes — ambos son aditivos y no tocan código de la app generada
+
+---
+
 ## [6.1.0] — 2026-03-26
 
 ### Changed

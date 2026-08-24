@@ -158,10 +158,10 @@ process.stdin.on('end', () => {
       if (/@Output\s*\(/.test(newContent))
         violations.push('Usa output() signal en vez de @Output() decorator');
 
-      // ARCH-11: supabase.types.ts es auto-generado — no editar manualmente
+      // ARCH-13: supabase.types.ts es auto-generado — no editar manualmente
       if (/core\/models\/supabase\.types\.ts/.test(normalizedPath))
         violations.push(
-          '[ARCH-11] supabase.types.ts es AUTO-GENERADO.\n' +
+          '[ARCH-13] supabase.types.ts es AUTO-GENERADO.\n' +
           '     No lo edites manualmente: ejecuta npm run supabase:types para regenerarlo.\n' +
           '     Las interfaces en dto/ deben EXTENDER de supabase.types.ts.'
         );

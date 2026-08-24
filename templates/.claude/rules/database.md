@@ -94,7 +94,7 @@ una posterior. Detalle en `docs/TECH-STACK-RULES.md#sec-rls-01`.
 - Ejecuta `npm run supabase:types` después de cada migración (requiere `supabase start`)
 - El archivo `src/app/core/models/supabase.types.ts` es **AUTO-GENERADO** — no editar manualmente
 - Las interfaces en `core/models/dto/` deben **extender** de `supabase.types.ts`, no redefinir campos
-- El Architect Guard bloqueará ediciones manuales a `supabase.types.ts` (`ARCH-11`)
+- El Architect Guard bloqueará ediciones manuales a `supabase.types.ts` (`ARCH-13`)
 
 ```typescript
 // CORRECTO: extender desde tipos generados

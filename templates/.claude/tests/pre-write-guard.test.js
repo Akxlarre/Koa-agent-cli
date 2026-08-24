@@ -198,14 +198,14 @@ describe('ARCHITECT GUARD — SQL', () => {
   });
 });
 
-describe('ARCHITECT GUARD — ARCH-11', () => {
+describe('ARCHITECT GUARD — ARCH-13', () => {
   test('bloquea edicion manual de supabase.types.ts', () => {
     const r = runHook(makeInput(
       '/project/src/app/core/models/supabase.types.ts',
       'export type Database = {};'
     ));
     assert.equal(r.exitCode, 2);
-    assert.ok(r.stderr.includes('ARCH-11') || r.stderr.includes('AUTO-GENERADO'));
+    assert.ok(r.stderr.includes('ARCH-13') || r.stderr.includes('AUTO-GENERADO'));
   });
 });
 

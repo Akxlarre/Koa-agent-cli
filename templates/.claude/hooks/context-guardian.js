@@ -7,8 +7,12 @@
  * una auditoría de la capa de contexto humano (context/).
  *
  * Checks:
- *   1. context/brief.md → last_updated > 7 días: avisar que puede estar desactualizado
- *   2. context/learnings.md → sin actualizar en >14 días: sugerir registrar aprendizajes
+ *   1. context/learnings.md → sin actualizar en >14 días: sugerir registrar aprendizajes
+ *
+ * La frescura de context/brief.md se auditaba aquí y se movió a session-start.js:
+ * avisar en el Stop hook que el brief estaba viejo llega después de que el agente
+ * ya codeó contra el objetivo equivocado. Ese aviso pertenece al arranque.
+ * Lo que SÍ tiene sentido preguntar al cerrar es lo de abajo: "¿aprendiste algo hoy?".
  *
  * Exit codes:
  *   0 = ok / nada que reportar
@@ -21,25 +25,7 @@ const path = require('path');
 const cwd = process.cwd();
 const warnings = [];
 
-// ─── Check 1: brief.md staleness ──────────────────────────────────────────
-const briefPath = path.join(cwd, 'context', 'brief.md');
-if (fs.existsSync(briefPath)) {
-  try {
-    const content = fs.readFileSync(briefPath, 'utf-8');
-    const match = content.match(/\*\*last_updated:\*\*\s*(\d{4}-\d{2}-\d{2})/);
-    if (match) {
-      const daysSince = Math.floor((Date.now() - new Date(match[1]).getTime()) / 86400000);
-      if (daysSince > 7) {
-        warnings.push(
-          `\u{1F4C5} BRIEF DESACTUALIZADO: context/brief.md fue actualizado hace ${daysSince} dias (${match[1]}).\n` +
-          `   Pide al humano que actualice last_updated y el objetivo antes de la proxima sesion.`
-        );
-      }
-    }
-  } catch { /* fail-open */ }
-}
-
-// ─── Check 2: learnings.md sin actualizar ─────────────────────────────────
+// ─── Check: learnings.md sin actualizar ───────────────────────────────────
 const learningsPath = path.join(cwd, 'context', 'learnings.md');
 if (fs.existsSync(learningsPath)) {
   try {

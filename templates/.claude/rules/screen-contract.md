@@ -45,6 +45,15 @@ Referencia viva: `/app/_ds` (sólo en dev). Copiá de ahí en vez de reinventar.
 5. **Los KPIs van en la banda del hero.** Cards sueltas encima del contenido empujan la lista
    fuera del viewport y rompen el contrato App-like.
 
+<a id="nav-01"></a>
+## El menú no promete pantallas que no existen — NAV-01
+
+Toda entrada de `menu-config.service.ts` tiene que resolver a una ruta declarada en
+`app.routes.ts`. Si el módulo todavía no existe, la entrada **no va** — un menú de
+promesas hace que el usuario haga clic y caiga en el not-found, y nada en el build lo
+delata: compila perfecto, se rompe en el navegador. `npm run lint:arch` (`NAV-01`) lo
+audita comparando ambos archivos.
+
 ## El contrato App-like
 
 - **Desktop (≥1024px):** la pantalla llena el viewport y el scroll vive **dentro** del panel. El

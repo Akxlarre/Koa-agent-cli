@@ -61,6 +61,7 @@
 
 ## Cómo elegir una celda bento
 
+<a id="arch-21"></a>
 > El sistema bento está **congelado por allowlist** (ARCH-21): agregar una clase
 > `.bento-*` a `_bento-grid.scss` sin sumarla a `scripts/lib/bento-classes.allowlist.json`
 > hace fallar `npm run lint:arch`. El freno existe porque este grid tiende a crecer por

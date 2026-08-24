@@ -1,5 +1,25 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-start.js"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/prompt-context.js"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
@@ -86,6 +106,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/sdd/hotfix-autoclose.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/spec-reflection.js"
           },
           {
             "type": "command",

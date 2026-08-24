@@ -52,6 +52,58 @@
 - Warning si un `*.facade.ts` es demasiado complejo (recomendación: \(\le 5\) `inject()` y métodos \(\le 50\) líneas).
 - Solución: extraer lógica a services/helpers y mantener la Facade como orquestador de estado/errores.
 
+<a id="arch-11"></a>
+### ARCH-11: `supabase.types.ts` es auto-generado
+- Prohibido editar `src/app/core/models/supabase.types.ts` a mano.
+- Solución: `npm run supabase:types` lo regenera. Las interfaces de `dto/` deben **extender** de ahí, no duplicar sus campos.
+- Por qué: cualquier edición manual se pierde en la próxima regeneración, y el tipo deja de reflejar el esquema real.
+
+<a id="arch-12"></a>
+### ARCH-12: Repository boundary
+- Prohibido llamar `.db.from()` o `.client.from()` dentro de un Facade.
+- Solución: crear o reutilizar un Repository en `core/repositories/` e inyectarlo.
+- Cadena canónica: `UI → Facade → Repository → SupabaseService.db`.
+- Por qué: el getter `.db` existe solo para Repositories. Si el Facade consulta directo, la forma del cliente Supabase se filtra hacia arriba y cambiar de proveedor pasa a tocar toda la app.
+
+<a id="a11y-01"></a>
+### A11Y-01: `<app-icon>` sin `aria-label`
+- Un icono de acción sin etiqueta es invisible para un lector de pantalla.
+- Solución: `[attr.aria-label]="'Descripción'"`. Si hay texto hermano visible que ya lo describe, `ariaHidden="true"`.
+
+<a id="a11y-02"></a>
+### A11Y-02: `<p-table>` sin `aria-label` ni caption
+- Solución: `[attr.aria-label]="'Nombre de la tabla'"` o `pTemplate="caption"`.
+
+<a id="llm-01"></a>
+### LLM-01: Botón `type="submit"` sin `data-llm-action`
+- Los formularios son puntos de mutación críticos. Un agente que lee el template necesita saber qué acción dispara el botón.
+- Solución: `<button type="submit" data-llm-action="crear-producto">`.
+
+<a id="llm-02"></a>
+### LLM-02: Botón destructivo sin `data-llm-action`
+- Aplica a botones cuyo `aria-label` indica eliminar/borrar/remove.
+- Solución: `<button aria-label="Eliminar producto" data-llm-action="delete-producto">`.
+
+<a id="sec-rls-01"></a>
+### SEC-RLS-01: Tabla creada sin políticas RLS
+- Una tabla con RLS activado y **cero políticas** no es segura: es **inaccesible**. Postgres deniega por defecto, así que ni tu propia app puede leerla.
+- El síntoma llega en runtime, lejos de la migración que lo causó.
+- Solución: al menos una política por operación necesaria, acotada al dueño del dato o al rol.
+- El hook exige el par tabla+política **en el mismo archivo** (la convención del blueprint). `lint:arch` es más flexible: mira todas las migraciones y acepta que las políticas lleguen en una posterior.
+
+<a id="sec-rls-02"></a>
+### SEC-RLS-02: Política permisiva sobre una escritura
+- Prohibido `USING (true)` / `WITH CHECK (true)` en `FOR ALL`, `INSERT`, `UPDATE` o `DELETE`.
+- **Sin cláusula `FOR`, Postgres asume `ALL`** — el caso más permisivo, y el más fácil de escribir por accidente.
+- Solución: `USING (auth.uid() = user_id)` o una condición por rol.
+- `FOR SELECT USING (true)` **sí** está permitido: una tabla de catálogo pública es legítima, y es la única forma en que `true` se defiende.
+- Por qué importa junto a SEC-RLS-01: el arreglo natural de "la tabla está bloqueada" es abrirla del todo. Se pasa de inaccesible a totalmente abierta en un commit, y ambos extremos compilan.
+
+<a id="sec-rls-03"></a>
+### SEC-RLS-03: Tabla sin RLS activado
+- Solo lo reporta `lint:arch`, que ve todas las migraciones juntas.
+- Solución: `ALTER TABLE public.tabla ENABLE ROW LEVEL SECURITY;`
+
 ## 1. Patrones de Diseño Arquitectónico Obligatorios
 
 ### A. Patrón Facade Estricto
@@ -80,6 +132,8 @@ Antes de crear un componente presentacional, consulta en este orden:
 1. `indices/COMPONENTS.md`: ¿El Boilerplate (Design System local) tiene algo aplicable? Si la respuesta es sí, úsalo.
 2. `PrimeNG`: En inputs de data, dropdowns complejos, calendarios, usa `p-dropdown`, `p-calendar` etc. (Ver [PrimeNG Priority Rule](../skills/primeng-priority.md)).
 3. Componente Custom: Solo escríbelo si los pasos 1 y 2 no cubrieron la necesidad.
+
+<a id="database"></a>
 
 ## 4. Base de Datos & Base de Trabajo (Supabase Migrations)
 - Todo esquema DDL va en la carpeta `supabase/migrations/` (Naming convention: `YYYYMMDDHHMMSS_<dominio>_<tipo>_<descripcion>.sql`).

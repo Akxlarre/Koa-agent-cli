@@ -58,3 +58,63 @@ describe('BASH GUARD — operaciones destructivas', () => {
     assert.equal(r.exitCode, 2);
   });
 });
+
+describe('APPROVAL GATE — operaciones DB irreversibles', () => {
+  test('bloquea supabase db push', () => {
+    const r = runHook('npx supabase db push');
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('APPROVAL GATE'));
+  });
+
+  test('bloquea supabase db reset', () => {
+    const r = runHook('supabase db reset --linked');
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('bloquea supabase migration repair', () => {
+    const r = runHook('supabase migration repair --status applied 20240101000000');
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('bloquea supabase link', () => {
+    const r = runHook('npx supabase link --project-ref abcdefghijklmnop');
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('bloquea DROP TABLE via psql', () => {
+    const r = runHook(`psql "$DB_URL" -c "DROP TABLE profiles"`);
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('permite supabase start (no destructivo)', () => {
+    const r = runHook('npx supabase start');
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('permite crear una migracion nueva (solo escribe un archivo)', () => {
+    const r = runHook('npx supabase migration new productos_create');
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('permite generar tipos (read-only)', () => {
+    const r = runHook('npx supabase gen types typescript --local');
+    assert.equal(r.exitCode, 0);
+  });
+});
+
+describe('BASH GUARD — bypass de creacion sin redireccion', () => {
+  test('bloquea cp hacia src/app', () => {
+    const r = runHook('cp /tmp/foo.ts src/app/features/x/x.component.ts');
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('bloquea mv hacia supabase/migrations', () => {
+    const r = runHook('mv /tmp/m.sql supabase/migrations/20240101000000_x.sql');
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('bloquea ng generate (escribe codigo sin pasar por los guards)', () => {
+    const r = runHook('ng generate component features/productos');
+    assert.equal(r.exitCode, 2);
+  });
+});

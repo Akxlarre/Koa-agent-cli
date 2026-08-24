@@ -204,6 +204,21 @@ const RULES = {
         doc: 'docs/TECH-STACK-RULES.md#arch-10',
         fix: 'Extrae lógica a helpers/servicios y reduce inject() y métodos largos. Mantén la Facade como orquestador.',
     },
+    'SEC-RLS-01': {
+        name: 'Table without RLS policies',
+        doc: 'indices/ANTI-PATTERNS.md#ap-012',
+        fix: 'Agrega al menos una CREATE POLICY por operación necesaria. RLS activado sin políticas deniega todo: la tabla queda inaccesible.',
+    },
+    'SEC-RLS-02': {
+        name: 'Permissive RLS policy on a write operation',
+        doc: 'indices/ANTI-PATTERNS.md#ap-012',
+        fix: 'Acota la condición al dueño del dato o al rol: USING (auth.uid() = user_id). `true` solo es defendible en FOR SELECT de una tabla pública.',
+    },
+    'SEC-RLS-03': {
+        name: 'Table without RLS enabled',
+        doc: 'docs/TECH-STACK-RULES.md#database',
+        fix: 'ALTER TABLE public.tabla ENABLE ROW LEVEL SECURITY;',
+    },
 };
 
 const targetDirs = [
@@ -661,6 +676,74 @@ function scanDirectory(dir) {
     }
 }
 
+// ─── SEC-RLS: auditoría acumulada de políticas RLS sobre supabase/migrations ──
+//
+// El hook pre-write-guard mira UN archivo en el momento de escribirlo y exige
+// el par tabla+política juntos — la convención del blueprint. Esto en cambio
+// mira el ESTADO ACUMULADO de todas las migraciones: una tabla creada en la
+// migración 3 con su política recién en la 7 le parece bien al hook (cada
+// archivo por separado está OK) pero deja la tabla inaccesible entre medio.
+// Ninguno de los dos solo alcanza: el hook no ve los otros archivos, y este
+// chequeo corre después de que el código ya se escribió.
+
+function auditMigrations() {
+    const dir = path.join(process.cwd(), 'supabase', 'migrations');
+    if (!fs.existsSync(dir)) return;
+
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+    if (files.length === 0) return;
+
+    const createdIn = new Map();   // tabla → archivo donde se creó
+    const rlsEnabled = new Set();  // tablas con ENABLE ROW LEVEL SECURITY
+    const withPolicy = new Set();  // tablas con al menos una política
+
+    /** Normaliza `public.tabla`, `"tabla"` y `tabla` a un único nombre. */
+    const norm = t => t.replace(/"/g, '').replace(/^public\./i, '').toLowerCase();
+
+    for (const file of files) {
+        const full = path.join(dir, file);
+        const sql = fs.readFileSync(full, 'utf-8');
+
+        for (const m of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/gi)) {
+            const t = norm(m[1]);
+            if (!createdIn.has(t)) createdIn.set(t, full);
+        }
+        for (const m of sql.matchAll(/ALTER\s+TABLE\s+([\w".]+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi)) {
+            rlsEnabled.add(norm(m[1]));
+        }
+        for (const m of sql.matchAll(/CREATE\s+POLICY[\s\S]*?\sON\s+([\w".]+)/gi)) {
+            withPolicy.add(norm(m[1]));
+        }
+
+        // Políticas permisivas sobre operaciones de escritura.
+        for (const chunk of sql.split(/CREATE\s+POLICY/i).slice(1)) {
+            if (!/\b(?:USING|WITH\s+CHECK)\s*\(\s*true\s*\)/i.test(chunk)) continue;
+            const forMatch = chunk.match(/\bFOR\s+(ALL|SELECT|INSERT|UPDATE|DELETE)\b/i);
+            // Sin cláusula FOR, Postgres asume ALL.
+            const command = forMatch ? forMatch[1].toUpperCase() : 'ALL';
+            if (command === 'SELECT') continue;
+            const onMatch = chunk.match(/\sON\s+([\w".]+)/i);
+            reportError(
+                'SEC-RLS-02', full,
+                `Política FOR ${command} con condición \`true\` sobre ${onMatch ? norm(onMatch[1]) : 'una tabla'}`,
+            );
+        }
+    }
+
+    for (const [table, file] of createdIn) {
+        if (!rlsEnabled.has(table)) {
+            reportError('SEC-RLS-03', file, `La tabla \`${table}\` no tiene RLS activado`);
+            continue;
+        }
+        if (!withPolicy.has(table)) {
+            reportError(
+                'SEC-RLS-01', file,
+                `La tabla \`${table}\` tiene RLS activado pero ninguna migración le define políticas`,
+            );
+        }
+    }
+}
+
 // ─── Ejecución ────────────────────────────────────────────────────────────────
 
 for (const dir of targetDirs) {
@@ -668,6 +751,9 @@ for (const dir of targetDirs) {
 }
 
 // ─── Checks globales (una sola vez, no por archivo) ──────────────────────────
+
+// SEC-RLS-01/02/03: estado acumulado de políticas RLS sobre supabase/migrations.
+auditMigrations();
 
 // ARCH-15/16/17/19: ratchet de disciplina DS.
 checkClassDiscipline();

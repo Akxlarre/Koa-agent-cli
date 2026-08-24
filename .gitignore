@@ -26,9 +26,23 @@ bazel-out/
 .claude/logs/
 .gemini/
 
+# Estado efímero de los hooks: LESSONS_LEARNED.md, session-writes.json, task-specs.
+# Es memoria de sesión, no código. El .gitignore que enviamos a los proyectos
+# generados ya lo ignoraba; este repo no, y por eso aparecía como cambio suelto
+# en cada commit.
+.claude/temp/
+
 
 # Workshop — espacio de trabajo privado (planes, research, ADRs, visión)
 /workshop/
 
 # Context — memoria semántica privada del agente (dominio, sesión, decisiones)
 /context/
+
+# Proyectos generados para probar el CLI localmente.
+# No commitear un scaffold de ejemplo: se desincroniza de templates/ en cuanto
+# cualquiera de los dos cambia, y una copia vieja del harness al lado de la real
+# es peor que ninguna — es lo primero que encuentra un agente al grepear.
+/ok-project/
+/test-project/
+/tmp-scaffold/

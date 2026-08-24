@@ -187,6 +187,25 @@ export class ExampleFacade {
 - **NEVER** modify the database manually — always via migrations
 - Document every new table in `indices/DATABASE.md`
 
+### Irreversible operations are the human's call
+
+Writing a migration is your job. **Applying it is not.**
+
+| Command | Why a human runs it |
+|---|---|
+| `supabase db push` | DDL with no automatic rollback |
+| `supabase db reset` | Destroys all data |
+| `supabase migration repair` | Rewrites migration history |
+| `supabase link` | Decides which database everything after it targets |
+| `psql … DROP / TRUNCATE / ALTER` | Schema changes outside versioned migrations |
+
+Leave the migration written, tell the human the exact command and target
+environment, and wait. In Claude Code an Approval Gate blocks these commands
+automatically; in other tools nothing stops you, so this is on you.
+
+The Supabase MCP server ships `--read-only` and scoped to a single project on
+purpose. Do not widen it to work around this rule.
+
 ---
 
 ## Testing (Vitest)
@@ -215,9 +234,14 @@ export class ExampleFacade {
 ## Note for Claude Code users
 
 When running Claude Code, `.claude/CLAUDE.md` extends this file with:
+- **Session Start / Prompt Context** hooks that inject the indexes, the session objective, and the out-of-scope list before you can go wrong
 - **Hooks** that automatically enforce rules (Discovery Gate, Architect Guard, File Protector, etc.)
-- **Skills** (`/angular-component`, `/angular-signals`, `/sync-indices`, `/plan`)
+- **Circuit Breaker** that stops retry loops after 3 identical blocked writes
+- **Approval Gate** on irreversible database operations
+- **Skills** (`/angular-component`, `/angular-signals`, `/sync-indices`, `/plan`, `/review`)
+- **Subagents** (`discovery-scout`, `arch-auditor`, `index-syncer`, `supabase-schema`, `code-judge`)
 - **Automatic index sync** reminders on session end
+- **Spec Reflection** that checks the task-spec's done criteria before closing out
 - **Context Guardian** that monitors staleness of `context/` files
 
 If you are not using Claude Code, enforce these rules manually — no automation backs you up.

@@ -7,7 +7,7 @@
 
 | Archivo | Responsabilidad | Tamaño actual |
 |---------|----------------|---------------|
-| `bin/index.js` | Entry point: resuelve stack, ejecuta preflight, muestra inquirer prompts, orquesta el flujo de scaffolding. Sin lógica de negocio propia. | ~115 líneas |
+| `bin/index.js` | Entry point: resuelve stack, ejecuta preflight, muestra inquirer prompts, orquesta el flujo de scaffolding. Sin lógica de negocio propia. | ~160 líneas |
 
 ## lib/ — Módulos especializados
 

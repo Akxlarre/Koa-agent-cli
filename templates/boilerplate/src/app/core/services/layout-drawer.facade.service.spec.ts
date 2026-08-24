@@ -39,4 +39,11 @@ describe('LayoutDrawerFacadeService', () => {
     facade.setActions([{ label: 'A', icon: 'check', callback: () => {} }]);
     expect(service.actions().length).toBe(1);
   });
+
+  it('NO re-expone clear() — es responsabilidad del componente del drawer', () => {
+    // El facade es la superficie que ve la UI. clear() destruye la vista y solo
+    // debe llamarlo el componente del drawer cuando GSAP terminó la salida.
+    // Exponerlo acá invitaría a cualquier componente a matar la animación.
+    expect((facade as unknown as { clear?: unknown }).clear).toBeUndefined();
+  });
 });

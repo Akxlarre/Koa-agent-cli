@@ -33,6 +33,34 @@ try {
   }
 } catch { /* fail-open */ }
 
+// ─── CIRCUIT BREAKER ─────────────────────────────────────────────────────────
+// Un bloqueo con exit 2 es un "no" sin memoria: el agente puede reintentar la
+// misma escritura indefinidamente y el guard la rechazara igual cada vez,
+// quemando tokens sin avanzar. El breaker cuenta bloqueos identicos por sesion
+// y al tercero cambia el mensaje: deja de explicar el arreglo y ordena parar.
+const BREAKER_THRESHOLD = 3;
+
+/**
+ * Registra un bloqueo y devuelve cuantas veces se repitio el mismo
+ * {archivo, motivo} en esta sesion. Fail-open: ante cualquier error de FS
+ * devuelve 1, de modo que el guard sigue bloqueando pero sin escalar.
+ */
+function recordBlock(sessionId, filePath, reason) {
+  try {
+    const statePath = path.join(os.tmpdir(), `koa-breaker-${sessionId}.json`);
+    const key = `${path.basename(filePath)}::${String(reason).replace(/\s+/g, ' ').slice(0, 120)}`;
+    let state = {};
+    if (fs.existsSync(statePath)) {
+      try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')) || {}; } catch { state = {}; }
+    }
+    state[key] = (state[key] || 0) + 1;
+    fs.writeFileSync(statePath, JSON.stringify(state));
+    return state[key];
+  } catch {
+    return 1;
+  }
+}
+
 // SEC-04: Limit stdin to 10 MB to prevent memory exhaustion (DoS) from crafted hook inputs.
 const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let data = '';
@@ -299,19 +327,86 @@ process.stdin.on('end', () => {
           '     Ejemplo: 20250301120000_auth_create_profiles.sql'
         );
 
-      if (/CREATE\s+TABLE/i.test(newContent) && !/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(newContent))
+      const createsTable = /CREATE\s+TABLE/i.test(newContent);
+
+      if (createsTable && !/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(newContent))
         violations.push(
           'Toda tabla nueva DEBE tener RLS activado.\n' +
           '     Agrega: ALTER TABLE nombre ENABLE ROW LEVEL SECURITY;'
         );
+
+      // [SEC-RLS-01] RLS activado sin politicas no es una tabla segura: es una
+      // tabla INACCESIBLE. Postgres deniega por defecto, asi que sin al menos una
+      // policy nadie puede leerla — ni la app. El fallo aparece en runtime, lejos
+      // de aqui, y se suele "arreglar" con una policy permisiva (ver SEC-RLS-02).
+      // Una migracion que SOLO agrega politicas a una tabla existente es valida y
+      // no entra en este check: por eso se exige el par solo cuando hay CREATE TABLE.
+      if (createsTable && !/CREATE\s+POLICY/i.test(newContent))
+        violations.push(
+          '[SEC-RLS-01] La migracion crea una tabla pero no define ninguna politica RLS.\n' +
+          '     Con RLS activado y cero politicas, Postgres deniega TODO: la tabla queda\n' +
+          '     inaccesible incluso para tu propia app.\n' +
+          '     Agrega al menos una politica por operacion que necesites:\n' +
+          '       CREATE POLICY "tabla_select_own" ON public.tabla\n' +
+          '         FOR SELECT USING (auth.uid() = user_id);\n' +
+          '     Documenta las politicas en indices/DATABASE.md.'
+        );
+
+      // [SEC-RLS-02] `USING (true)` en una policy de escritura deja la tabla
+      // abierta a cualquier usuario autenticado. En SELECT puede ser legitimo
+      // (una tabla de catalogo publica), por eso solo se bloquea cuando la policy
+      // cubre ALL / INSERT / UPDATE / DELETE.
+      const policyChunks = newContent.split(/CREATE\s+POLICY/i).slice(1);
+      for (const chunk of policyChunks) {
+        const permissive = /\b(?:USING|WITH\s+CHECK)\s*\(\s*true\s*\)/i.test(chunk);
+        if (!permissive) continue;
+
+        const forMatch = chunk.match(/\bFOR\s+(ALL|SELECT|INSERT|UPDATE|DELETE)\b/i);
+        // Sin clausula FOR, Postgres asume ALL — el caso mas permisivo.
+        const command = forMatch ? forMatch[1].toUpperCase() : 'ALL';
+        if (command === 'SELECT') continue;
+
+        violations.push(
+          `[SEC-RLS-02] Politica FOR ${command} con condicion \`true\`.\n` +
+          '     Eso permite a cualquier usuario autenticado escribir sobre cualquier fila.\n' +
+          '     Acota la condicion al dueno del dato o al rol correspondiente:\n' +
+          '       USING (auth.uid() = user_id)\n' +
+          '       USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = \'admin\'))\n' +
+          '     `USING (true)` solo es defendible en FOR SELECT de una tabla publica.'
+        );
+        break;
+      }
     }
 
     // --- Reportar violaciones ---
     if (violations.length > 0) {
+      // El breaker cuenta por la PRIMERA violacion, no por la lista completa:
+      // el agente suele arreglar una y dejar la otra, y el conjunto cambia en
+      // cada intento aunque el problema de fondo sea siempre el mismo.
+      const attempts = recordBlock(sessionId, filePath, violations[0]);
+
+      if (attempts >= BREAKER_THRESHOLD) {
+        process.stderr.write(
+          `\u{1F534} CIRCUIT BREAKER: ${attempts} intentos bloqueados por lo mismo en ${path.basename(filePath)}.\n\n` +
+          `Violacion persistente:\n  \u274C ${violations[0]}\n\n` +
+          `DETENTE. No vuelvas a intentar esta escritura \u2014 el guard la va a rechazar igual.\n` +
+          `Ya van ${attempts} rondas y el enfoque no esta funcionando. Haz esto:\n` +
+          `  1. Explicale al humano que estas bloqueado y pega la violacion de arriba.\n` +
+          `  2. Di que entendiste de la regla y por que tu solucion no la satisface.\n` +
+          `  3. Espera indicaciones. Si crees que la regla esta mal aplicada, dilo \u2014 pero no la esquives.\n\n` +
+          `NO intentes rodear el guard escribiendo por Bash, renombrando el archivo\n` +
+          `ni troceando el cambio en escrituras mas chicas.`
+        );
+        process.exit(2);
+      }
+
       process.stderr.write(
         `\u{1F6A8} ARCHITECT GUARD: Violaciones detectadas en ${path.basename(filePath)}:\n` +
         violations.map(v => `  \u274C ${v}`).join('\n') +
-        `\nCorrige el codigo antes de escribirlo.`
+        `\nCorrige el codigo antes de escribirlo.` +
+        (attempts > 1
+          ? `\n\n\u26A0\uFE0F  Intento ${attempts}/${BREAKER_THRESHOLD} con la misma violacion. Al ${BREAKER_THRESHOLD}\u00BA se corta y hay que escalar al humano \u2014 cambia de enfoque, no de sintaxis.`
+          : '')
       );
       process.exit(2);
     }

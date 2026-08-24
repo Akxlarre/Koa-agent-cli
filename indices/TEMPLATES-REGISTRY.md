@@ -11,7 +11,7 @@
 | `templates/AGENTS.md` | `AGENTS.md` | **Master universal** self-contained para todos los AI tools (OpenCode, Copilot, Codex…). Workflow de 5 pasos, reglas arquitectónicas, anti-patterns, los 10 índices. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
 | `templates/gitignore.template` | `.gitignore` | .gitignore con entradas para Angular, Supabase, GSAP, Vitest, Playwright. |
 | `templates/docs/` | `docs/` | Guías de usuario: HOOKS-SYSTEM.md, TECH-STACK-RULES.md, BRAND_GUIDELINES.md, PRODUCT-VISION.md. |
-| `templates/indices/` | `indices/` | 15 índices. **12 se auto-generan** con `npm run indices:sync` (COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, GUARDS, UTILS, PIPES, STYLES, DATABASE, ROUTES, USAGE-MAP): el contenido va entre marcadores `<!-- AUTO-GENERATED:BEGIN/END -->` y se sobrescribe. Los 3 restantes (ANTI-PATTERNS, LAYOUTS, STORES) son manuales. |
+| `templates/indices/` | `indices/` | 15 índices. **13 se auto-generan** con `npm run indices:sync` (COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, GUARDS, UTILS, PIPES, STYLES, STORES, DATABASE, ROUTES, USAGE-MAP): el contenido va entre marcadores `<!-- AUTO-GENERATED:BEGIN/END -->` y se sobrescribe. Los 2 restantes (ANTI-PATTERNS, LAYOUTS) son manuales. **ANTI-PATTERNS.md no viene vacío**: 12 anti-patrones en dos grupos — AP-001→006 los bloquea el Architect Guard, AP-007→012 son de diseño y solo los ve `code-judge` o una persona. |
 | `templates/context/domain.md` | `context/domain.md` | Entidades del negocio, reglas de dominio, terminología específica, stakeholders. Gitignored. |
 | `templates/context/brief.md` | `context/brief.md` | Objetivo de la sesión actual (campo `last_updated`). Se actualiza al inicio de cada sesión. Gitignored. |
 | `templates/context/constraints.md` | `context/constraints.md` | Restricciones del proyecto: integraciones externas, deuda técnica aceptada, entorno, límites del cliente. Gitignored. |
@@ -25,15 +25,16 @@
 | Ruta en templates/.claude/ | Destino | Propósito |
 |---|---|---|
 | `templates/.claude/CLAUDE.md` | `.claude/CLAUDE.md` | Instrucciones del agente para el proyecto Angular. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/.claude/settings.json` | `.claude/settings.json` | Configuración de hooks para Claude Code (13 hooks cableados, incl. `harness-gate.js`). |
+| `templates/.claude/settings.json` | `.claude/settings.json` | Cableado de hooks. 7 eventos: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostCompact, Stop. 16 hooks cableados, incl. `harness-gate.js`. |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
 | `templates/.claude/author.local.json.example` | `.claude/author.local.json.example` | Plantilla del código de autor (una letra) para la capa multi-dev del SDD. Se copia a `author.local.json`, que va gitignored. |
 | `templates/.claude/commands/` | `.claude/commands/` | 11 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/assign-*` (3). |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 13 hooks de guardrails, incl. `sdd/` y `harness-gate.js` (ver tabla de hooks abajo). |
-| `templates/.claude/rules/` | `.claude/rules/` | 12 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 13 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 18 archivos: 16 cableados en settings.json (incl. `sdd/` y `harness-gate.js`), `context-enrichment-guard.js` opt-in (no cableado), y `validators/validate-file-contains.js` invocado por skills (ver tabla de hooks abajo). |
+| `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
+| `templates/.claude/rules/` | `.claude/rules/` | 15 reglas arquitectónicas path-scoped. |
+| `templates/.claude/skills/` | `.claude/skills/` | 15 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
-| `templates/.claude/tests/` | `.claude/tests/` | Contract tests de los hooks (`npm run claude:test-hooks`). 23 tests. |
+| `templates/.claude/tests/` | `.claude/tests/` | 9 archivos de tests de contrato (`node --test`, `npm run claude:test-hooks`). Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada, y `harness-gate.test.js` (11 tests del Generalization Gate). |
 
 ## Adapters de AI tools (condicional)
 
@@ -68,9 +69,10 @@
 | `templates/boilerplate/src/app/core/directives/` | `src/app/core/directives/` | 11 directivas: `animate-in`, `bento-grid-layout`, `bento-reveal` (pre-hide + reveal sin flash), `card-hover`, `click-outside`, `has-role`, `modal-overlay`, `press-feedback`, `scroll-container`, `scroll-reveal`, `search-shortcut`, `stable-width`. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/core/models/layout.model.ts` | `src/app/core/models/layout.model.ts` | Tipo `LayoutTier` (`mobile \| tablet \| desktop`), resuelto por ancho de contenedor. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/` | `src/` | Código Angular inicial: layout, auth, dashboard, shared components | Siempre en Full Scaffold |
-| `templates/boilerplate/scripts/` | `scripts/` | `indices-sync.js` (auto-indexer AST con caché incremental: genera 12 índices), `architect.js` (linter arquitectónico, 25 reglas), `check-bento-classes.js` (ARCH-21, también suelto con `npm run check:bento`), `lint-arch-wrapper.js`, `set-env.js`, `assignments-sync.js`, `assignments-audit.js`, más `package.json` que declara la carpeta como ESM. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/app/core/services/` | `src/app/core/services/` | Todos los servicios viven **planos** aquí. No hay subcarpetas: `core/services/ui/` existió por una copia mal hecha y se eliminó en 6.7. | Siempre en Full Scaffold |
+| `templates/boilerplate/scripts/` | `scripts/` | `indices-sync.js` (auto-indexer AST con caché incremental: genera 13 índices), `architect.js` (linter arquitectónico, 28 reglas — incl. `SEC-RLS-01/02/03` sobre `supabase/migrations/`), `check-bento-classes.js` (ARCH-21, también suelto con `npm run check:bento`), `lint-arch-wrapper.js`, `set-env.js`, `assignments-sync.js`, `assignments-audit.js`, más `package.json` que declara la carpeta como ESM. | Siempre en Full Scaffold |
 | `templates/boilerplate/scripts/lib/` | `scripts/lib/` | Guardrails con tests propios (`npm run lint:arch:test`): `sql-schema` (migraciones → DATABASE.md), `theme-tokens` (ARCH-11/18), `icon-registry` (ICON-01), `a11y-guardrails` (A11Y-03), `tailwind-bare-utilities` (ARCH-22 y ARCH-26, también suelto con `node scripts/lib/tailwind-bare-utilities.js`), `bento-fill-rows` (ARCH-23), `class-discipline` (ARCH-15/16/17/19/24, ratchet), `contrast-check` (ARCH-25: contraste AA en los dos temas, ratchet propio), `nav-integrity` (NAV-01: toda entrada del menú resuelve a una ruta declarada), `rule-wiring` (audita el linter a sí mismo: toda regla registrada tiene que poder fallar). **Koa se entrega sin baselines** —ni `class-discipline.baseline.json` ni `contrast.baseline.json`—: tolerancia cero. Se generan con `npm run lint:arch -- --update-ds-baseline` / `--update-contrast-baseline` si el proyecto adopta deuda a propósito. | Siempre en Full Scaffold |
-| `templates/boilerplate/src/styles/` | `src/styles/` | `tokens/_variables.scss` (4 capas + vocabulario semántico: `.kpi-value`, `.micro-label`, `.item-title`, `.section-eyebrow`, `.badge-count`), `layout/` (bento con modificadores App-like + page-shell), `motion/`, `vendors/_primeng-overrides.scss`, `_animations.scss` (fallback CSS sin JS). Todos importados desde `styles.scss`. | Siempre en Full Scaffold |
+| `templates/boilerplate/src/styles/` | `src/styles/` | `tokens/_variables.scss` (4 capas + vocabulario semántico: `.kpi-value`, `.micro-label`, `.item-title`, `.section-eyebrow`, `.badge-count`), `layout/` (bento con modificadores App-like + page-shell), `motion/`, `vendors/_primeng-overrides.scss`, `_animations.scss` (fallback CSS sin JS). Todo `.scss` bajo `styles/` **debe** estar alcanzable desde `src/styles.scss` vía `@use` — un parcial huérfano es código muerto que nadie nota. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/core/services/error-sanitizer.service.ts` | `src/app/core/services/error-sanitizer.service.ts` | Convierte errores crudos (SQLSTATE de Postgres, HTTP, Auth de Supabase) en mensajes de usuario. Nunca expone `details`/`hint`, que filtran tablas y policies RLS. | Siempre en Full Scaffold |
 | `templates/boilerplate/src/app/core/errors/global-error-handler.ts` | `src/app/core/errors/global-error-handler.ts` | `ErrorHandler` global: atrapa excepciones no manejadas y las muestra saneadas en un toast. Registrado en `app.config.ts`. | Siempre en Full Scaffold |
 | `templates/boilerplate/vitest.config.ts` | `vitest.config.ts` | Config de Vitest (reemplaza Karma) | Siempre en Full Scaffold |
@@ -82,19 +84,24 @@
 
 | Hook | Evento Claude Code | Propósito | Dependencias |
 |---|---|---|---|
-| `pre-write-guard.js` | PreToolUse (Edit/Write) | 4 capas: File Protection, Discovery Gate, Architect Guard (ARCH-01→12 + LLM-01→02), Context Injection | discovery-tracker flag, blueprint.json |
-| `discovery-tracker.js` | PostToolUse (Read) | Crea flag cuando se leen indices/ — levanta el Discovery Gate | — |
-| `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
-| `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de archivos .ts/.html/.scss via Bash | — |
-| `compact-recovery.js` | PostCompact | Re-inyecta índices tras compactación de contexto | discovery-tracker flag |
-| `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos modificados en session-writes.json | — |
-| `sync-check.js` | Stop | Verifica si los índices necesitan actualización al cerrar sesión | write-tracker JSON |
-| `context-guardian.js` | Stop | Audita frescura de context/: brief.md >7d y learnings.md >14d sin actualizar | — |
-| `harness-gate.js` | PreToolUse (Edit/Write) | Gobierna ediciones a superficies de guía (`.claude/rules/`, `indices/ANTI-PATTERNS.md`, `context/learnings.md`, `CLAUDE.md`) y a scripts de capacidad: exige principios reutilizables, no parches de un track | — |
+| `session-start.js` | SessionStart | Inyecta índices core, objetivo del brief y pendientes del último task-spec. Audita frescura del brief. **Escribe el discovery flag** | indices/, context/brief.md, task-spec |
+| `prompt-context.js` | UserPromptSubmit | Reinyecta el `## Out of scope` del brief y las casillas abiertas del spec. Dedup por contenido, refresco cada 8 prompts | context/brief.md, task-spec |
 | `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escrituras en código de producto si no hay spec activa con plan. **Fail-open**: sin carpeta `specs/` no bloquea nada | `specs/.active` |
+| `pre-write-guard.js` | PreToolUse (Edit/Write) | 4 capas: File Protection, Discovery Gate, Architect Guard (ARCH-01→12, A11Y, LLM, SEC, **SEC-RLS-01/02**), Context Injection. Incluye **Circuit Breaker** (3 bloqueos idénticos → escalar al humano) | discovery flag, blueprint.json |
+| `harness-gate.js` | PreToolUse (Edit/Write) | Generalization Gate + Placement Guard sobre el harness mismo (rules/, learnings.md, ANTI-PATTERNS.md, CLAUDE.md, scripts/) — ver HOOKS-SYSTEM.md §8 | — |
 | `sdd/plan-injector.js` | PreToolUse (Edit/Write) | Inyecta la spec + plan activos como contexto en cada edición | `specs/.active` |
+| `bash-guard.js` | PreToolUse (Bash) | Bloquea creación de fuentes via Bash (`>`, `touch`, `cp`, `mv`, `install`, `ng generate`), destructivos sobre dirs críticos, y **Approval Gate** de operaciones DB irreversibles | — |
+| `spec-diff-check.js` | PreToolUse (Bash → git commit) | Bloquea el commit si hay componentes/facades nuevos sin registrar en índices | session-writes.json |
+| `discovery-tracker.js` | PostToolUse (Read) | Crea/appendea el flag cuando se leen `indices/` o `context/` | — |
+| `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos fuente modificados en session-writes.json | — |
+| `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
+| `compact-recovery.js` | PostCompact | Re-inyecta índices (selectivo + cortado en `DETAIL:BEGIN`) y **solo las casillas pendientes** del spec | discovery flag, task-spec |
 | `sdd/hotfix-autoclose.js` | Stop | Cierra automáticamente los tracks `hotfix-*` al terminar la sesión | `specs/.active` |
+| `spec-reflection.js` | Stop | Verifica el "Criterio de done" del task-spec activo con evidencia del filesystem. Anti-bucle por estado del spec | task-spec, session-writes.json |
+| `sync-check.js` | Stop | Compara mtime de fuentes vs índices al cerrar sesión | session-writes.json |
+| `context-guardian.js` | Stop | Audita si `context/learnings.md` lleva >14d sin crecer. (La frescura del brief se auditó ya en SessionStart) | — |
 | `context-enrichment-guard.js` | — (**OPT-IN**, no cableado) | Day 0 Context Guard: bloquea escribir código si `context/domain.md` o `indices/DATABASE.md` siguen vacíos. No viene activo porque bloquearía un proyecto recién generado | `context/domain.md` |
+| `validators/validate-file-contains.js` | Invocado por skills | Validador genérico: `--directory`, `--pattern`, `--contains`, `--max-age`, `--require-file`. Lo usa `/plan` desde su frontmatter | — |
 | `post-edit.js` (scripts/) | PostToolUse (Edit/Write) | Corre Prettier automáticamente tras cada escritura | — |
 
 ## Skills en templates/.claude/skills/
@@ -131,3 +138,40 @@
 | `notifications.md` | `features/**`, `layout/**` | ToastService, nunca MessageService directo |
 | `database.md` | `supabase/**`, `core/services/**` | Migrations SQL, RLS obligatorio |
 | `layout-blueprints.md` | `src/app/features/**` | 8 arquetipos de página: hero, grid, componentes por tipo |
+| `a11y-spec.md` | `src/app/**/*.html` | Reglas de accesibilidad: aria-label en iconos de acción, caption en tablas |
+| `delegation.md` | `src/app/**/*.ts`, `.html`, `supabase/migrations/**` | Cuándo delegar en un subagente y —más importante— cuándo no. Permisos acotados de `index-syncer` y `code-judge` |
+
+## Subagentes en templates/.claude/agents/
+
+> Corren en su propia ventana de contexto y devuelven un resumen, no volcados de archivos.
+> El campo `model:` del frontmatter implementa escalation/fallback: rápido para lo
+> mecánico, razonador para juzgar.
+
+| Subagente | Devuelve | Modelo | Tools |
+|---|---|---|---|
+| `discovery-scout.md` | Qué reutilizar / qué crear / qué evitar | haiku | Read, Grep, Glob |
+| `arch-auditor.md` | `lint:arch` + `tsc` comprimidos a violaciones accionables | haiku | Bash, Read, Grep |
+| `index-syncer.md` | Diff de índices reconciliados contra el código real | haiku | Bash, Read, Edit, Write, Grep, Glob |
+| `supabase-schema.md` | Tablas, FKs y políticas RLS reales según migraciones | haiku | Read, Grep, Glob, Bash |
+| `code-judge.md` | Veredicto por criterio contra la rúbrica | opus | Read, Grep, Glob |
+
+`code-judge` **no tiene `Bash`** a propósito: recibe el diff como archivo
+(`.claude/temp/review-diff.patch`, que deja `/review`). Con shell podría escribir con
+`>` y la regla "el juez no arregla nada" dependería de su buen comportamiento.
+
+## Contratos entre piezas
+
+Dos contratos se pueden romper sin que nada avise hasta que falla en producción:
+
+**Task-spec** — lo comparten cinco piezas: la skill `/plan`, el hook de su frontmatter,
+`spec-reflection.js`, `prompt-context.js` y `compact-recovery.js`.
+- Nombre `task-spec-YYYYMMDD-HHMMSS.md` (los hooks toman el último por orden alfabético,
+  que solo coincide con el cronológico si el formato se respeta)
+- Casillas `- [ ]` / `- [x]`
+- Encabezados `##` exactos: `Objetivo`, `Artefactos afectados`, `Reglas que aplican`,
+  `Pasos de ejecucion`, `Criterio de done`
+
+**Discovery flag** — `$TMPDIR/koa-discovery-{sessionId}.flag`. Lo escriben
+`discovery-tracker.js` y `session-start.js`; lo leen el Discovery Gate de
+`pre-write-guard.js` y `compact-recovery.js`. Cada línea debe seguir conteniendo
+`indices/NOMBRE.md`: `compact-recovery.js` parsea eso para decidir qué re-inyectar.

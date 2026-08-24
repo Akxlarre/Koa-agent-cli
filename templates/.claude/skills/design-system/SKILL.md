@@ -127,6 +127,12 @@ Reglas GSAP:
 
 Para usar un ícono adicional: importarlo de `'lucide-angular'` con PascalCase y agregarlo al objeto `provideIcons()` en `app.config.ts`. Referencia completa: lucide.dev/icons
 
+<a id="icon-01"></a>
+**ICON-01** (`npm run lint:arch`): compara los íconos usados en templates contra los
+registrados en `provideIcons()`. Uno usado y no registrado **no rompe el build** —
+Angular compila sin quejarse y lucide-angular lanza recién en **runtime**, al renderizar
+ese `<app-icon>` por primera vez. El linter lo atrapa antes de que llegue a producción.
+
 ## Utilidades Semánticas — Nuevos Constructos
 
 ### KPI — Componente (OBLIGATORIO usar app-kpi-card)

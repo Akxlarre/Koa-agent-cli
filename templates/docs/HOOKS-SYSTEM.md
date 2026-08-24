@@ -1,4 +1,4 @@
-# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.1)
+# Sistema de Hooks — Guardrails Automáticos (Koa Blueprint v6.9)
 
 > Este documento explica cómo el sistema de hooks convierte las reglas arquitectónicas
 > en **constraints** reales que Claude no puede ignorar.
@@ -50,6 +50,39 @@ Claude recibe un prompt del humano
 
 ## Hooks Activos
 
+### 0. Session Start (`session-start.js`) y Prompt Context (`prompt-context.js`)
+
+Los dos primeros hooks del ciclo. Existen para volver **proactivo** lo que antes
+era reactivo.
+
+Antes: el agente arrancaba a ciegas, intentaba escribir, el Discovery Gate lo
+bloqueaba y recién ahí leía los índices. El bloqueo funcionaba, pero costaba una
+ronda entera y llegaba después de que el agente ya había decidido qué hacer.
+
+| Hook | Evento | Qué inyecta |
+|---|---|---|
+| `session-start.js` | SessionStart | Índices core (Quick Reference), objetivo de `context/brief.md`, pendientes del último task-spec |
+| `prompt-context.js` | UserPromptSubmit | El "Out of scope" del brief y las casillas abiertas del spec |
+
+**Session Start levanta el Discovery Gate.** Escribe el mismo flag que
+`discovery-tracker.js`, marcado como `SESSION-START`. Es deliberado: si el agente
+ya tiene los índices en contexto, bloquearlo por "no haberlos leído" sería falso —
+la condición que el Gate protege está satisfecha. Si no hay índices que inyectar,
+el flag no se escribe y el Gate sigue activo como red de seguridad.
+
+**Prompt Context no repite lo de Session Start.** Corre en *cada* prompt, así que
+reinyectar 2 KB de índices por turno sería la forma más cara posible de no aportar
+nada. Solo lleva lo que se degrada dentro de una misma sesión: la restricción de
+alcance (lo primero que el agente olvida, porque nada en la conversación se la
+repite) y dónde iba el trabajo.
+
+Con dedup: un bloque se reinyecta solo si su contenido cambió, o cada 8 prompts.
+Un recordatorio que aparece en todos los turnos deja de leerse.
+
+**Frescura del brief:** se audita en Session Start, no en el Stop hook. Avisar al
+cerrar que el brief estaba viejo llega después de que el agente ya codeó contra el
+objetivo equivocado.
+
 ### 1. Pre-Write Guard (`pre-write-guard.js`)
 - **Evento**: PreToolUse
 - **Matcher**: `Edit|Write|MultiEdit`
@@ -77,6 +110,8 @@ Claude recibe un prompt del humano
 | No Facade en Dumb comp. | shared/.component.ts | Dumb components no inyectan Facades |
 | Naming de migraciones | supabase/migrations/ | Formato: YYYYMMDDHHMMSS_dominio_tipo_desc.sql |
 | RLS obligatorio | .sql con CREATE TABLE | Toda tabla nueva debe tener RLS activado |
+| `SEC-RLS-01` | .sql con CREATE TABLE | RLS activado sin ninguna `CREATE POLICY` — la tabla queda inaccesible |
+| `SEC-RLS-02` | .sql con CREATE POLICY | `USING (true)` / `WITH CHECK (true)` en ALL/INSERT/UPDATE/DELETE. Permitido en FOR SELECT |
 
 ### Hooks del harness y del SDD
 
@@ -114,16 +149,43 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 ### 3. Bash Guard (`bash-guard.js`)
 - **Evento**: PreToolUse
 - **Matcher**: `Bash`
-- **Función**: Bloquea dos patrones peligrosos:
-  - Creación de archivos `.ts/.html/.scss/.sql` via Bash (debe usar Edit/Write)
-  - Operaciones destructivas (`rm -rf`) sobre directorios críticos
+- **Función**: Tres capas:
+  - **Creación de archivos fuente** — `.ts/.html/.scss/.sql` via Bash queda bloqueado
+    (debe usar Edit/Write). Cubre redirecciones (`>`, `cat`, `tee`), creación directa
+    (`touch`, `cp`, `mv`) y generadores (`ng generate`). Todos esos caminos escriben
+    código a disco **sin que el Architect Guard llegue a ver el contenido**.
+  - **Operaciones destructivas** — `rm -rf` sobre directorios críticos.
+  - **Approval Gate de base de datos** — ver abajo.
+
+#### Approval Gate (dentro de bash-guard)
+
+Las capas anteriores protegen el filesystem, que es recuperable con git.
+Una migración aplicada contra una base remota no lo es.
+
+| Comando | Por qué necesita un humano |
+|---|---|
+| `supabase db push` | Ejecuta DDL sin rollback automático |
+| `supabase db reset` | Borra todos los datos |
+| `supabase migration repair` | Reescribe el historial de migraciones |
+| `supabase link` | Define contra qué base apuntan los comandos siguientes |
+| `psql … DROP/TRUNCATE/DELETE/ALTER` | Cambios de esquema fuera de migraciones versionadas |
+
+El agente **sí** escribe la migración en `supabase/migrations/`. Lo que no hace es
+aplicarla: informa el comando exacto y espera. `supabase start`, `migration new` y
+`gen types` no se ven afectados.
 
 ### 4. Compact Recovery (`compact-recovery.js`)
 - **Evento**: PostCompact
 - **Matcher**: ninguno (se ejecuta en cada compactación)
-- **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contenido
-  de todos los archivos `indices/*.md` al contexto. Claude nunca pierde la memoria
-  de lo que existe en el proyecto.
+- **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contexto
+  que el agente estaba usando. Tres decisiones de diseño:
+  - **Selectiva** — solo los índices que el agente había leído (más los 3 core),
+    según el flag de discovery. No los 11.
+  - **Parcial** — corta cada índice en `<!-- DETAIL:BEGIN -->`: vuelve la Quick
+    Reference, no los ejemplos de código.
+  - **Solo lo pendiente** — del task-spec activo re-inyecta únicamente las casillas
+    `- [ ]`. Lo ya completado se descarta a propósito (Context Offloading): el agente
+    necesita saber qué le falta, no qué ya hizo.
 
 ### 5. Failure Tracker (`failure-tracker.js`)
 - **Evento**: PostToolUseFailure
@@ -142,12 +204,50 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
   componentes/servicios nuevos sin actualizar los índices. Si detecta drift,
   fuerza a Claude a continuar y actualizar los índices.
 
-### 7. Prettier (post-edit.js)
+### 7. Circuit Breaker (dentro de `pre-write-guard.js`)
+- **Evento**: PreToolUse (Edit|Write|MultiEdit)
+- **Función**: Un `exit 2` es un "no" sin memoria — el agente puede reintentar la
+  misma escritura indefinidamente. El breaker cuenta bloqueos por `{archivo, violación}`
+  en un estado de sesión (`$TMPDIR/koa-breaker-{sessionId}.json`):
+
+  | Intento | Qué recibe el agente |
+  |---|---|
+  | 1º | Violación + cómo corregirla |
+  | 2º | Lo mismo + aviso de que va 2/3 |
+  | 3º | **STOP**: deja de explicar el arreglo y le ordena escalar al humano |
+
+  El mensaje del 3º intento cierra explícitamente las vías de escape (Bash, renombrar
+  el archivo, trocear el cambio) porque son los rodeos que un agente bloqueado intenta.
+
+  Cuenta por la **primera** violación, no por la lista completa: el agente suele
+  arreglar una y dejar otra, con lo que el conjunto cambia en cada intento aunque el
+  problema de fondo sea el mismo.
+
+### 8. Spec Reflection (`spec-reflection.js`)
+- **Evento**: Stop
+- **Función**: `/plan` genera un task-spec con un "Criterio de done" en casillas
+  markdown. Hasta v6.4 nadie las verificaba nunca — el spec era write-only. Este hook
+  lee el spec activo al terminar la respuesta y devuelve los puntos sin cerrar, más
+  evidencia del filesystem sobre los que puede comprobar solo (p.ej. si los fuentes
+  son más recientes que los índices, la casilla de índices no está cumplida de verdad).
+
+  **No re-evalúa el código** — eso es `/review` + `code-judge`. Solo comprueba que lo
+  que el agente declaró que iba a hacer, lo hizo.
+
+  **Anti-bucle**: el mismo estado del spec no se reporta dos veces. Sin eso el agente
+  responde, el hook lo frena, vuelve a responder y el hook lo frena otra vez con lo
+  mismo. Si el spec avanza (o retrocede), el aviso vuelve a salir.
+
+  Si el spec no tiene **ninguna** casilla marcada, el hook calla: el agente no está
+  usando el flujo del task-spec y no tiene sentido reclamarle pendientes de un
+  documento que no adoptó.
+
+### 9. Prettier (post-edit.js)
 - **Evento**: PostToolUse
 - **Matcher**: `Edit|Write|MultiEdit`
 - **Función**: Formatea automáticamente con Prettier cada archivo editado.
 
-### 8. Harness Gate (`harness-gate.js`)
+### 10. Harness Gate (`harness-gate.js`)
 - **Evento**: PreToolUse
 - **Matcher**: `Edit|Write|MultiEdit`
 - **Función**: Gobierna las ediciones al harness mismo (no al código de la app). Se activa
@@ -177,7 +277,7 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 
 ## Linter Arquitectónico Completo (`architect.js` v2.0)
 
-El linter AST se ejecuta con `npm run lint:arch` y valida **25 reglas**.
+El linter AST se ejecuta con `npm run lint:arch` y valida **28 reglas**.
 
 Analiza los `.ts`, los `.scss` y **los templates `template:` inline**, no solo los
 `.html`: el boilerplate no tiene un solo archivo `.html`, así que sin eso las reglas
@@ -234,6 +334,30 @@ tolerancia cero.
 | NAV-01 | Entrada del menú que no resuelve a ninguna ruta de `app.routes.ts`. El usuario hace clic y cae en el not-found, y nada en el build lo delata. Koa mismo nacía con una: `/app/settings` estaba en el menú sin existir como ruta |
 
 Los guardrails viven en `scripts/lib/` con sus propios tests: `npm run lint:arch:test`.
+
+**Seguridad de datos (RLS), sobre el estado acumulado de `supabase/migrations/`:**
+
+| Regla | Qué detecta | Método |
+|---|---|---|
+| SEC-RLS-01 | Tabla con RLS activado pero **ninguna** `CREATE POLICY` en todas las migraciones juntas | Agregado entre todas las migraciones |
+| SEC-RLS-02 | Política permisiva (`USING (true)` / `WITH CHECK (true)`) en `FOR ALL/INSERT/UPDATE/DELETE` (o sin cláusula `FOR`, que Postgres interpreta como `ALL`) | Regex por sentencia `CREATE POLICY` |
+| SEC-RLS-03 | Tabla creada sin `ENABLE ROW LEVEL SECURITY` en ninguna migración | Agregado entre todas las migraciones |
+
+### RLS: por qué el hook y el linter no son redundantes
+
+Es el único caso donde los dos miran lo mismo con criterios distintos, y es a propósito:
+
+- **El hook** (`pre-write-guard.js`, ARCH Guard) ve un archivo en el momento de escribirlo.
+  Exige el par tabla+política **juntos**, que es la convención del blueprint (sus propias
+  migraciones lo hacen así).
+- **El linter** ve todas las migraciones a la vez. Reconstruye el esquema acumulado y
+  detecta el agujero real: una tabla que, sumadas todas las migraciones, sigue sin
+  políticas. Una tabla creada en la migración 3 con políticas en la 7 le parece bien al
+  hook (cada archivo por separado está OK), pero deja la tabla inaccesible entre medio.
+
+Por eso el linter es más permisivo en un eje y más completo en el otro. Ninguno de los
+dos solo alcanza: el hook no puede ver los otros archivos, y el linter corre después de
+que el código ya se escribió.
 
 ### La invariante: toda regla registrada tiene que poder fallar
 
@@ -310,3 +434,89 @@ Envuelve los `echo` en `if [[ $- == *i* ]]; then ... fi`.
 ### "Quiero editar un archivo protegido"
 Los archivos del sistema de hooks están protegidos contra edición por Claude.
 Edítalos manualmente en tu editor de texto.
+
+---
+
+## Subagentes (`.claude/agents/`)
+
+Los hooks restringen al agente. Los subagentes le dan **presupuesto de contexto**:
+corren en su propia ventana y devuelven un resumen en vez de volcar archivos.
+
+| Subagente | Devuelve | Modelo | Puede escribir |
+|---|---|---|---|
+| `discovery-scout` | Qué reutilizar / qué crear / qué evitar | rápido | no |
+| `arch-auditor` | Violaciones de `lint:arch` + `tsc`, comprimidas | rápido | no |
+| `index-syncer` | Diff de índices actualizados | rápido | solo `indices/` |
+| `supabase-schema` | Tablas, FKs y políticas RLS reales | rápido | no |
+| `code-judge` | Veredicto por criterio contra la rúbrica | razonador | no |
+
+### Por qué el juez usa un modelo más caro
+
+`code-judge` corre con un modelo de razonamiento mientras el resto usa uno rápido.
+Un evaluador que razona igual que el generador no detecta los errores del generador —
+comparte sus puntos ciegos. El resto de subagentes hacen tareas mecánicas (correr un
+comando, comparar dos listas) donde un modelo rápido rinde igual y cuesta menos.
+
+### Qué cubre el juez que los hooks no
+
+Los guardrails detectan **sintaxis**: `*ngIf`, `@Input()`, colores hardcodeados, falta
+de `OnPush`. Todo eso es regex y AST, y se atrapa solo.
+
+Lo que ningún hook atrapa es el **diseño**: una facade que no respeta su contrato, un
+Repository saltado, un Smart component disfrazado de Dumb, un nombre que contradice
+`context/domain.md`. Para eso hace falta un modelo leyendo la rúbrica, y por eso
+`/review` existe además de `npm run lint:arch`.
+
+---
+
+## Validadores genéricos (`.claude/hooks/validators/`)
+
+A diferencia del resto de los hooks, `validate-file-contains.js` no sabe nada del
+proyecto: recibe qué buscar por flags. Un validador, muchos usos.
+
+```bash
+node .claude/hooks/validators/validate-file-contains.js \
+  --directory .claude/temp \
+  --pattern "task-spec-*.md" \
+  --max-age 60 \
+  --require-file \
+  --contains "## Objetivo" \
+  --contains "## Criterio de done"
+```
+
+| Flag | Qué hace |
+|---|---|
+| `--directory` | Dónde buscar (relativo a la raíz del proyecto). Requerido. |
+| `--pattern` | Glob simple sobre el nombre (`*`, `?`). Default `*.md` |
+| `--contains` | Substring requerido. Repetible. |
+| `--max-age` | Solo archivos modificados en los últimos N minutos |
+| `--require-file` | Fallar si no existe ningún archivo que coincida |
+
+Sin `--require-file`, "no hay archivo" significa "nada que validar" y sale con 0.
+Mal configurado (sin `--contains`) tampoco bloquea: un validador roto no debe
+frenar al agente.
+
+### Hooks declarados en el frontmatter de una skill
+
+Las skills pueden declarar sus propios hooks, que corren solo mientras esa skill
+está activa. `/plan` lo usa para validar su propia salida:
+
+```yaml
+---
+name: plan
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory .claude/temp --pattern "task-spec-*.md"
+            --require-file --contains "## Objetivo" --contains "## Criterio de done"
+---
+```
+
+Por qué importa: pedirle a un agente en prosa que "genere un archivo con estas
+secciones" es una *guideline*, y las guidelines se ignoran bajo presión de
+contexto. Esto la convierte en *guardrail*. Y los encabezados no son decorativos —
+`spec-reflection.js`, `prompt-context.js` y `compact-recovery.js` los leen por
+nombre, así que renombrarlos en `/plan` rompe tres hooks.

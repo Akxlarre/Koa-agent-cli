@@ -21,6 +21,7 @@ El Architect Guard valida estos contratos automáticamente en cada escritura.
 - **PROHIBIDO**: `<p-table [value]="datos()">`  
 - **OBLIGATORIO**: `<p-table [value]="datos()" [attr.aria-label]="'Tabla de usuarios'">` o con `<ng-template pTemplate="caption">`
 
+<a id="a11y-03"></a>
 ### A11Y-03 — botones de solo icono requieren aria-label
 - **PROHIBIDO**: `<button (click)="borrar()"><app-icon name="trash" /></button>`  
 - **OBLIGATORIO**: `<button (click)="borrar()" aria-label="Eliminar registro"><app-icon name="trash" /></button>`

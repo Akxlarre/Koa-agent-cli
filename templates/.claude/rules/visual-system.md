@@ -90,6 +90,53 @@ Combinar con `.card-tinted` para máximo contraste visual en KPIs.
 > `.section-eyebrow` (`text-sm`, natural, `text-secondary`): la primera etiqueta un dato, la
 > segunda da contexto legible antes de un título.
 
+## Disciplina de clases y tokens del Design System — ARCH-11, 15–19, 22
+
+Siete reglas del linter (`npm run lint:arch`) que no tienen sección propia todavía; se
+documentan acá juntas porque comparten el mismo mecanismo: recomponer a mano algo que el
+Design System ya resuelve.
+
+<a id="arch-15"></a>
+**ARCH-15 — Pill/badge ad-hoc.** Usa el componente de badge del proyecto en vez de
+recomponer `rounded-full` + micro-texto + `px-` a mano.
+
+<a id="arch-16"></a>
+**ARCH-16 — Utilities de tamaño pisando un `.btn-*`.** No pises el tamaño de un `.btn-*`
+con `px-`/`py-`/`text-*`/`rounded-*`. Si hace falta otra medida, es una variante del DS,
+no un parche por encima.
+
+<a id="arch-17"></a>
+**ARCH-17 — Tamaño de fuente arbitrario.** Reemplaza `text-[NNpx]` por un token de la
+escala tipográfica — ver "Vocabulario tipográfico" arriba.
+
+<a id="arch-19"></a>
+**ARCH-19 — Cluster tipográfico ad-hoc.** Usa `.micro-label` / `.item-title` /
+`.section-eyebrow` / `.kpi-value` en vez de recomponer el cluster de utilities
+(`text-xs uppercase tracking-* text-muted`, etc.) cada vez.
+
+Estas tres (ARCH-15/16/17/19) usan un **ratchet**: `scripts/lib/class-discipline.baseline.json`
+registra la deuda tolerada por archivo y solo reporta una **regresión** (un archivo que
+supera su cuota). El proyecto solo puede mejorar. Koa arranca **sin baseline**, es decir con
+tolerancia cero — se genera con `npm run lint:arch -- --update-ds-baseline` si el proyecto
+adopta deuda a propósito.
+
+<a id="arch-11"></a>
+**ARCH-11 — Clases de token muertas.** La clase no existe en `@theme` (`src/tailwind.css`):
+Tailwind no genera CSS para ella y el estilo simplemente no aplica, sin error visible. Usa
+un token real o agrégalo al `@theme`.
+
+<a id="arch-18"></a>
+**ARCH-18 — Alias prohibidos dentro del propio `@theme`.** Un alias "pelado" en `@theme`
+colisiona con utilidades nativas de Tailwind. Renombra el token.
+
+<a id="arch-22"></a>
+**ARCH-22 — Clase del DS que colisiona con una utilidad "pelada" de Tailwind.** Si
+nombrás una clase del design system igual que una utilidad nativa (`.truncate`,
+`.overline`, …), Tailwind genera su propia regla homónima en `@layer utilities` y **se
+suma** a la tuya en vez de reemplazarla — el síntoma es un estilo extra que aparece de la
+nada. Renombra la clase del design system.
+
+<a id="arch-24"></a>
 ## Vocabulario de campos (OBLIGATORIO) — ARCH-24
 
 Un input tiene borde, fondo, padding y radio. Escritos como utilities son catorce clases que hay
@@ -116,6 +163,7 @@ que repetir idénticas en cada campo de la app, y no lo van a ser.
 como el resto de la disciplina de clases: la deuda existente se tolera vía baseline, una nueva es
 regresión.
 
+<a id="arch-25"></a>
 ## El contraste no se hereda del token — ARCH-25
 
 Que un token exista en los dos temas **no significa que se pueda leer**. Un par texto/fondo
@@ -128,6 +176,7 @@ válido en claro puede quedar en 2.1:1 en oscuro y nadie lo nota hasta que un us
 - Al agregar un par texto/fondo nuevo al DS, agregarlo también a `PARES_CANONICOS`. Un par que
   nadie mide es un par que nadie garantiza.
 
+<a id="arch-26"></a>
 ## Nombrar tokens del `@theme` — ARCH-26
 
 La colisión con utilities bare (`.overline`) tiene un gemelo del lado del `@theme`, y es peor.
@@ -178,7 +227,7 @@ scrollea mal**. App-like OBLIGA a los dos juntos:
 | `.bento-grid--hero-fit` | La 1ª fila se ajusta a su contenido (hero slim sin hueco debajo). |
 | `.bento-grid--rows-fit` | TODAS las filas se ajustan. Solo para grids de puros `.bento-banner`. |
 
-- **Toda celda hija de un grid fill-screen debe ocupar UNA sola fila.** Los modificadores
+- <a id="arch-23"></a>**Toda celda hija de un grid fill-screen debe ocupar UNA sola fila.** Los modificadores
   definen un `grid-template-rows` explícito; si una celda pide 2 filas, el template se
   desborda, el grid crea filas implícitas y **las celdas se superponen**. `.bento-hero`,
   `.bento-feature` y `.bento-tall` ocupan 2 filas → **no sirven acá**. Usar `.bento-banner`

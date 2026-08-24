@@ -8,43 +8,73 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { execSync, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const HOOK = path.resolve(__dirname, '..', 'hooks', 'pre-write-guard.js');
 
-// El Discovery Gate corre ANTES que el Architect Guard y bloquea toda escritura
-// mientras no exista el flag de discovery de la sesión. Sin levantarlo, cada test
-// del Architect Guard recibiría el mensaje del Discovery Gate en vez del esperado.
-// Usamos una sesión fija por corrida y creamos su flag una sola vez.
-const TEST_SESSION_ID = 'koa-test-session';
-
-function seedDiscoveryFlag() {
-  const flagPath = path.join(os.tmpdir(), `koa-discovery-${TEST_SESSION_ID}.flag`);
-  fs.writeFileSync(flagPath, 'indices/COMPONENTS.md\n');
-  return flagPath;
-}
-
-seedDiscoveryFlag();
+let sessionCounter = 0;
 
 /**
  * Ejecuta el hook con un TOOL_INPUT simulado.
+ *
+ * Cada llamada usa un CLAUDE_SESSION_ID unico para que el dedup de Context
+ * Injection y el Circuit Breaker no arrastren estado entre tests.
+ *
+ * Por defecto se pre-crea el flag de descubrimiento: las capas del hook corren
+ * en orden y el Discovery Gate (capa 2) bloquearia antes de llegar al Architect
+ * Guard (capa 3), haciendo intesteable todo lo que va despues. Los tests que
+ * quieren verificar el Gate en si pasan { discovered: false }.
+ *
  * @param {object} input - { tool_name, tool_input: { file_path, content|new_string } }
- * @returns {{ exitCode: number, stdout: string, stderr: string }}
+ * @param {{ discovered?: boolean }} [opts]
+ * @returns {{ exitCode: number, stdout: string, stderr: string, sessionId: string }}
  */
-function runHook(input) {
+function runHook(input, opts = {}) {
+  const { discovered = true } = opts;
+  const sessionId = `test-session-${Date.now()}-${sessionCounter++}`;
+
+  if (discovered) {
+    const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
+    fs.writeFileSync(flagPath, `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`);
+  }
+
   const result = spawnSync('node', [HOOK], {
     input: JSON.stringify(input),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: TEST_SESSION_ID }
+    env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
   });
   return {
     exitCode: result.status,
     stdout: result.stdout || '',
-    stderr: result.stderr || ''
+    stderr: result.stderr || '',
+    sessionId
   };
+}
+
+/**
+ * Ejecuta el hook N veces reusando la MISMA sesion — necesario para probar
+ * el Circuit Breaker, que cuenta bloqueos identicos por sesion.
+ */
+function runHookRepeated(input, times) {
+  const sessionId = `test-breaker-${Date.now()}-${sessionCounter++}`;
+  fs.writeFileSync(
+    path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`),
+    `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`
+  );
+
+  const runs = [];
+  for (let i = 0; i < times; i++) {
+    const result = spawnSync('node', [HOOK], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
+    });
+    runs.push({ exitCode: result.status, stderr: result.stderr || '' });
+  }
+  return runs;
 }
 
 function makeInput(filePath, content, toolName = 'Write') {
@@ -156,11 +186,15 @@ describe('ARCHITECT GUARD — SQL', () => {
     assert.ok(r.stderr.includes('RLS') || r.stderr.includes('ROW LEVEL SECURITY'));
   });
 
-  test('permite CREATE TABLE con RLS', () => {
+  test('permite CREATE TABLE con RLS y politica', () => {
+    // Desde SEC-RLS-01, activar RLS ya no alcanza: una tabla con RLS y cero
+    // politicas queda inaccesible. El contrato ahora es tabla + RLS + politica.
     const r = runHook(makeInput(migrationPath,
-      'CREATE TABLE public.users (id uuid PRIMARY KEY);\nALTER TABLE public.users ENABLE ROW LEVEL SECURITY;'
+      'CREATE TABLE public.users (id uuid PRIMARY KEY);\n' +
+      'ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;\n' +
+      'CREATE POLICY "users_select_own" ON public.users FOR SELECT USING (auth.uid() = id);'
     ));
-    assert.ok(r.exitCode !== 2 || !r.stderr.includes('RLS'));
+    assert.notEqual(r.exitCode, 2);
   });
 });
 
@@ -172,5 +206,149 @@ describe('ARCHITECT GUARD — ARCH-11', () => {
     ));
     assert.equal(r.exitCode, 2);
     assert.ok(r.stderr.includes('ARCH-11') || r.stderr.includes('AUTO-GENERADO'));
+  });
+});
+
+// ─── CIRCUIT BREAKER tests ────────────────────────────────────────────────
+describe('CIRCUIT BREAKER', () => {
+  const htmlPath = '/project/src/app/features/dashboard/dashboard.component.html';
+  const badContent = '<div *ngIf="cond">x</div>';
+
+  test('avisa del contador a partir del 2do intento identico', () => {
+    const runs = runHookRepeated(makeInput(htmlPath, badContent), 2);
+    assert.equal(runs[0].exitCode, 2);
+    assert.ok(!runs[0].stderr.includes('Intento'), 'el 1er intento no debe mencionar contador');
+    assert.ok(runs[1].stderr.includes('Intento 2/3'));
+  });
+
+  test('escala a CIRCUIT BREAKER al 3er intento identico', () => {
+    const runs = runHookRepeated(makeInput(htmlPath, badContent), 3);
+    assert.equal(runs[2].exitCode, 2);
+    assert.ok(runs[2].stderr.includes('CIRCUIT BREAKER'));
+    assert.ok(runs[2].stderr.includes('DETENTE'));
+  });
+
+  test('el contador es por sesion — otra sesion arranca limpia', () => {
+    runHookRepeated(makeInput(htmlPath, badContent), 3);
+    const fresh = runHook(makeInput(htmlPath, badContent));
+    assert.equal(fresh.exitCode, 2);
+    assert.ok(!fresh.stderr.includes('CIRCUIT BREAKER'));
+  });
+
+  test('no escala si el codigo es valido (no hay bloqueo que contar)', () => {
+    const runs = runHookRepeated(
+      makeInput(htmlPath, '@if (cond) { <div>x</div> }'),
+      3
+    );
+    assert.ok(runs.every(r => r.exitCode !== 2));
+  });
+});
+
+// ─── DISCOVERY GATE tests ─────────────────────────────────────────────────
+describe('DISCOVERY GATE', () => {
+  const featurePath = '/project/src/app/features/dashboard/dashboard.component.ts';
+
+  test('bloquea escritura en src/app sin haber leido indices', () => {
+    const r = runHook(makeInput(featurePath, 'export class X {}'), { discovered: false });
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('DISCOVERY GATE'));
+  });
+
+  test('permite pasar del Gate una vez leidos los indices', () => {
+    const r = runHook(makeInput(featurePath, 'export class X {}'), { discovered: true });
+    assert.ok(!r.stderr.includes('DISCOVERY GATE'));
+  });
+});
+
+// ─── RLS / migraciones SQL ────────────────────────────────────────────────
+describe('ARCHITECT GUARD — RLS en migraciones', () => {
+  const mig = '/project/supabase/migrations/20250101000000_pedidos_create.sql';
+  const table = 'CREATE TABLE public.pedidos (id uuid);\n';
+  const rls = 'ALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;\n';
+
+  test('bloquea CREATE TABLE sin RLS', () => {
+    const r = runHook(makeInput(mig, table));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('ROW LEVEL SECURITY'));
+  });
+
+  test('[SEC-RLS-01] bloquea RLS activado sin ninguna politica', () => {
+    const r = runHook(makeInput(mig, table + rls));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('SEC-RLS-01'));
+    assert.ok(r.stderr.includes('inaccesible'), 'debe explicar que el efecto es denegar todo');
+  });
+
+  test('permite tabla con RLS y politica acotada', () => {
+    const sql = table + rls +
+      'CREATE POLICY "pedidos_select_own" ON public.pedidos FOR SELECT USING (auth.uid() = user_id);\n';
+    const r = runHook(makeInput(mig, sql));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('acepta CREATE POLICY IF NOT EXISTS (forma usada por el blueprint)', () => {
+    const sql = table + rls +
+      'CREATE POLICY IF NOT EXISTS "p" ON public.pedidos FOR SELECT USING (auth.uid() = user_id);\n';
+    const r = runHook(makeInput(mig, sql));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('no exige politicas en una migracion que no crea tablas', () => {
+    // Agregar politicas a una tabla existente es un cambio valido por si solo.
+    const r = runHook(makeInput(
+      '/project/supabase/migrations/20250101000001_pedidos_rls.sql',
+      'CREATE POLICY "p2" ON public.pedidos FOR SELECT USING (auth.uid() = user_id);\n',
+    ));
+    assert.notEqual(r.exitCode, 2);
+  });
+});
+
+describe('ARCHITECT GUARD — politicas RLS permisivas', () => {
+  const mig = '/project/supabase/migrations/20250101000000_pedidos_create.sql';
+  const base = 'CREATE TABLE public.pedidos (id uuid);\nALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;\n';
+
+  const blocked = ['ALL', 'UPDATE', 'DELETE', 'INSERT'];
+  for (const cmd of blocked) {
+    test(`[SEC-RLS-02] bloquea FOR ${cmd} con USING (true)`, () => {
+      const r = runHook(makeInput(mig, base + `CREATE POLICY "p" ON public.pedidos FOR ${cmd} USING (true);\n`));
+      assert.equal(r.exitCode, 2);
+      assert.ok(r.stderr.includes('SEC-RLS-02'));
+      assert.ok(r.stderr.includes(`FOR ${cmd}`));
+    });
+  }
+
+  test('permite FOR SELECT con USING (true) — tabla de catalogo publica', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos FOR SELECT USING (true);\n'));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('bloquea una politica sin clausula FOR (Postgres asume ALL)', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos USING (true);\n'));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('SEC-RLS-02'));
+  });
+
+  test('permite WITH CHECK (false) — insercion solo via trigger', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos FOR INSERT WITH CHECK (false);\n'));
+    assert.notEqual(r.exitCode, 2);
+  });
+
+  test('bloquea WITH CHECK (true) en una escritura', () => {
+    const r = runHook(makeInput(mig, base + 'CREATE POLICY "p" ON public.pedidos FOR INSERT WITH CHECK (true);\n'));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('SEC-RLS-02'));
+  });
+
+  test('las migraciones que envia el blueprint pasan el guard', () => {
+    // Regresion: si un check nuevo rompe las migraciones propias, el proyecto
+    // generado arranca bloqueado.
+    const migDir = path.resolve(__dirname, '..', '..', 'supabase', 'migrations');
+    const files = fs.readdirSync(migDir).filter(f => f.endsWith('.sql'));
+    assert.ok(files.length > 0, 'deberia haber migraciones que verificar');
+    for (const f of files) {
+      const sql = fs.readFileSync(path.join(migDir, f), 'utf-8');
+      const r = runHook(makeInput(`/project/supabase/migrations/${f}`, sql));
+      assert.notEqual(r.exitCode, 2, `${f} quedo bloqueada: ${r.stderr}`);
+    }
   });
 });

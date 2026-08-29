@@ -5,7 +5,8 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: 0/53 · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
+**Progreso** — Nivel A: **5/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
+**Hallazgos abiertos** — 16: **3 `S1`**, 7 `S2`, 6 `S3`. Ver `HALLAZGOS.md`.
 
 ---
 
@@ -18,11 +19,20 @@
 
 | | ID | Unidad | Formato | Productores | Consumidores |
 |---|---|---|---|---|---|
-| · | `C-01` | Discovery flag | `$TMPDIR/koa-discovery-{sessionId}.flag` | `discovery-tracker`, `session-start` | `pre-write-guard`, `compact-recovery` |
-| · | `C-02` | Session writes | `.claude/temp/session-writes.json` | `write-tracker` | `sync-check`, `spec-diff-check`, `spec-reflection`, `index-syncer` |
-| · | `C-03` | Task-spec | `task-spec-YYYYMMDD-HHMMSS.md` | skill `/plan` | `spec-reflection`, `prompt-context`, `compact-recovery`, `validate-file-contains` |
-| · | `C-04` | Marcadores auto-generados | `<!-- AUTO-GENERATED:BEGIN/END -->` | `indices-sync`, `assignments-sync` | todo editor manual de índices |
-| · | `C-05` | Blueprint | `blueprint.json` | `lib/scaffolder`, Wikiflow | `lib/preflight`, `lib/generator`, `pre-write-guard` |
+| ! | `C-01` | Discovery flag | `$TMPDIR/koa-discovery-{sessionId}.flag` | `discovery-tracker`, `session-start` | `pre-write-guard`, `compact-recovery` |
+| ! | `C-02` | Session writes | `.claude/temp/session-writes.json` | `write-tracker` | `sync-check`, `spec-diff-check`, `spec-reflection`, `index-syncer` |
+| ✓ | `C-03` | Task-spec | `task-spec-YYYYMMDD-HHMMSS.md` | skill `/plan` | `spec-reflection`, `prompt-context`, `compact-recovery`, `validate-file-contains` |
+| ✓ | `C-04` | Marcadores auto-generados | `<!-- AUTO-GENERATED:BEGIN/END -->` | `indices-sync`, `assignments-sync` | todo editor manual de índices |
+| ! | `C-05` | Blueprint | `blueprint.json` | `lib/scaffolder`, Wikiflow | `lib/preflight`, `lib/generator`, `pre-write-guard` |
+
+> **Bloque cerrado — 2026-08-29.** Fichas en `fichas/C-0*.md`. 16 hallazgos, 3 de ellos
+> `S1`. El más grave: `DEC-001` — `spec-diff-check.js` nunca bloqueó un commit porque lee
+> el payload de una variable de entorno que nadie setea. Tres contratos quedaron marcados
+> `!` (cerrados con hallazgo grave) y dos `✓`.
+>
+> **Deuda de esta ronda:** el campo 4 de `C-04` se verificó por inspección y no por
+> ejecución (`indices-sync.js` necesita `node_modules`, ausente en el entorno). Cerrar en
+> `S-03`. Lo mismo con `test/scaffolder.test.mjs` para `C-05` → cerrar en `G-06`.
 
 **Preguntas propias del bloque** (además de la ficha A):
 - ¿El formato está declarado en `.claude/rules/templates-contract.md`? ¿Completo?

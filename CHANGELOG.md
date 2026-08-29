@@ -6,6 +6,55 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [7.1.0] — 2026-08-29
+
+Continúa donde quedó 6.9.0. Aquel cierre puso guardrails deterministas sobre RLS
+(`SEC-RLS-01/02/03`), que atrapan la política **ausente** o **obviamente abierta**.
+Quedaba fuera la política **presente, acotada y aun así explotable** — y esa no la
+ve ningún regex.
+
+### Added
+- **Subagente `security-judge`** (`.claude/agents/security-judge.md`, opus, sin
+  `Bash`). Audita el diff con una sola pregunta: *¿cómo rompo esto?* Rúbrica de
+  ocho criterios sobre el terreno que los checks deterministas no pisan:
+  `UPDATE` con `USING` correcto y **sin `WITH CHECK`** (el `USING` decide qué filas
+  tocas, no qué valores escribes); ownership comparado contra una columna que el
+  propio cliente escribe; `SECURITY DEFINER` sin `search_path` fijo; UI escondida
+  por rol sin política que la respalde en la BD; fuga de esquema por errores que no
+  pasan por `mensajeSeguroDeBd()`; `service_role` key en cliente; buckets de Storage
+  sin políticas.
+- **Regla del camino de explotación.** Todo `RECHAZADO` del nuevo juez debe nombrar
+  atacante, petición y qué consigue leer o escribir. Sin eso no es un rechazo, es
+  una observación, y baja a `APROBADO CON RESERVAS`. Un auditor que reporta
+  sospechas en vez de fallos entrena al equipo a ignorarlo.
+- **`/review` dispara por riesgo, no por conteo de archivos.** 🟢 solo estilos/docs
+  → ningún juez; 🟡 lógica → `code-judge`; 🔴 `supabase/migrations/`, auth, guards,
+  `has-role`, RPC o Storage → los dos jueces **en paralelo**, aunque el diff sea de
+  una línea. El criterio viejo ("más de 2 archivos") trataba cinco archivos de SCSS
+  como más riesgosos que una policy RLS invertida.
+- **Manda el peor veredicto.** Un `RECHAZADO` de `security-judge` no lo compensa un
+  `APROBADO` de `code-judge`.
+
+### Por qué dos jueces y no un criterio más en `code-judge`
+
+Habría sido más barato: un subagente, una llamada. No funciona. La seguridad como
+criterio C11 de once compite con diez criterios de arquitectura y pierde — el
+modelo llega ahí con el análisis ya encaminado hacia capas y contratos. Una
+escalada de privilegios no se encuentra de pasada; hay que ir a buscarla con esa
+intención desde el primer token. Por eso corren en paralelo, y por eso
+`security-judge` no ve el veredicto de arquitectura antes de emitir el suyo.
+
+### Migración desde 7.0.0
+
+Ninguna acción obligatoria. `create-koa-agent` sobrescribe `.claude/` (es
+`CLI_OWNED`), así que el subagente y el `/review` nuevo llegan al regenerar. En un
+proyecto existente que no quiera regenerar: copiar
+`.claude/agents/security-judge.md` y reemplazar `.claude/skills/review/SKILL.md`.
+
+No cambia ningún contrato de hooks ni de task-spec.
+
+---
+
 ## [7.0.0] — 2026-08-24
 
 Cosecha aprendizajes reales de Autoescuela (y de la spec 0002 de "app-familiar") hacia el

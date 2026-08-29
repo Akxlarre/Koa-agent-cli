@@ -30,7 +30,7 @@
 | `templates/.claude/author.local.json.example` | `.claude/author.local.json.example` | Plantilla del código de autor (una letra) para la capa multi-dev del SDD. Se copia a `author.local.json`, que va gitignored. |
 | `templates/.claude/commands/` | `.claude/commands/` | 11 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/assign-*` (3). |
 | `templates/.claude/hooks/` | `.claude/hooks/` | 18 archivos: 16 cableados en settings.json (incl. `sdd/` y `harness-gate.js`), `context-enrichment-guard.js` opt-in (no cableado), y `validators/validate-file-contains.js` invocado por skills (ver tabla de hooks abajo). |
-| `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
+| `templates/.claude/agents/` | `.claude/agents/` | 6 subagentes con ventana de contexto propia (ver tabla abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 15 reglas arquitectónicas path-scoped. |
 | `templates/.claude/skills/` | `.claude/skills/` | 15 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
@@ -154,10 +154,18 @@
 | `index-syncer.md` | Diff de índices reconciliados contra el código real | haiku | Bash, Read, Edit, Write, Grep, Glob |
 | `supabase-schema.md` | Tablas, FKs y políticas RLS reales según migraciones | haiku | Read, Grep, Glob, Bash |
 | `code-judge.md` | Veredicto por criterio contra la rúbrica | opus | Read, Grep, Glob |
+| `security-judge.md` | Veredicto por criterio de seguridad (S1–S8), cada rechazo con camino de explotación | opus | Read, Grep, Glob |
 
-`code-judge` **no tiene `Bash`** a propósito: recibe el diff como archivo
-(`.claude/temp/review-diff.patch`, que deja `/review`). Con shell podría escribir con
-`>` y la regla "el juez no arregla nada" dependería de su buen comportamiento.
+`code-judge` y `security-judge` **no tienen `Bash`** a propósito: reciben el diff como
+archivo (`.claude/temp/review-diff.patch`, que deja `/review`). Con shell podrían escribir
+con `>` y la regla "el juez no arregla nada" dependería de su buen comportamiento.
+
+Los dos jueces cubren **ejes distintos** y `/review` los lanza en paralelo cuando el diff
+toca `supabase/migrations/`, auth o guards. `security-judge` no repite `SEC-RLS-01/02/03`
+—esos ya los emite el linter con número de línea— sino la policy presente, acotada y aun
+así explotable: `UPDATE` sin `WITH CHECK`, ownership comparado contra una columna que el
+cliente escribe, `SECURITY DEFINER` sin `search_path`, UI escondida por rol sin policy
+detrás. Manda el peor veredicto de los dos.
 
 ## Contratos entre piezas
 

@@ -77,6 +77,7 @@ llenar tu contexto principal de output que solo necesitas una vez.
 | `index-syncer` | Reconciliar `indices/*.md` con el código real | rápido |
 | `supabase-schema` | Esquema real de la BD a partir de las migraciones | rápido |
 | `code-judge` | Veredicto de diseño contra la rúbrica (lo invoca `/review`) | razonador |
+| `security-judge` | Escalada de privilegios, RLS evadible y fuga de datos (lo invoca `/review` en diffs de BD/auth) | razonador |
 
 El juez usa a propósito un modelo más capaz que el que genera el código: un
 evaluador que razona igual que el generador no detecta los errores del generador.
@@ -85,9 +86,10 @@ evaluador que razona igual que el generador no detecta los errores del generador
 nada de lo que ya sabes. `.claude/rules/delegation.md` (se carga sola al editar
 código) dice cuándo vale la pena y cuándo hacerlo tú.
 
-`code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff como archivo
-(`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría escribir
-usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un hecho.
+Ninguno de los dos jueces tiene `Write`, `Edit` **ni `Bash`** — reciben el diff como
+archivo (`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podrían
+escribir usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez
+de un hecho.
 
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 

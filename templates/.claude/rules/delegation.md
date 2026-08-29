@@ -22,6 +22,7 @@ Un subagente corre en su propia ventana y te devuelve el resumen.
 | Terminaste de escribir y quieres validar | `arch-auditor` | Devuelve violaciones accionables, no output de compilador |
 | Vas a escribir un Repository, una query o una migración | `supabase-schema` | El esquema real sale de las migraciones, no de tu memoria |
 | Vas a commitear algo no trivial | `/review` → `code-judge` | Juzga el diseño, que es lo que el regex no ve |
+| Tocaste `supabase/migrations/`, auth o guards | `/review` → `+ security-judge` | Los checks `SEC-RLS` ven la policy ausente; este ve la presente y equivocada |
 | Cerraste la tarea y tocaste `src/app/` | `index-syncer` | Reconcilia `indices/` con el código real |
 
 ## Cuándo NO delegar
@@ -46,12 +47,16 @@ Los subagentes **reportan**, no deciden. `arch-auditor` te dice qué está mal;
 elegir el arreglo es tuyo. `code-judge` emite un veredicto; acatarlo o discutirlo
 con el humano es tuyo.
 
-Dos tienen permisos de escritura deliberadamente acotados:
+Tres tienen permisos de escritura deliberadamente acotados:
 
 - `index-syncer` escribe **solo** en `indices/`. Nunca en `src/app/`.
-- `code-judge` no tiene `Write`, `Edit` **ni `Bash`**. Recibe el diff como archivo.
-  No es una cuestión de confianza: un juez que puede editar el código que juzga
-  deja de ser un juez, y con `Bash` podría escribir usando `>`.
+- `code-judge` y `security-judge` no tienen `Write`, `Edit` **ni `Bash`**. Reciben
+  el diff como archivo. No es una cuestión de confianza: un juez que puede editar
+  el código que juzga deja de ser un juez, y con `Bash` podría escribir usando `>`.
+
+Cuando el diff toca la BD corren **los dos jueces en paralelo**, y manda el peor
+veredicto. Un `RECHAZADO` de seguridad no lo compensa un `APROBADO` de
+arquitectura: que las capas estén bien no hace segura una policy abierta.
 
 Si un subagente te devuelve algo que contradice lo que ves en el filesystem, **gana
 el filesystem** y lo reportas. Los índices se desincronizan; el código no miente.

@@ -5,8 +5,11 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **12/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
-**Hallazgos abiertos** — 29: **4 `S1`**, 14 `S2`, 11 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **25/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
+**Hallazgos abiertos** — 40: **6 `S1`**, 19 `S2`, 15 `S3`. Ver `HALLAZGOS.md`.
+
+> **Bloques 0 y 1 cerrados.** Quedan los scripts (`S-*`), el CLI (`G-*`), los subagentes
+> (`A-*`) y los tests (`T-*`) para completar el nivel A.
 
 ---
 
@@ -54,29 +57,41 @@
 | ! | `H-04` | `pre-write-guard.js` | PreToolUse `Edit\|Write\|MultiEdit` (2º) | **sí** |
 | ! | `H-05` | `harness-gate.js` | PreToolUse `Edit\|Write\|MultiEdit` (3º) | **sí** |
 | ! | `H-06` | `sdd/plan-injector.js` | PreToolUse `Edit\|Write\|MultiEdit` (4º) | no |
-| · | `H-07` | `bash-guard.js` | PreToolUse `Bash` (1º) | **sí** |
-| · | `H-08` | `spec-diff-check.js` | PreToolUse `Bash` (2º) | **sí** |
-| · | `H-09` | `discovery-tracker.js` | PostToolUse `Read` | no |
-| · | `H-10` | `write-tracker.js` | PostToolUse `Edit\|Write\|MultiEdit` | no |
-| · | `H-11` | `.claude/scripts/post-edit.js` | PostToolUse `Edit\|Write\|MultiEdit` | no |
-| · | `H-12` | `failure-tracker.js` | PostToolUseFailure | no |
-| · | `H-13` | `compact-recovery.js` | PostCompact | no |
-| · | `H-14` | `sdd/hotfix-autoclose.js` | Stop (1º) | no |
-| · | `H-15` | `spec-reflection.js` | Stop (2º) | **sí** |
-| · | `H-16` | `sync-check.js` | Stop (3º) | **sí** |
-| · | `H-17` | `context-guardian.js` | Stop (4º) | **sí** |
-| · | `H-18` | `context-enrichment-guard.js` | — (opt-in, no cableado) | **sí** |
-| · | `H-19` | `validators/validate-file-contains.js` | invocado desde frontmatter de skills | **sí** |
+| ✓ | `H-07` | `bash-guard.js` | PreToolUse `Bash` (1º) | **sí** |
+| ! | `H-08` | `spec-diff-check.js` | PreToolUse `Bash` (2º) | **sí** |
+| ✓ | `H-09` | `discovery-tracker.js` | PostToolUse `Read` | no |
+| ✓ | `H-10` | `write-tracker.js` | PostToolUse `Edit\|Write\|MultiEdit` | no |
+| ! | `H-11` | `.claude/scripts/post-edit.js` | PostToolUse `Edit\|Write\|MultiEdit` | no |
+| ! | `H-12` | `failure-tracker.js` | PostToolUseFailure | no |
+| ✓ | `H-13` | `compact-recovery.js` | PostCompact | no |
+| ✓ | `H-14` | `sdd/hotfix-autoclose.js` | Stop (1º) | no |
+| ✓ | `H-15` | `spec-reflection.js` | Stop (2º) | **sí** |
+| ! | `H-16` | `sync-check.js` | Stop (3º) | **sí** |
+| ! | `H-17` | `context-guardian.js` | Stop (4º) | **sí** |
+| ✓ | `H-18` | `context-enrichment-guard.js` | — (opt-in, no cableado) | **sí** |
+| ✓ | `H-19` | `validators/validate-file-contains.js` | invocado desde frontmatter de skills | **sí** |
 
 
-> **H-00 → H-06 cerradas — 2026-08-29.** 13 hallazgos nuevos, uno `S1`: `CAR-001`
-> (`plan-injector` inyecta ~6.155 tokens en cada Edit, sin dedup ni techo — la única pieza
-> del harness sin ningún control de costo). El bloque también reescribió `INC-001`: no hay
-> hueco de numeración ARCH, el namespace está repartido en tres implementaciones y la única
-> regla fantasma es `ARCH-14`.
+> **Bloque 1 cerrado — 2026-08-29.** Las 20 unidades. 24 hallazgos en total, tres `S1`:
+> `CAR-001` (`plan-injector` inyecta ~6.155 tokens por Edit sin dedup), `SEC-001`
+> (`post-edit.js` ejecuta comandos desde la ruta del payload) y `DEC-003` (`post-edit.js`
+> no carga en Node 20, el mínimo que el CLI exige).
 >
-> **Faltan `H-07` → `H-19`** (13 hooks). Evidencia ya recogida en esta ronda para `H-07`
-> (bash-guard verificado bloqueando creación por Bash) y `H-08` (`DEC-001`).
+> **Las respuestas a las preguntas del bloque:**
+> - *¿Los cuatro de `Stop` se pisan?* **Sí.** Con `learnings.md` viejo, task-spec abierto e
+>   índices atrasados, tres de los cuatro emiten `exit 2` en el mismo cierre, y solo
+>   `spec-reflection` tiene anti-bucle.
+> - *¿Alguien asume un orden que nada garantiza?* **Sí, tres veces** → `ACO-004`.
+> - *¿`H-18` y `H-19` siguen funcionando?* `H-19` sí y tiene test; `H-18` no está cableado
+>   a propósito y su justificación está escrita en el archivo.
+>
+> **El patrón de fondo:** `ACO-001`, `CAR-002` e `INC-007` son tres hooks distintos que
+> asumen que `Stop` significa «fin de sesión» cuando significa «fin de respuesta». No es un
+> bug repetido: es un malentendido compartido sobre el evento. Candidato a conclusión del
+> pase general.
+>
+> **Deuda de ejecución:** capas 2 y 3 de `bash-guard` y `hotfix-autoclose` verificados por
+> lectura, no ejecutando. Cerrar al escribir los tests que pide `HUE-011`.
 
 **Preguntas propias del bloque:**
 - `H-00`: ¿el orden declarado en `settings.json` es el que las piezas asumen? ¿Un hook
@@ -91,7 +106,7 @@
 
 | | ID | Script | Qué verifica |
 |---|---|---|---|
-| · | `S-01` | `scripts/architect.js` | 22 códigos ARCH + SEC-RLS + A11Y sobre AST — **sub-tabla obligatoria** |
+| · | `S-01` | `scripts/architect.js` | Reglas `ARCH-*` + SEC-RLS + A11Y-03 sobre AST — **sub-tabla obligatoria** |
 | · | `S-02` | `scripts/lint-arch-wrapper.js` | memoria de fallos → `LESSONS_LEARNED.md` |
 | · | `S-03` | `scripts/indices-sync.js` | auto-indexer AST con caché por mtime (1343 líneas) |
 | · | `S-04` | `scripts/check-bento-classes.js` | allowlist del bento (cableado como ARCH-21) |
@@ -107,12 +122,14 @@
 
 | Código | Qué prohíbe | ¿Tiene fixture en `provocacion.baseline.json`? | ¿Dispara? |
 |---|---|---|---|
-| ARCH-01 … ARCH-26 (22 activos) | | | |
+| ARCH-01 … ARCH-26 (los que emite este archivo) | | | |
 | SEC-RLS-01/02/03 | | | |
 | A11Y-03 | | | |
 
-> Los códigos 12, 13, 14 y 20 no existen. Verificar si es hueco deliberado o reglas
-> eliminadas sin limpiar la numeración.
+> **Ver `INC-001` (reescrito).** No hay hueco de numeración: ARCH-12 y ARCH-13 los emite
+> `pre-write-guard.js` y ARCH-20 vive en `lib/a11y-guardrails.js`. La sub-tabla debe cubrir
+> solo lo que emite **este** archivo, y la ficha debe cerrar el destino de `ARCH-14`, que
+> `verify/SKILL.md` documenta y nadie implementa.
 
 **Preguntas propias del bloque:**
 - `S-05` y `S-06` son los auditores del repo. **¿Quién los audita a ellos?** Si uno de

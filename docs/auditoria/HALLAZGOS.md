@@ -11,7 +11,7 @@ hallazgo; recién después agregá un tipo (y documentalo acá).
 
 | Tipo | Nombre | Qué es | Ejemplo del repo |
 |---|---|---|---|
-| `INC` | Inconsistencia | La documentación dice X, el código hace Y | `.claude/CLAUDE.md` habla de reglas ARCH hasta la 26; hay 22 activas |
+| `INC` | Inconsistencia | La documentación dice X, el código hace Y | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 |
 | `DEC` | Chequeo decorativo | Existe, corre, pasa — y no puede fallar | ARCH-24 y ARCH-26, muertas hasta que existió `provocar-reglas.mjs` |
 | `ACO` | Acoplamiento no declarado | Una pieza depende del formato de otra sin que figure en `templates-contract.md` | — |
 | `DUP` | Autoridad duplicada | Dos piezas deciden lo mismo, posiblemente con criterios distintos | `session-start` y `discovery-tracker` escriben el mismo flag |
@@ -21,6 +21,12 @@ hallazgo; recién después agregá un tipo (y documentalo acá).
 > `CAR` es el tipo que casi nadie incluye y en un harness es central: **una pieza puede
 > ser correcta y aun así ser neta negativa**, porque cada regla, cada skill
 > model-invocable y cada inyección paga renta en la ventana de contexto.
+
+> `SEC-001` usó el prefijo `SEC` dentro del tipo `DEC` porque la taxonomía se quedó corta:
+> un guardrail que además **abre** una superficie de ataque no es exactamente «un chequeo
+> que no puede fallar». Se mantiene como `DEC` para no cambiar la taxonomía a mitad de la
+> auditoría (regla 1 del README); decidir en el pase general si `SEC` merece ser un tipo
+> propio y, si se agrega, reclasificar hacia atrás.
 
 ## Severidad
 
@@ -65,6 +71,17 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-005` | S3 | `H-01` | `<!-- DETAIL:BEGIN -->` y `**last_updated:**` son contratos de 2-3 piezas sin declarar | abierto |
 | `ACO-006` | S3 | `H-02` | `koa-prompt-ctx-{sessionId}.json` no declarado | abierto |
 | `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | abierto |
+| `SEC-001` | **S1** | `H-11` | `post-edit.js` interpola la ruta del payload en una cadena de shell: una ruta con comillas ejecuta comandos arbitrarios | abierto |
+| `DEC-003` | **S1** | `H-11` | `post-edit.js` usa `import` bajo un `package.json` sin `type:module`: no carga en Node 20/21, el mínimo que el CLI exige | abierto |
+| `HUE-016` | S2 | `H-12` | Un error con `\|` corrompe `LESSONS_LEARNED.md` en el siguiente parseo; se pierden firma y conteo, y el daño es acumulativo | abierto |
+| `DUP-002` | S2 | `H-12` | `failure-tracker` y `lint-arch-wrapper` escriben ambos en `LESSONS_LEARNED.md` con formatos distintos | abierto |
+| `CAR-002` | S2 | `H-17` | `context-guardian` avisa en cada respuesta indefinidamente: no tiene anti-bucle | abierto |
+| `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | abierto |
+| `INC-007` | S2 | `H-14` | `hotfix-autoclose` dice cerrar «al terminar la sesión»; `Stop` corre al final de cada respuesta | abierto |
+| `HUE-017` | S3 | `H-13` | `compact-recovery` no tiene tope de tamaño: los 4 archivos de `context/` se inyectan enteros | abierto |
+| `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | abierto |
+| `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
+| `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | abierto |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | abierto |
 | `HUE-002` | **S1** | `C-01` | `sessionId` sale de una env var con fallback `'default'`; el flag es global en TMPDIR y nunca se borra | abierto |
 | `HUE-005` | **S1** | `C-05` | `blueprint.json` no se valida dentro del proyecto generado, y su `stack` crudo decide qué guardrails corren | abierto |

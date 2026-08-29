@@ -96,9 +96,14 @@ Areas where contributions are most useful:
 
 1. Fork the repo and create a branch from `master`
 2. Make your changes
-3. Test with `TEST_MODE=inject node bin/index.js` at minimum
-4. Update `indices/CLI-MODULES.md` or `indices/TEMPLATES-REGISTRY.md` if you changed the architecture
-5. Open a PR with a clear description of what changed and why
+3. Run `npm test` — this runs both suites and is what CI gates on:
+   - `npm run test:cli` — the generator (`bin/`, `lib/`)
+   - `npm run test:hooks` — the hook contracts in `templates/.claude/tests/`.
+     Mandatory when you touch `templates/.claude/hooks/`, per
+     `.claude/rules/templates-contract.md`.
+4. Test with `TEST_MODE=inject node bin/index.js` at minimum
+5. Update `indices/CLI-MODULES.md` or `indices/TEMPLATES-REGISTRY.md` if you changed the architecture
+6. Open a PR with a clear description of what changed and why
 
 ---
 

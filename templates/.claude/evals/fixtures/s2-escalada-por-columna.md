@@ -2,8 +2,16 @@
 juez: security-judge
 esperado: RECHAZADO
 criterio: S2
+tambien_valido: [S5]
 nombre: Auto-elevacion de rol en la fila propia
 ---
+
+> **Nota del corpus.** Este fixture viola dos criterios, no uno. Borrar la
+> proteccion de `role` habilita la escalada (S2) y, como efecto encadenado, deja
+> a `roleGuard` y `*hasRole` como unica autorizacion (S5) — el propio docblock de
+> `role.guard.ts` dice que la proteccion real vive en RLS. Un juez que reporte
+> ambos esta en lo correcto; el criterio que **debe** aparecer es S2, que es la
+> causa. Por eso `tambien_valido`.
 
 ## Por que es vulnerable
 

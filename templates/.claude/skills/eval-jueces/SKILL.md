@@ -43,6 +43,7 @@ frontmatter:
 juez: security-judge        # a quien se le pasa
 esperado: RECHAZADO         # o APROBADO
 criterio: S2                # el criterio que debe nombrar; "-" en los limpios
+tambien_valido: [S5]        # opcional: criterios extra que NO son falsos positivos
 nombre: ...
 ```
 
@@ -50,8 +51,16 @@ El cuerpo explica por que es vulnerable (o por que no), cual es el camino de
 explotacion esperado, por que los checks deterministas no lo ven, y trae el diff
 en un bloque ```diff.
 
-Un fixture viola **un solo** criterio, igual que en `provocacion.js`: si violara
-tres no se sabria cual disparo, y el dia que uno se rompa los otros dos lo tapan.
+Un fixture apunta a **un solo** criterio como causa, igual que en
+`provocacion.js`: si apuntara a tres no se sabria cual disparo, y el dia que uno
+se rompa los otros dos lo taparian.
+
+Pero un fallo real puede encadenar. Borrar la proteccion de `role` habilita la
+escalada (S2) y, como consecuencia, deja la autorizacion del front sin respaldo
+(S5). El juez que reporta los dos no se equivoca: esta siguiendo el efecto. Por
+eso `criterio` es la **causa** —el que tiene que aparecer si o si— y
+`tambien_valido` lista los encadenados que no cuentan como ruido. Un criterio
+fuera de ambas listas si es ruido, y se reporta.
 
 ## Pasos
 

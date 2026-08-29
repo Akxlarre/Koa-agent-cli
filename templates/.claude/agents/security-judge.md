@@ -45,8 +45,8 @@ Fuentes de verdad. Leelas antes de juzgar — no califiques de memoria.
 
 | Criterio | Que buscas | Fuente |
 |---|---|---|
-| S1 `WITH CHECK` ausente | `FOR UPDATE`/`INSERT` con `USING` pero sin `WITH CHECK` | `.claude/rules/database.md` |
-| S2 Escalada de privilegios | Policy que deja al usuario escribir la columna que decide sus permisos | `supabase/migrations/*_auth_rls_role_protection.sql` |
+| S1 `USING` mas amplio que la escritura | Policy cuyo `USING` esta pensado para la lectura y, al reutilizarse como `WITH CHECK`, deja escribir filas ajenas | `.claude/rules/database.md` |
+| S2 Escalada por columna | Policy correcta a nivel de fila sobre una tabla donde una **columna** decide permisos: el usuario muta su propia fila y se eleva | `supabase/migrations/*_auth_rls_role_protection.sql` |
 | S3 Ownership falsificable | El predicado compara contra una columna que el cliente controla, no contra `auth.uid()` | `.claude/rules/database.md` |
 | S4 Evasion de RLS | `SECURITY DEFINER` sin `search_path` fijo, vistas sobre tablas protegidas, RPC que consulta sin filtrar | migraciones |
 | S5 Autorizacion solo en cliente | `*hasRole` / guard de ruta sin policy equivalente en la BD | `core/directives/has-role.directive.ts` |
@@ -56,6 +56,47 @@ Fuentes de verdad. Leelas antes de juzgar — no califiques de memoria.
 
 Un criterio que no aplica se marca `N/A`, nunca `APROBADO`. Un diff que solo
 toca SCSS no necesita S1-S4.
+
+### La semantica que tenes que tener bien antes de juzgar S1 y S2
+
+**Un `WITH CHECK` ausente NO es por si solo un hallazgo.** Si no defines
+`WITH CHECK`, PostgreSQL **reutiliza la expresion `USING`** para validar la fila
+nueva. Verificado contra PostgreSQL 16:
+
+```sql
+CREATE POLICY p ON pedidos FOR UPDATE USING (auth.uid() = user_id);
+-- ana intenta regalarle su pedido a beto:
+UPDATE pedidos SET user_id = 'beto' WHERE id = 1;
+-- ERROR: new row violates row-level security policy
+```
+
+Marcar eso como vulnerable es un falso positivo, y un auditor que los produce se
+vuelve ruido. Lo que si es real son estos dos casos, ambos verificados:
+
+**S1 — el `USING` es mas amplio que la escritura que hacia falta.** El autor lo
+escribio pensando en la lectura; al reutilizarse como `WITH CHECK`, autoriza
+escrituras que nunca quiso:
+
+```sql
+-- Intencion: "leo los docs de mi equipo, pero solo edito los mios".
+CREATE POLICY d ON docs FOR ALL USING (team = mi_equipo());
+-- ana, del equipo ventas, edita el doc de beto Y se lo apropia. Ambos pasan.
+UPDATE docs SET titulo = 'secuestrado', owner = 'ana' WHERE id = 2;
+```
+
+**S2 — la fila es legitimamente tuya, pero una columna decide permisos.** El
+`USING` acota **que fila**, nunca **que columnas**. La fila mutada sigue
+cumpliendo el predicado:
+
+```sql
+CREATE POLICY p ON profiles FOR UPDATE USING (auth.uid() = id);
+UPDATE profiles SET role = 'admin' WHERE id = auth.uid();  -- pasa: sigue siendo su fila
+```
+
+La regla practica: no preguntes "¿falta `WITH CHECK`?" sino **"¿el `USING`
+describe exactamente lo que el usuario deberia poder escribir?"**. Si describe
+algo mas amplio, o si la tabla tiene una columna que otorga privilegio, hace
+falta un `WITH CHECK` explicito.
 
 ## La regla del camino de explotacion
 
@@ -69,9 +110,9 @@ que consigue leer o escribir que no deberia.
 ```
 ✗ "La policy de UPDATE podria ser insegura."
 ✓ "Usuario autenticado con rol `member` manda
-   PATCH /rest/v1/pedidos?id=eq.<id_ajeno> con {\"user_id\": \"<su_uid>\"}.
-   El USING pasa porque evalua la fila ANTES del cambio; sin WITH CHECK nada
-   valida la fila despues. Se apropia del pedido de otro usuario."
+   PATCH /rest/v1/profiles?id=eq.<su_uid> con {\"role\": \"admin\"}.
+   La fila sigue siendo la suya, asi que el USING (auth.uid() = id) pasa; nada
+   valida que `role` no haya cambiado. Queda admin sin tocar el backend."
 ```
 
 Si no consigues escribir el camino, no es un `RECHAZADO`: es una observacion, y
@@ -111,8 +152,8 @@ Cuando rechaces algo de S1-S4, apunta a esta migracion como el patron a seguir.
 ```
 VEREDICTO: APROBADO | RECHAZADO | APROBADO CON RESERVAS
 
-S1 WITH CHECK ausente ............ APROBADO | RECHAZADO | N/A
-S2 Escalada de privilegios ....... APROBADO | RECHAZADO | N/A
+S1 USING mas amplio que escritura  APROBADO | RECHAZADO | N/A
+S2 Escalada por columna .......... APROBADO | RECHAZADO | N/A
 S3 Ownership falsificable ........ APROBADO | RECHAZADO | N/A
 S4 Evasion de RLS ................ APROBADO | RECHAZADO | N/A
 S5 Autorizacion solo en cliente .. APROBADO | RECHAZADO | N/A

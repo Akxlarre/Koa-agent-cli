@@ -16,13 +16,18 @@ ve ningún regex.
 ### Added
 - **Subagente `security-judge`** (`.claude/agents/security-judge.md`, opus, sin
   `Bash`). Audita el diff con una sola pregunta: *¿cómo rompo esto?* Rúbrica de
-  ocho criterios sobre el terreno que los checks deterministas no pisan:
-  `UPDATE` con `USING` correcto y **sin `WITH CHECK`** (el `USING` decide qué filas
-  tocas, no qué valores escribes); ownership comparado contra una columna que el
-  propio cliente escribe; `SECURITY DEFINER` sin `search_path` fijo; UI escondida
-  por rol sin política que la respalde en la BD; fuga de esquema por errores que no
-  pasan por `mensajeSeguroDeBd()`; `service_role` key en cliente; buckets de Storage
-  sin políticas.
+  ocho criterios sobre el terreno que los checks deterministas no pisan: un `USING`
+  más amplio que la escritura que hacía falta; escalada por columna dentro de la
+  fila propia (`role = 'admin'` sobre tu propio perfil); ownership comparado contra
+  una columna que el propio cliente escribe; `SECURITY DEFINER` sin `search_path`
+  fijo; UI escondida por rol sin política que la respalde en la BD; fuga de esquema
+  por errores que no pasan por `mensajeSeguroDeBd()`; `service_role` key en cliente;
+  buckets de Storage sin políticas.
+- **Semántica de `WITH CHECK` documentada en la rúbrica.** Un `WITH CHECK` ausente
+  **no** es por sí solo un hallazgo: PostgreSQL reutiliza la expresión `USING` para
+  validar la fila nueva. La rúbrica lleva los tres casos verificados contra
+  PostgreSQL 16 —el falso positivo y las dos vulnerabilidades reales— para que el
+  juez no grite lobo.
 - **Regla del camino de explotación.** Todo `RECHAZADO` del nuevo juez debe nombrar
   atacante, petición y qué consigue leer o escribir. Sin eso no es un rechazo, es
   una observación, y baja a `APROBADO CON RESERVAS`. Un auditor que reporta
@@ -34,6 +39,19 @@ ve ningún regex.
   como más riesgosos que una policy RLS invertida.
 - **Manda el peor veredicto.** Un `RECHAZADO` de `security-judge` no lo compensa un
   `APROBADO` de `code-judge`.
+
+- **Corpus de evals para los jueces** (`.claude/evals/`) y skill **`/eval-jueces`**.
+  `provocar-reglas.mjs` ya medía si cada regla del linter puede fallar de verdad;
+  su propia cabecera dice que *"una regla que nunca se pudo hacer fallar es
+  decoración"*. Eso valía igual para los jueces y ahí nadie lo verificaba. El
+  corpus trae 7 fixtures con verdad de campo: 4 vulnerables (uno por criterio) y
+  **3 controles limpios**, porque un juez que rechaza todo saca 100% de recall.
+  Dos de los limpios son trampas: un `WITH CHECK` omitido que es seguro, y un
+  `USING (true)` legítimo sobre un catálogo público.
+- **Baseline de criterios sin fixture**, con la misma regla que el del linter:
+  solo puede achicarse. Los diez criterios de `code-judge` entran ahí — lleva
+  versiones en producción sin una sola prueba de que detecte algo, y ahora eso
+  está anotado en vez de ser invisible.
 
 ### Por qué dos jueces y no un criterio más en `code-judge`
 

@@ -1,0 +1,10 @@
+{
+  "_comentario": "Criterios de la rubrica sin fixture todavia. Esta lista SOLO puede achicarse: agregar un criterio nuevo a un juez sin su fixture hace fallar /eval-jueces. Exigir los ocho el primer dia garantizaria que alguien desactive el chequeo entero.",
+  "security-judge": {
+    "sinFixture": ["S3", "S5", "S7", "S8"]
+  },
+  "code-judge": {
+    "_nota": "Sin corpus todavia. Los diez criterios C1-C10 estan sin fixture; el juez lleva versiones en produccion sin una sola prueba de que detecte algo.",
+    "sinFixture": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10"]
+  }
+}

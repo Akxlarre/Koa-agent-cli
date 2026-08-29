@@ -32,7 +32,8 @@
 | `templates/.claude/hooks/` | `.claude/hooks/` | 18 archivos: 16 cableados en settings.json (incl. `sdd/` y `harness-gate.js`), `context-enrichment-guard.js` opt-in (no cableado), y `validators/validate-file-contains.js` invocado por skills (ver tabla de hooks abajo). |
 | `templates/.claude/agents/` | `.claude/agents/` | 6 subagentes con ventana de contexto propia (ver tabla abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 15 reglas arquitectónicas path-scoped. |
-| `templates/.claude/skills/` | `.claude/skills/` | 15 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
+| `templates/.claude/skills/` | `.claude/skills/` | 16 skills, incl. `harness-feedback` y `eval-jueces` (ver tabla de skills abajo). |
+| `templates/.claude/evals/` | `.claude/evals/` | Corpus de fixtures para medir a los jueces: 7 casos con verdad de campo en el frontmatter (4 vulnerables, 3 controles limpios) + `baseline.json` de criterios sin fixture. Lo consume la skill `eval-jueces`. |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático). |
 | `templates/.claude/tests/` | `.claude/tests/` | 9 archivos de tests de contrato (`node --test`, `npm run claude:test-hooks`). Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada, y `harness-gate.test.js` (11 tests del Generalization Gate). |
 
@@ -121,6 +122,9 @@
 | `grill_me` | Interroga una propuesta antes de volverla spec (Critic Loop) |
 | `harness-feedback` | Capturar fricción del harness para mejorarlo |
 | `writing-great-skills` | Meta-skill: cómo escribir skills |
+| `plan` | Genera el task-spec antes de implementar (contrato de 5 encabezados `##`) |
+| `review` | Juzga un cambio antes de commitear. Dispara por riesgo 🟢/🟡/🔴 y lanza uno o dos jueces |
+| `eval-jueces` | Mide si los jueces detectan lo que su rúbrica promete: recall, falsos positivos y precisión de criterio contra `.claude/evals/` |
 
 ## Reglas en templates/.claude/rules/
 

@@ -77,6 +77,13 @@ fuera de ambas listas si es ruido, y se reporta.
       esperas, ni si es vulnerable.** Un juez al que le avisas que busque una
       escalada de privilegios la encuentra siempre — y no habrias medido nada.
 
+      Ojo con la clave de respuesta: los fixtures viven en el repo y el juez tiene
+      `Read` y `Grep`, asi que **puede** abrir `.claude/evals/fixtures/` y leer el
+      criterio esperado. Escribir la frase de contexto como si fuera un commit
+      real —nunca "audita este fixture"— es lo que evita que se le ocurra
+      buscarlo. Si en una corrida ves que lo leyo, esa medicion no vale: repetila
+      copiando el patch a un directorio temporal fuera del repo.
+
    c. Parsea de su respuesta la linea `VEREDICTO:` y, si rechazo, que criterios
       marco `RECHAZADO`.
 

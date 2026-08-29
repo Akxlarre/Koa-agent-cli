@@ -4,7 +4,9 @@
   "description": "Scaffold Angular projects that are native to AI agents — agentic harness, real-time guardrails, and living indexes out of the box.",
   "main": "index.js",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "npm run test:cli && npm run test:hooks",
+    "test:cli": "node --test test/*.test.mjs",
+    "test:hooks": "node --test templates/.claude/tests/*.test.js"
   },
   "keywords": [
     "angular",
@@ -27,6 +29,9 @@
     "ora": "^9.3.0"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "create-koa-agent": "./bin/index.js"
   }

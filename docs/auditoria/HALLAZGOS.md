@@ -51,7 +51,20 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 
 | ID | Sev | Unidad | Una línea | Estado |
 |---|---|---|---|---|
-| `INC-001` | S3 | `L-05` | `.claude/CLAUDE.md` y el mapa hablaban de 26 reglas ARCH; hay 22 códigos activos (faltan 12, 13, 14, 20) | abierto |
+| `INC-001` | S2 | `S-01` | **(reescrito)** El namespace ARCH está repartido en tres implementaciones sin registro único; `ARCH-14` está documentado y no lo emite nadie | abierto |
+| `CAR-001` | **S1** | `H-06` | `plan-injector` inyecta ~6.155 tokens en CADA Edit, sin dedup ni techo — la única pieza del harness sin ningún control de costo | abierto |
+| `DEC-002` | S2 | `H-05` | `GATE-A1` de `harness-gate` se satisface con la palabra «cuando»; 12 de 15 reglas reales ya lo cumplen sin intentarlo | abierto |
+| `INC-005` | S2 | `H-03` | `spec-gate` y `plan-injector` clasifican el mismo archivo con listas de exención distintas | abierto |
+| `HUE-010` | S2 | `H-03` | Los 3 hooks de `sdd/` y `context-enrichment-guard` leen stdin sin el cap SEC-04 | abierto |
+| `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | abierto |
+| `HUE-012` | S2 | `H-04` | Las ~20 reglas regex de `pre-write-guard` no las cubre `provocar-reglas.mjs` | abierto |
+| `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | abierto |
+| `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | abierto |
+| `HUE-009` | S3 | `H-00` | Ningún test verifica que los comandos cableados apunten a archivos existentes | abierto |
+| `HUE-013` | S3 | `H-05` | `GATE-B1` bloquearía una regla que documenta un hook; latente, no activo hoy | abierto |
+| `ACO-005` | S3 | `H-01` | `<!-- DETAIL:BEGIN -->` y `**last_updated:**` son contratos de 2-3 piezas sin declarar | abierto |
+| `ACO-006` | S3 | `H-02` | `koa-prompt-ctx-{sessionId}.json` no declarado | abierto |
+| `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | abierto |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | abierto |
 | `HUE-002` | **S1** | `C-01` | `sessionId` sale de una env var con fallback `'default'`; el flag es global en TMPDIR y nunca se borra | abierto |
 | `HUE-005` | **S1** | `C-05` | `blueprint.json` no se valida dentro del proyecto generado, y su `stack` crudo decide qué guardrails corren | abierto |
@@ -70,36 +83,63 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 
 ---
 
-## INC-001 · Numeración de códigos ARCH
+## INC-001 · El namespace ARCH está repartido en tres implementaciones (reescrito)
 
-- **Tipo / severidad:** `INC` · S3
-- **Unidad:** `L-05` (docs) — confirmar también en `S-01` (`architect.js`)
+- **Tipo / severidad:** `INC` · S2 *(era S3; la premisa original era incorrecta)*
+- **Unidad:** `S-01` (`architect.js`) y `H-04` (`pre-write-guard.js`)
 - **Contexto:** B (harness)
+
+> **Corrección.** La versión anterior de este hallazgo decía que faltaban los códigos
+> ARCH-12, 13, 14 y 20 porque no aparecían en `architect.js`. Eso salió de grepear
+> literales de string en un solo archivo, y era una conclusión equivocada: tres de los
+> cuatro existen, en otros archivos. El hallazgo real es distinto y más interesante.
 
 **Qué encontré**
 
-`templates/boilerplate/scripts/architect.js` define 22 códigos `ARCH-*` activos,
-numerados hasta ARCH-26. Los códigos 12, 13, 14 y 20 no existen en el archivo.
-La documentación del harness describe el linter sin aclarar esa discontinuidad.
+El namespace de códigos no vive en un solo lugar. Está repartido en tres superficies:
+
+| Superficie | Códigos | Mecanismo |
+|---|---|---|
+| `scripts/architect.js` | ARCH-01…11, 15…19, 21…26 · A11Y-03 · SEC-RLS-01/02/03 | AST de TypeScript |
+| `scripts/lib/a11y-guardrails.js` | ARCH-20 | función pura importada por `architect.js` |
+| `.claude/hooks/pre-write-guard.js` | ARCH-12, ARCH-13 · A11Y-01, A11Y-02 · LLM-01, LLM-02 | regex, en tiempo de escritura |
+
+No hay ningún hueco de numeración: 12, 13 y 20 existen. **La excepción es `ARCH-14`**, que
+`skills/verify/SKILL.md` documenta como si existiera —«Íconos sin registrar en
+`provideIcons()` | ARCH-14 + `icon-registry.js`»— y que ningún archivo emite. Solo aparece
+además en un comentario de `class-discipline.js` que lo menciona de pasada.
+
+(`ARCH-99` aparece en `provocacion.test.mjs`, pero es un fixture de test, no una regla.)
 
 **Por qué importa**
 
-Sola, la discontinuidad es cosmética. Lo que hay que resolver es **por qué** faltan: si
-son reglas eliminadas sin limpiar la numeración, hay que verificar que nada siga
-refiriéndose a ellas (baseline de provocación, docs, tests). Si son huecos reservados,
-hay que documentarlo.
+Tres consecuencias:
+
+1. **Nadie puede contar las reglas.** Responder «¿cuántas reglas tiene el linter?» exige
+   grepear tres archivos y saber que dos de las superficies no son el linter.
+2. **Nada previene una colisión.** Si alguien agrega un `ARCH-27` en el hook y otro en el
+   linter, no hay registro que lo impida.
+3. **`ARCH-14` es una regla fantasma**: documentada, referenciada desde una skill que el
+   agente lee, y sin ninguna implementación detrás. Un agente que la busque para cumplirla
+   no encuentra nada.
 
 **Evidencia**
 
 ```bash
-grep -oE "'ARCH-[0-9]+'" templates/boilerplate/scripts/architect.js | sort -u | wc -l
-# → 22
+grep -rhoE "(ARCH|A11Y|LLM|SEC-RLS)-[0-9]+" templates/boilerplate/scripts/   templates/.claude/hooks/ | sort -u -V
+# → ARCH-01 … ARCH-26 continuo, + ARCH-99 (fixture), A11Y-01..03, LLM-01/02, SEC-RLS-01..03
+
+grep -rn "ARCH-14" templates/ | grep -v auditoria
+# → class-discipline.js:22  (comentario: "igual que ARCH-14")
+# → skills/verify/SKILL.md:346  (tabla, como si existiera)
+#   ningún reportError, ninguna implementación
 ```
 
 **Propuesta**
 
-Determinar el origen de los cuatro huecos durante la ficha `S-01` y, según el caso,
-documentar la discontinuidad o renumerar. Actualizar la prosa que cuente reglas.
+Un registro único de códigos —un `.md` o un `.json` que enumere código, superficie que lo
+emite y regla— y un test que lo compare contra los tres archivos. Resolver `ARCH-14`:
+implementarla o sacarla de `verify/SKILL.md`.
 
 **Estado:** abierto
 
@@ -704,6 +744,429 @@ La partición es hoy exacta y coincide con `TEMPLATES-REGISTRY.md`, pero nada la
 
 Test de tres líneas: todo índice sin `AUTO-GENERATED:BEGIN` tiene que estar en la lista de
 manuales. Convierte una coincidencia afortunada en un invariante.
+
+**Estado:** abierto
+
+## CAR-001 · `plan-injector` inyecta ~6.155 tokens en cada Edit, sin ningún control de costo
+
+- **Tipo / severidad:** `CAR` · **S1**
+- **Unidad:** `H-06`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`sdd/plan-injector.js` inyecta `spec.md` + `plan.md` + `tasks.md` como `additionalContext`
+en cada `Edit`/`Write` sobre código de producto, con `MAX_SECTION_CHARS = 8000` por sección
+y **sin techo agregado**. No tiene estado, ni caché, ni dedup: `grep -c "tmpdir|STATE|seen|cache"`
+sobre el archivo devuelve 0.
+
+**Por qué importa**
+
+Medido en sandbox con tres artefactos de tamaño realista: **24.622 caracteres, ~6.155
+tokens estimados, en una sola edición**. Diez ediciones en una sesión son ~61.000 tokens
+del mismo contrato repetido palabra por palabra.
+
+Lo decisivo es que la misma casa ya resolvió este problema tres veces y este hook no aplicó
+ninguna solución:
+
+| Pieza | Control de costo |
+|---|---|
+| `prompt-context.js` | dedup por contenido + `REPEAT_EVERY = 8` |
+| `pre-write-guard.js` capa 4 | flag de dedup por categoría y sesión |
+| `session-start.js` | tope de 2.500 chars + corte en `DETAIL:BEGIN` |
+| **`plan-injector.js`** | **ninguno** |
+
+Es `S1` y no `S2` porque un harness que agota la ventana de contexto fuerza compactaciones,
+y cada compactación dispara `compact-recovery` — que re-inyecta más contexto. El costo no
+es lineal.
+
+**Evidencia**
+
+```bash
+echo "0001-x" > specs/.active   # spec.md, plan.md y tasks.md > 8000 chars cada uno
+echo '{"tool_input":{"file_path":"src/app/features/x.component.ts","content":"x"}}' \
+  | node .claude/hooks/sdd/plan-injector.js
+# → caracteres inyectados: 24.622   (~6.155 tokens)
+# → truncados a 8000: 3 de 3 secciones
+
+grep -c "tmpdir\|STATE\|seen\|cache" templates/.claude/hooks/sdd/plan-injector.js
+# → 0
+```
+
+**Propuesta**
+
+Aplicar el patrón que ya usa `pre-write-guard` capa 4: un flag de dedup por track y sesión,
+inyectando completo la primera vez y solo el delta de `tasks.md` después. Y un techo
+agregado, no solo por sección.
+
+**Estado:** abierto
+
+---
+
+## DEC-002 · El Generalization Gate se satisface con la palabra «cuando»
+
+- **Tipo / severidad:** `DEC` · S2
+- **Unidad:** `H-05` (`harness-gate.js`)
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`GATE-A1` bloquea cuando el contenido cita un track ID **y no contiene** un marcador de
+generalización. El marcador se define como:
+
+```js
+/\b(cuando|siempre que|nunca|cada vez que|toda vez que|regla:|criterio|aplicabilidad|
+   aplica cuando|no aplica|excepci[oó]n|independientemente de)\b/i
+```
+
+`cuando` y `nunca` son dos de las palabras más frecuentes de la prosa técnica en español.
+El gate se satisface con que aparezcan en **cualquier** lugar del texto, sin ninguna
+relación con el criterio de aplicabilidad que dice exigir.
+
+**Por qué importa**
+
+**12 de las 15 reglas reales del template ya contienen un marcador** sin habérselo
+propuesto. El gate filtra solo el caso patológico puro —una receta escrita en telegrama— y
+deja pasar cualquier receta redactada en español normal.
+
+El daño no es que no filtre: es que su documentación promete un filtro fuerte, y eso induce
+a confiar en que la memoria del harness está curada cuando no lo está.
+
+**Evidencia**
+
+```
+A · "En fix-042 el boton no andaba. Le puse un margin-top de 4px."
+    → exit 2  🧭 HARNESS GATE                      ✔ atrapa
+
+B · "En fix-042 el boton no andaba cuando lo probamos. Le puse un margin-top de 4px."
+    → exit 0                                        ✘ la misma receta pasa
+
+12 de 15 reglas del template ya contienen un marcador de generalización
+```
+
+**Propuesta**
+
+El problema es de fondo: un marcador léxico no puede distinguir un principio de una receta.
+Dos caminos posibles — exigir que el marcador esté en la **misma frase** que el track ID
+(más estricto, todavía evadible), o aceptar que este chequeo es heurístico y bajar el tono
+de lo que promete. Lo que no puede quedar es la brecha entre ambas cosas.
+
+**Estado:** abierto
+
+---
+
+## INC-005 · `spec-gate` y `plan-injector` clasifican el mismo archivo distinto
+
+- **Tipo / severidad:** `INC` · S2
+- **Unidad:** `H-03` / `H-06`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+Los dos hooks corren sobre el mismo matcher y comparten un bloque `isProductCode` **idéntico
+carácter por carácter**. Lo que diverge son las listas de exención que corren antes:
+
+| Categoría | Exime `spec-gate` pero **no** `plan-injector` |
+|---|---|
+| Prefijos | `supabase/seed`, `tests/`, `.next/`, `.angular/` |
+| Extensiones | `.mdx`, `.gitignore`, `.npmrc`, `.env`, `.editorconfig` |
+| Otros | `*.spec.ts`, `*.spec.js`, `*.test.{ts,js,tsx,jsx}`, `Dockerfile`, `Makefile`, `LICENSE`, `README` |
+
+**Por qué importa**
+
+El primer hook de la cadena declara «esto no es código de producto» y el cuarto le inyecta
+el contrato completo igual. Al editar `src/app/features/x.spec.ts`: `spec-gate` sale en 0 y
+`plan-injector` inyecta 24.622 caracteres. Multiplica `CAR-001` sobre toda la superficie de
+tests, que es donde más ediciones hay en un flujo TDD.
+
+**Evidencia**
+
+```bash
+'{"tool_input":{"file_path":"src/app/features/x.spec.ts","content":"x"}}'
+  → spec-gate      exit 0  (exento)
+  → plan-injector  SI — 24.622 caracteres
+```
+
+**Propuesta**
+
+Extraer la clasificación a un módulo compartido en `sdd/`. Es copia-pega divergente, no un
+desacuerdo de diseño: nadie decidió que un `.spec.ts` mereciera el contrato completo.
+
+**Estado:** abierto
+
+---
+
+## HUE-010 · Los hooks de `sdd/` leen stdin sin el cap SEC-04
+
+- **Tipo / severidad:** `HUE` · S2
+- **Unidad:** `H-03` / `H-06`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`MAX_STDIN_BYTES = 10 MB` se aplicó a los hooks de la raíz de `hooks/`. Los que leen stdin
+**sin** el cap son exactamente los cuatro que quedaron fuera de esa pasada:
+`sdd/spec-gate.js`, `sdd/plan-injector.js`, `sdd/hotfix-autoclose.js` y
+`context-enrichment-guard.js`.
+
+**Por qué importa**
+
+Es una regresión de alcance, no una decisión: SEC-04 se aplicó por directorio y el
+subdirectorio `sdd/` quedó afuera. Los tres hooks de SDD acumulan `data += chunk` sin
+límite.
+
+**Evidencia**
+
+```bash
+for f in templates/.claude/hooks/*.js templates/.claude/hooks/sdd/*.js; do
+  grep -q "process.stdin" "$f" && ! grep -q "MAX_STDIN_BYTES" "$f" && basename "$f"
+done
+# → context-enrichment-guard.js, hotfix-autoclose.js, plan-injector.js, spec-gate.js
+```
+
+**Propuesta**
+
+Aplicar el mismo cap. Es el ejemplo de por qué un chequeo de seguridad necesita un test que
+lo verifique en **todos** los archivos, no una pasada manual.
+
+**Estado:** abierto
+
+---
+
+## HUE-011 · Cero tests en todo `sdd/`
+
+- **Tipo / severidad:** `HUE` · S2
+- **Unidad:** `H-03` / `H-06` / `H-14`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+Los tres hooks del motor SDD —`spec-gate.js` (176 líneas, ocho ramas de decisión),
+`plan-injector.js` (121) y `hotfix-autoclose.js` (65)— no tienen ningún archivo de test.
+
+**Por qué importa**
+
+`spec-gate` es un hook **que bloquea**, con lógica de rutas legacy (`fixes/hotfixes/` vs
+`hotfixes/`) — exactamente el tipo de cosa que se rompe en una migración sin que nadie se
+entere. Los dos hallazgos de esta ronda sobre `sdd/` (`INC-005`, `HUE-010`) los habría
+encontrado cualquier suite mínima.
+
+**Evidencia**
+
+```bash
+ls templates/.claude/tests/ | grep -E "spec-gate|plan-injector|hotfix"
+# → (vacío)
+```
+
+**Propuesta**
+
+Es la segunda entrada más rentable del backlog de tests, después de `HUE-006`.
+
+**Estado:** abierto
+
+---
+
+## HUE-012 · Las reglas regex de `pre-write-guard` no están provocadas
+
+- **Tipo / severidad:** `HUE` · S2
+- **Unidad:** `H-04`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`provocar-reglas.mjs` existe para responder «¿esta regla puede fallar?» y cubre las reglas
+de `architect.js`. Las ~20 reglas regex de la capa 3 de `pre-write-guard.js` —`*ngIf`,
+`@Input()`, colores hardcodeados, ARCH-12, ARCH-13, A11Y-01, A11Y-02, LLM-01, LLM-02— no
+tienen ningún equivalente de provocación.
+
+**Por qué importa**
+
+Es la pregunta central del repo aplicada al revés. El linter AST corre cuando alguien
+ejecuta `npm run lint:arch`; el guard regex corre **en cada escritura**. La mitad del
+sistema de reglas que más veces se ejecuta es la que nadie provoca.
+
+`pre-write-guard.test.js` existe y cubre algunas reglas, pero testear no es provocar:
+comprueba que el guard bloquea lo que debe, no que cada regla individual siga viva.
+
+**Propuesta**
+
+Extender `provocar-reglas.mjs` con fixtures que se pasen al hook por stdin, o crear su
+equivalente. Es el hallazgo con más apalancamiento de esta ronda: convierte ~20 reglas de
+«asumimos que funcionan» a «comprobado».
+
+**Estado:** abierto
+
+---
+
+## ACO-004 · El orden de los hooks es un contrato tácito
+
+- **Tipo / severidad:** `ACO` · S2
+- **Unidad:** `H-00`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+Tres dependencias de orden, de las cuales solo una está escrita:
+
+| Dependencia | ¿Documentada? | Qué se rompe al reordenar |
+|---|---|---|
+| `spec-reflection` (Stop 2º) antes que `sync-check` (Stop 3º) | **no** | `sync-check` borra `session-writes.json`; si sube, `spec-reflection` pierde su evidencia |
+| `spec-gate` (1º) antes que `plan-injector` (4º) | sí, en el docblock de `plan-injector` | el injector inyectaría sobre escrituras que el gate iba a bloquear |
+| `discovery-tracker` (PostToolUse Read) antes de cualquier Edit | **no** | el Gate depende de que el PostToolUse ya haya corrido |
+
+**Por qué importa**
+
+`settings.json` se lee como una lista de hooks, no como una secuencia. Alguien que reordene
+por prolijidad rompe `C-02` sin ninguna señal.
+
+**Propuesta**
+
+Declarar el orden como contrato en `templates-contract.md`, con las tres dependencias
+nombradas, y un comentario en el propio `settings.json`.
+
+**Estado:** abierto
+
+---
+
+## INC-004 · El registro cuenta 16 hooks cableados; son 17
+
+- **Tipo / severidad:** `INC` · S3
+- **Unidad:** `H-00`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`TEMPLATES-REGISTRY.md` dice «7 eventos, 16 hooks cableados». Los eventos son 7; los
+comandos cableados son **17**. El que falta contar es `.claude/scripts/post-edit.js`, que
+vive fuera de `hooks/` pero está cableado como hook de `PostToolUse`.
+
+**Evidencia**
+
+```
+SessionStart 1 · UserPromptSubmit 1 · PreToolUse[Edit] 4 · PreToolUse[Bash] 2 ·
+PostToolUse[Read] 1 · PostToolUse[Edit] 2 · PostToolUseFailure 1 · PostCompact 1 · Stop 4
+TOTAL = 17     (17 comandos, 0 colgantes)
+```
+
+**Propuesta**
+
+Corregir el número y decir «16 en `hooks/` + `post-edit.js` en `.claude/scripts/`», que es
+la distinción que hace falta entender.
+
+**Estado:** abierto
+
+---
+
+## HUE-009 · Nada verifica que el cableado apunte a archivos que existen
+
+- **Tipo / severidad:** `HUE` · S3
+- **Unidad:** `H-00`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+Ningún test comprueba que los comandos de `settings.json` resuelvan a archivos reales. Hoy
+los 17 resuelven, pero es una coincidencia mantenida a mano.
+
+**Por qué importa**
+
+Un hook renombrado deja un comando colgante y Claude Code simplemente no lo ejecuta: el
+guardrail desaparece del proyecto del usuario sin ningún error visible.
+
+**Propuesta**
+
+Test de cinco líneas, del mismo tipo que `HUE-008`. Barato y cierra una clase entera de
+fallo silencioso.
+
+**Estado:** abierto
+
+---
+
+## HUE-013 · `GATE-B1` bloquearía una regla que documenta un hook
+
+- **Tipo / severidad:** `HUE` · S3
+- **Unidad:** `H-05`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`EXEC_CODE_RE` bloquea `require(`, `process.exit(`, `fs.readFileSync(` en cualquier
+superficie de guía. Una regla que **documenta** cómo funciona un hook dispara el gate.
+
+**Por qué importa**
+
+Es exactamente lo que hace `.claude/rules/templates-contract.md`: explicar el
+funcionamiento de los hooks dentro de un archivo de reglas.
+
+Verificado que **ninguna** regla actual del template ni de este repo lo dispara hoy, así
+que es riesgo latente y no un problema activo — por eso `S3`.
+
+**Propuesta**
+
+Excluir el contenido dentro de bloques de código markdown (``` ```` ```) del chequeo: ahí
+el código es cita, no lógica.
+
+**Estado:** abierto
+
+---
+
+## ACO-005 · `DETAIL:BEGIN` y `last_updated` son contratos sin declarar
+
+- **Tipo / severidad:** `ACO` · S3
+- **Unidad:** `H-01`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+- `<!-- DETAIL:BEGIN -->` — marca el corte entre Quick Reference y detalle. Lo usan
+  `session-start.js`, `compact-recovery.js` y los propios índices.
+- `**last_updated:** YYYY-MM-DD` — formato exacto que parsean `session-start.js` y
+  `discovery-tracker.js` para la frescura del brief.
+
+Ninguno figura en `templates-contract.md`.
+
+**Por qué importa**
+
+Un índice generado sin el marcador se inyecta entero, no su Quick Reference: el
+presupuesto de `session-start` (2.500 chars) lo trunca a la mitad de una tabla.
+
+**Estado:** abierto
+
+---
+
+## ACO-006 · `koa-prompt-ctx-{sessionId}.json` no declarado
+
+- **Tipo / severidad:** `ACO` · S3
+- **Unidad:** `H-02`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`prompt-context.js` guarda su estado de dedup —contador de prompts y hash de cada bloque—
+en `$TMPDIR/koa-prompt-ctx-{sessionId}.json`. No está declarado, y hereda el `sessionId`
+global de `HUE-002`: con el fallback `'default'`, un bloque inyectado en un proyecto puede
+quedar silenciado en otro durante 8 prompts.
+
+**Estado:** abierto
+
+---
+
+## ACO-007 · El estado del circuit breaker y del dedup de contexto no está declarado
+
+- **Tipo / severidad:** `ACO` · S3
+- **Unidad:** `H-04`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`pre-write-guard.js` mantiene dos familias de estado en `os.tmpdir()`:
+
+- `koa-breaker-{sessionId}.json` — contador de bloqueos idénticos (umbral 3)
+- `koa-ctx-{categoría}-{sessionId}.flag` — **once** flags, uno por categoría de inyección
+
+Ninguno declarado, todos con el `sessionId` de `HUE-002`. Con el fallback, el contador del
+breaker y los flags de dedup se comparten entre proyectos: el contexto de `features/` puede
+no inyectarse nunca en un proyecto porque otro ya lo consumió.
 
 **Estado:** abierto
 

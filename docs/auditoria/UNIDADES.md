@@ -5,8 +5,8 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **5/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
-**Hallazgos abiertos** — 16: **3 `S1`**, 7 `S2`, 6 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **12/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
+**Hallazgos abiertos** — 29: **4 `S1`**, 14 `S2`, 11 `S3`. Ver `HALLAZGOS.md`.
 
 ---
 
@@ -47,13 +47,13 @@
 
 | | ID | Hook | Evento | Puede bloquear |
 |---|---|---|---|---|
-| · | `H-00` | `.claude/settings.json` — el cableado | — | — |
-| · | `H-01` | `session-start.js` | SessionStart | no |
-| · | `H-02` | `prompt-context.js` | UserPromptSubmit | no |
-| · | `H-03` | `sdd/spec-gate.js` | PreToolUse `Edit\|Write\|MultiEdit` (1º) | **sí** |
-| · | `H-04` | `pre-write-guard.js` | PreToolUse `Edit\|Write\|MultiEdit` (2º) | **sí** |
-| · | `H-05` | `harness-gate.js` | PreToolUse `Edit\|Write\|MultiEdit` (3º) | **sí** |
-| · | `H-06` | `sdd/plan-injector.js` | PreToolUse `Edit\|Write\|MultiEdit` (4º) | no |
+| ! | `H-00` | `.claude/settings.json` — el cableado | — | — |
+| ✓ | `H-01` | `session-start.js` | SessionStart | no |
+| ✓ | `H-02` | `prompt-context.js` | UserPromptSubmit | no |
+| ! | `H-03` | `sdd/spec-gate.js` | PreToolUse `Edit\|Write\|MultiEdit` (1º) | **sí** |
+| ! | `H-04` | `pre-write-guard.js` | PreToolUse `Edit\|Write\|MultiEdit` (2º) | **sí** |
+| ! | `H-05` | `harness-gate.js` | PreToolUse `Edit\|Write\|MultiEdit` (3º) | **sí** |
+| ! | `H-06` | `sdd/plan-injector.js` | PreToolUse `Edit\|Write\|MultiEdit` (4º) | no |
 | · | `H-07` | `bash-guard.js` | PreToolUse `Bash` (1º) | **sí** |
 | · | `H-08` | `spec-diff-check.js` | PreToolUse `Bash` (2º) | **sí** |
 | · | `H-09` | `discovery-tracker.js` | PostToolUse `Read` | no |
@@ -67,6 +67,16 @@
 | · | `H-17` | `context-guardian.js` | Stop (4º) | **sí** |
 | · | `H-18` | `context-enrichment-guard.js` | — (opt-in, no cableado) | **sí** |
 | · | `H-19` | `validators/validate-file-contains.js` | invocado desde frontmatter de skills | **sí** |
+
+
+> **H-00 → H-06 cerradas — 2026-08-29.** 13 hallazgos nuevos, uno `S1`: `CAR-001`
+> (`plan-injector` inyecta ~6.155 tokens en cada Edit, sin dedup ni techo — la única pieza
+> del harness sin ningún control de costo). El bloque también reescribió `INC-001`: no hay
+> hueco de numeración ARCH, el namespace está repartido en tres implementaciones y la única
+> regla fantasma es `ARCH-14`.
+>
+> **Faltan `H-07` → `H-19`** (13 hooks). Evidencia ya recogida en esta ronda para `H-07`
+> (bash-guard verificado bloqueando creación por Bash) y `H-08` (`DEC-001`).
 
 **Preguntas propias del bloque:**
 - `H-00`: ¿el orden declarado en `settings.json` es el que las piezas asumen? ¿Un hook

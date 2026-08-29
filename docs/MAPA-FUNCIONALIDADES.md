@@ -365,7 +365,7 @@ naming, colisiones, refs colgantes y filas stale — sin escribir nada.
 
 | Script | Qué comprueba | Cuándo |
 |---|---|---|
-| `architect.js` | **22 códigos ARCH activos** (numerados hasta ARCH-26) sobre el AST real de TypeScript (no regex sobre código): UI sin Supabase, componentes sin Services inyectados, facades/services con su `.spec.ts`, `OnPush` obligatorio, sin `@angular/animations`, sin `*ngIf`/`[ngClass]`, sin `@keyframes`, sin colores Tailwind hardcodeados, disciplina de clases del DS con ratchet, contraste AA, sprawl del bento | `npm run lint:arch` · `arch-auditor` |
+| `architect.js` | Reglas `ARCH-*` sobre el AST real de TypeScript (no regex sobre código): UI sin Supabase, componentes sin Services inyectados, facades/services con su `.spec.ts`, `OnPush` obligatorio, sin `@angular/animations`, sin `*ngIf`/`[ngClass]`, sin `@keyframes`, sin colores Tailwind hardcodeados, disciplina de clases del DS con ratchet, contraste AA, sprawl del bento | `npm run lint:arch` · `arch-auditor` |
 | `lint-arch-wrapper.js` | Memoria de fallos: guarda el fallo en `arch-last-failure.json`, y cuando pasa escribe la lección en `LESSONS_LEARNED.md` | envuelve al anterior |
 | `indices-sync.js` | Auto-indexer AST (1343 líneas) con caché incremental por mtime | `npm run indices:sync` · `index-syncer` |
 | `check-bento-classes.js` | Freno al sprawl del bento contra un allowlist (cableado como ARCH-21) | `npm run check:bento` |
@@ -373,6 +373,13 @@ naming, colisiones, refs colgantes y filas stale — sin escribir nada.
 | `smoke-scripts.mjs` | Lo mismo para los scripts de `package.json`: mete un defecto a propósito y exige que el script se dé cuenta. Restaura siempre en el `finally` | al cerrar sesión |
 | `verificar-specs.mjs` | Integridad de enlaces entre specs (las dos puntas existen) | `npm run lint:specs` |
 | `set-env.js` | Inyecta creds en `environment.prod.ts` desde el entorno; falla si faltan | CI/CD |
+
+> **El namespace de códigos está repartido en tres superficies**, sin registro único:
+> `architect.js` (ARCH-01…11, 15…19, 21…26 · A11Y-03 · SEC-RLS-01/02/03, sobre AST),
+> `scripts/lib/a11y-guardrails.js` (ARCH-20) y `.claude/hooks/pre-write-guard.js`
+> (ARCH-12, ARCH-13 · A11Y-01, A11Y-02 · LLM-01, LLM-02, por regex en cada escritura).
+> No hay hueco de numeración; la única regla documentada sin implementación es `ARCH-14`.
+> Ver `docs/auditoria/HALLAZGOS.md` → `INC-001`.
 
 > `provocar-reglas.mjs` y `smoke-scripts.mjs` son la respuesta a
 > `docs/CHEQUEOS-QUE-NO-CHEQUEAN.md`: el problema de los chequeos verdes que nunca

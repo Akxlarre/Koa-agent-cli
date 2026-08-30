@@ -5,11 +5,26 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **36/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
-**Hallazgos abiertos** — 49: **7 `S1`**, 24 `S2`, 18 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **53/53 ✅** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
+**Hallazgos abiertos** — 61: **7 `S1`**, 27 `S2`, 27 `S3`. Ver `HALLAZGOS.md`.
 
-> **Bloques 0, 1 y 2 cerrados.** Quedan el CLI (`G-*`), los subagentes (`A-*`) y los
-> tests (`T-*`) para completar el nivel A.
+> ## NIVEL A COMPLETO — 2026-08-29
+>
+> Las 53 unidades con comportamiento, cerradas. **Los seis `S1` del harness están, sin
+> excepción, en hooks sin test** (ver `T-01`), y el séptimo (`DEC-004`) es que el auditor
+> de reglas cubre el 14% de lo que audita.
+>
+> **Los tres patrones estructurales que emergieron**, ninguno visible en una ficha
+> individual:
+> 1. **`Stop` malentendido.** `ACO-001`, `CAR-002` e `INC-007`: tres hooks asumen «fin de
+>    sesión» donde el evento significa «fin de respuesta».
+> 2. **Cobertura ↔ calidad.** Los hooks con test tienen hallazgos de diseño o de
+>    declaración; los sin test tienen los seis `S1`.
+> 3. **Las dos mitades del repo no están al mismo nivel.** El generador respeta sus cuatro
+>    fronteras, documenta sus decisiones difíciles donde se aplican y tiene un solo hallazgo
+>    con impacto real. El harness concentra los siete `S1`.
+>
+> Siguen el nivel B (41 unidades de prosa) y el nivel C (8 lotes).
 
 ---
 
@@ -159,16 +174,16 @@
 
 | | ID | Módulo | Responsabilidad declarada |
 |---|---|---|---|
-| · | `G-01` | `bin/index.js` | orquestación, sin lógica de negocio (techo ~150 líneas) |
-| · | `G-02` | `lib/config.js` | stack, validación, constantes |
-| · | `G-03` | `lib/runner.js` | spawn puro |
-| · | `G-04` | `lib/preflight.js` | checks de sistema, sin instalar |
-| · | `G-05` | `lib/installer.js` | solo npm/npx |
-| · | `G-06` | `lib/scaffolder.js` | solo filesystem |
-| · | `G-07` | `lib/generator.js` | subcomando `generate feature` |
-| · | `G-08` | `lib/feature-templates.js` | 11 plantillas, strings puros |
-| · | `G-09` | `lib/ui.js` | solo chalk |
-| · | `G-10` | Los 9 parches de `injectBoilerplate()` | **en lote** — es donde se rompe el proyecto generado |
+| ! | `G-01` | `bin/index.js` | orquestación, sin lógica de negocio (techo ~150 líneas) |
+| ! | `G-02` | `lib/config.js` | stack, validación, constantes |
+| ✓ | `G-03` | `lib/runner.js` | spawn puro |
+| ✓ | `G-04` | `lib/preflight.js` | checks de sistema, sin instalar |
+| ✓ | `G-05` | `lib/installer.js` | solo npm/npx |
+| ✓ | `G-06` | `lib/scaffolder.js` | solo filesystem |
+| ! | `G-07` | `lib/generator.js` | subcomando `generate feature` |
+| ! | `G-08` | `lib/feature-templates.js` | 11 plantillas, strings puros |
+| ✓ | `G-09` | `lib/ui.js` | solo chalk |
+| ! | `G-10` | Los 9 parches de `injectBoilerplate()` | **en lote** — es donde se rompe el proyecto generado |
 
 **Preguntas propias del bloque:**
 - ¿Cada módulo respeta la frontera de `.claude/rules/cli-architecture.md`, o hay filtración?
@@ -181,11 +196,11 @@
 
 | | ID | Subagente | Modelo | Tools |
 |---|---|---|---|---|
-| · | `A-01` | `discovery-scout` | haiku | Read, Grep, Glob |
-| · | `A-02` | `arch-auditor` | haiku | Bash, Read, Grep |
-| · | `A-03` | `index-syncer` | haiku | Bash, Read, Edit, Write, Grep, Glob |
-| · | `A-04` | `supabase-schema` | haiku | Read, Grep, Glob, Bash |
-| · | `A-05` | `code-judge` | opus | Read, Grep, Glob (**sin Bash, deliberado**) |
+| ✓ | `A-01` | `discovery-scout` | haiku | Read, Grep, Glob |
+| ✓ | `A-02` | `arch-auditor` | haiku | Bash, Read, Grep |
+| ✓ | `A-03` | `index-syncer` | haiku | Bash, Read, Edit, Write, Grep, Glob |
+| ✓ | `A-04` | `supabase-schema` | haiku | Read, Grep, Glob, Bash |
+| ✓ | `A-05` | `code-judge` | opus | Read, Grep, Glob (**sin Bash, deliberado**) |
 
 **Preguntas propias del bloque:**
 - ¿El set de `tools` es el mínimo necesario? ¿Alguno puede hacer más de lo que su
@@ -199,8 +214,8 @@
 
 | | ID | Unidad | Contenido |
 |---|---|---|---|
-| · | `T-01` | `templates/.claude/tests/*.test.js` | 9 archivos — **¿ejecutan la ruta de fallo?** |
-| · | `T-02` | `templates/boilerplate/scripts/lib/*.test.mjs` | 13 archivos de funciones puras |
+| ✓ | `T-01` | `templates/.claude/tests/*.test.js` | 9 archivos — **¿ejecutan la ruta de fallo?** |
+| ✓ | `T-02` | `templates/boilerplate/scripts/lib/*.test.mjs` | 13 archivos de funciones puras |
 
 **La pregunta del bloque**, que es la más importante de toda la auditoría:
 

@@ -14,20 +14,28 @@
  * Exit codes:
  *   0 = permitir el commit
  *   2 = bloquear el commit con mensaje de qué falta actualizar
+ *
+ * DEC-001 (S1) — la entrada llegaba de `process.env.TOOL_INPUT`, que NO existe:
+ * no está entre las variables que Claude Code expone a los hooks. Con el comando
+ * siempre vacío, la guarda de abajo cortaba en la primera línea y este chequeo no
+ * podía fallar nunca. La lógica estaba bien; estaba desconectada de su entrada.
+ * Ahora lee stdin, que es el contrato documentado, vía lib/payload.js.
  */
 
 const fs = require('fs');
 const path = require('path');
+const payload = require('./lib/payload.js');
 
-// Solo aplica a comandos git commit
-const toolInput = process.env.TOOL_INPUT || '{}';
-let cmd = '';
-try { cmd = JSON.parse(toolInput).command || ''; } catch { /* ignore */ }
+payload.read().then((input) => {
+  // Solo aplica a comandos git commit
+  const cmd = input.command;
+  if (!cmd.includes('git') || !cmd.includes('commit')) {
+    process.exit(0);
+  }
+  revisarIndices();
+});
 
-if (!cmd.includes('git') || !cmd.includes('commit')) {
-  process.exit(0);
-}
-
+function revisarIndices() {
 const sessionWritesPath = path.join(process.cwd(), '.claude', 'temp', 'session-writes.json');
 if (!fs.existsSync(sessionWritesPath)) process.exit(0);
 
@@ -93,3 +101,4 @@ if (missing.length > 0) {
 }
 
 process.exit(0);
+} // fin de revisarIndices()

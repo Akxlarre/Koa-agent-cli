@@ -38,6 +38,9 @@ let sessionCounter = 0;
  * @returns {{ exitCode: number, stdout: string, stderr: string, sessionId: string }}
  */
 /** Deja el discovery flag donde el hook lo busca, usando su mismo modulo. */
+/** Proyectos temporales creados por los helpers, para borrarlos al final. */
+const proyectosTemp = [];
+
 function sembrarDescubrimiento(payload) {
   const session = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'session.js'));
   session.appendState(payload, 'discovery.flag',
@@ -48,6 +51,7 @@ function runHook(input, opts = {}) {
   const { discovered = true } = opts;
   const sessionId = `test-session-${Date.now()}-${sessionCounter++}`;
   const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-'));
+  proyectosTemp.push(proyecto);
   const payload = { ...input, session_id: sessionId, cwd: proyecto };
 
   if (discovered) {
@@ -74,6 +78,7 @@ function runHook(input, opts = {}) {
 function runHookRepeated(input, times) {
   const sessionId = `test-breaker-${Date.now()}-${sessionCounter++}`;
   const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-brk-'));
+  proyectosTemp.push(proyecto);
   const payload = { ...input, session_id: sessionId, cwd: proyecto };
   sembrarDescubrimiento(payload);
 

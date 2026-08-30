@@ -119,7 +119,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-013` | S2 | Lente 1 | 21 artefactos compartidos, 3 declarados. Y `templates-contract.md` vive en este repo, no en el payload: el proyecto generado no recibe ninguna declaración de sus propios contratos | abierto |
 | `HUE-031` | S3 | Lente 2 | `pre-write-guard` capa 1 y `harness-gate` protegen superficies complementarias del harness sin criterio común; ninguno cubre `.claude/skills/` ni `.claude/agents/` | abierto |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | abierto |
-| `HUE-002` | **S1** | `C-01` | `sessionId` sale de una env var con fallback `'default'`; el flag es global en TMPDIR y nunca se borra | abierto |
+| `HUE-002` | **S1** | `C-01` | **(ampliado)** `CLAUDE_SESSION_ID` **no existe**: `sessionId` es siempre `'default'`. Demostrado que una lectura en un proyecto levanta el Discovery Gate de otro | abierto |
 | `HUE-005` | **S1** | `C-05` | `blueprint.json` no se valida dentro del proyecto generado, y su `stack` crudo decide qué guardrails corren | abierto |
 | `ACO-001` | S2 | `C-02` | `sync-check` borra `session-writes.json` en cada `Stop` (que es por respuesta, no por sesión) | abierto |
 | `HUE-001` | S2 | `C-01` | El Discovery Gate solo comprueba que el flag exista; leer `context/` lo levanta sin ningún índice | abierto |
@@ -1710,3 +1710,64 @@ idioma — no hay test que cruce lo que un comando genera con lo que el auditor 
 
 **Arreglo:** `ADR-004` §2 — dos formas válidas, el interruptor `specs/AUTHORS.md` decide
 cuál, una sola implementación, y el test que cruza generador y detector.
+
+---
+
+## HUE-002 · Ampliación al diseñar: el fallback no es un fallback
+
+**Añadido en fase de diseño, al ejecutar la lista de verificación de `ADR-003`.**
+
+La ficha describía la consecuencia en condicional: *«con ese fallback, todos los proyectos de
+la máquina comparten…»*. **El condicional sobra.**
+
+**1 · `CLAUDE_SESSION_ID` no existe.** No está en la lista de variables de entorno que la
+documentación de Claude Code expone a los hooks (`$CLAUDE_PROJECT_DIR`, `$CLAUDE_PLUGIN_ROOT`,
+`$CLAUDE_PLUGIN_DATA`, `$CLAUDE_CODE_REMOTE`, `$CLAUDE_CODE_BRIDGE_SESSION_ID`,
+`$CLAUDE_EFFORT`, `$CLAUDE_PLUGIN_OPTION_*`). Comprobado además en un runtime real:
+
+```
+$ env | grep -c '^CLAUDE_SESSION_ID='
+0
+```
+
+Existe `CLAUDE_CODE_SESSION_ID` —otro nombre— y tampoco está documentada como contrato para
+hooks. La que sí lo está es `session_id`, **en el payload de stdin**, que ningún hook lee.
+
+**2 · Entonces `sessionId` es siempre `'default'`.** Los cinco hooks resuelven a la misma
+cadena en todas las sesiones y todos los proyectos de la máquina. No es el caso degradado: es
+el único caso.
+
+**3 · Demostrado de punta a punta.** Dos proyectos distintos, dos sesiones distintas:
+
+```
+PASO 1 — proyecto A, sesión 'sesion-AAA': el agente lee indices/COMPONENTS.md
+   flag creado: koa-discovery-default.flag          ← una sola clave, global
+
+PASO 2 — proyecto B, sesión 'sesion-ZZZ' (otro proyecto, otra sesión, nunca leyó nada)
+   Discovery Gate exit=0   (2 = bloquea · 0 = deja pasar)
+```
+
+**El Discovery Gate del proyecto B se levanta con una lectura del proyecto A.** Y como el
+flag vive en `TMPDIR` y nadie lo borra, queda levantado para toda sesión posterior en esa
+máquina hasta que el SO limpie `/tmp`.
+
+**Alcance real, corregido**
+
+| Artefacto | Qué deja de funcionar |
+|---|---|
+| `koa-discovery-default.flag` | El Discovery Gate no bloquea desde la segunda sesión de la máquina, nunca más |
+| `koa-ctx-${categoría}-default.flag` | Cada inyección de contexto por categoría ocurre **una vez por máquina**, no por sesión |
+| `koa-breaker-default.json` | Un solo presupuesto de fallos para todas las sesiones y proyectos |
+| `koa-prompt-ctx-default.json` | El contador de `REPEAT_EVERY=8` es compartido |
+
+**Severidad:** sigue `S1`, pero por un motivo más fuerte que el registrado. No es *«el
+fallback podría colisionar»*: es que **el guardrail principal del harness está desactivado en
+la práctica en toda sesión que no sea la primera de la máquina**, y nada lo indica.
+
+Refuerza también `HUE-032` y `DUP-004` (`ADR-003` §1-2): el estado no se comparte solo entre
+hilos de una sesión — se comparte entre todo.
+
+**Arreglo:** el ya diseñado en `ADR-001` §1, `sessionId(payload)`, cuyo primer nivel es
+`payload.session_id` —el campo documentado— y cuyo último nivel deriva del `cwd`, nunca
+`'default'`. Lo que cambia es la prioridad: pasa a ser lo primero de la tanda 0, antes que
+`SEC-001`.

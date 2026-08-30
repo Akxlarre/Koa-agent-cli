@@ -102,10 +102,23 @@ subagentes** y ninguno lee `agent_id`, así que el estado de dedup es un pozo co
 entre seis hilos (`HUE-032`, `S1`) y `discovery-scout` levanta el Gate del hilo principal
 (`DUP-004`). Es `ADR-003`.
 
-> Poner esas afirmaciones como precondición en vez de como supuesto es lo que hizo que el
-> error apareciera en un documento y no en producción. **Cada ADR lleva su lista** — la de
-> `ADR-003` está abierta, y va en la tanda 0 porque `HUE-032` cambia la firma de
-> `lib/session.js`.
+Y la lista de `ADR-003`, ejecutada después, encontró lo mayor: **`CLAUDE_SESSION_ID` no
+existe.** No está entre las variables que la documentación expone a los hooks, y en un
+runtime real `env | grep -c '^CLAUDE_SESSION_ID='` da `0`. Los cinco hooks que la leen
+resuelven a `'default'` siempre — no es un fallback, es el único valor. Demostrado con dos
+proyectos y dos sesiones:
+
+```
+proyecto A, sesión AAA: lee indices/COMPONENTS.md  →  koa-discovery-default.flag
+proyecto B, sesión ZZZ: intenta escribir           →  Discovery Gate exit=0
+```
+
+**El guardrail principal del harness está desactivado en toda sesión que no sea la primera de
+la máquina**, y el flag vive en `TMPDIR` sin que nadie lo borre. `HUE-002` pasa a ser lo
+primero de la tanda 0.
+
+> Poner esas afirmaciones como precondición en vez de como supuesto es lo que hizo que los
+> tres errores aparecieran en un documento y no en producción. **Cada ADR lleva su lista.**
 
 ---
 
@@ -114,8 +127,9 @@ entre seis hilos (`HUE-032`, `S1`) y `discovery-scout` levanta el Gate del hilo 
 Cuando pasemos a código, el orden es el de `ADR-001` §Plan de migración:
 
 ```
-tanda 0  S1 independientes del núcleo   riesgo nulo   SEC-001 · DEC-003 · INC-020 · test de post-edit
-         + la verificación de ADR-003 (agent_id en el payload) — precondición de session.js
+tanda 0  HUE-002 primero              ← el Gate está desactivado hoy, en toda sesión que
+                                        no sea la primera de la máquina
+         luego SEC-001 · DEC-003 · INC-020 · test de post-edit      riesgo nulo
 tanda 1  escribir el núcleo             riesgo nulo   cinco módulos + tests, sin tocar hooks
 tanda 2  tests de los 11 hooks sin test riesgo nulo   contra el comportamiento actual, bugs incluidos
 tanda 3  migrar módulo por módulo       acotado       payload → session → paths → budget → contracts

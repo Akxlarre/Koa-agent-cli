@@ -169,18 +169,42 @@ cablearlo.
 
 ---
 
-## Verificación — pendiente
+## Verificación — ejecutada, y encontró algo mayor
 
-La misma lista que `ADR-002` dejó, para lo que este ADR afirma:
+| Afirmación | Resultado |
+|---|---|
+| `agent_id` llega en el payload dentro de un subagente | ✅ documentado: *«the input carries the `agent_id` and `agent_type`»* |
+| `SubagentStop` recibe `agent_id` | ✅ documentado como campo común del contexto de subagente |
+| `PreCompact` puede escribir a disco antes de compactar | ✅ es un command hook síncrono, previo a la compactación |
+| El `session_id` del subagente es el mismo que el del hilo principal | ⚠️ **no está documentado explícitamente** — ver abajo |
 
-- [ ] `agent_id` llega efectivamente en el payload de `PreToolUse`/`PostToolUse` dentro de un
-      subagente, y **el `session_id` es el mismo** que el del hilo principal
-- [ ] `SubagentStop` recibe `agent_id` — sin eso no puede limpiar el ámbito de hilo
-- [ ] `PreCompact` puede escribir a disco antes de la compactación
+### La cuarta se volvió irrelevante, por un motivo peor
 
-Las dos primeras se comprueban con un hook de dos líneas que vuelca el payload y un subagente
-que lea un archivo. **Va en la tanda 0, antes de escribir `session.js`** — porque `HUE-032`
-cambia la firma de todo el módulo.
+Al buscar si el `session_id` cambia dentro de un subagente apareció que **la variable de la
+que hoy sale la identidad no existe.** `CLAUDE_SESSION_ID` no está entre las que la
+documentación expone a los hooks, y en un runtime real:
+
+```
+$ env | grep -c '^CLAUDE_SESSION_ID='
+0
+```
+
+Los cinco hooks que la leen resuelven a `'default'` **siempre**. Demostrado con dos proyectos
+y dos sesiones distintas: una lectura de `indices/COMPONENTS.md` en el proyecto A deja el
+Discovery Gate del proyecto B en `exit=0`. Ver la ampliación de `HUE-002`.
+
+**Qué significa para este ADR.** El §1 decía que el estado es un pozo compartido *entre el
+hilo principal y sus subagentes*. Es cierto y se queda corto: **está compartido entre todo**
+—sesiones, proyectos, máquina— porque la clave es una constante. La separación
+`sessionScope` / `threadScope` sigue siendo la decisión correcta; lo que cambia es que **no
+puede construirse encima de la identidad actual**, porque no hay ninguna.
+
+Por eso `sessionId(payload)` pasa a ser lo primero de la tanda 0, antes que `SEC-001`, y el
+nivel `process.env.CLAUDE_SESSION_ID` sale del diseño de `ADR-001` §1.
+
+Que el `session_id` del payload sea o no el mismo dentro de un subagente deja de ser
+bloqueante: `threadScope` se indexa por `agent_id ?? 'main'`, que está documentado y es
+suficiente aunque el `session_id` coincida.
 
 ---
 

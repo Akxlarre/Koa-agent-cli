@@ -102,12 +102,27 @@ cleanup({ source })        // borra por ANTIGÜEDAD; nunca el estado de la sesi�
 
 ```
 1. payload.session_id           ← lo que Claude Code entrega y hoy nadie lee
-2. process.env.CLAUDE_SESSION_ID
-3. 'proj-' + sha1(process.cwd()).slice(0,8)   ← acotado al proyecto, nunca 'default'
+2. 'proj-' + sha1(process.cwd()).slice(0,8)   ← acotado al proyecto, nunca 'default'
 ```
 
-El tercer nivel es lo que mata la fuga por construcción: aun sin ninguna señal de sesión,
+El segundo nivel es lo que mata la fuga por construcción: aun sin ninguna señal de sesión,
 dos proyectos distintos nunca comparten estado.
+
+> **Verificado, y peor de lo registrado.** La primera versión ponía
+> `process.env.CLAUDE_SESSION_ID` como segundo nivel, tratándolo como una fuente válida
+> degradada. **Esa variable no existe**: no está entre las que la documentación expone a los
+> hooks, y en un runtime real `env | grep -c '^CLAUDE_SESSION_ID='` da `0`. Existe
+> `CLAUDE_CODE_SESSION_ID`, otro nombre, tampoco documentada como contrato.
+>
+> Entonces los cinco hooks no tienen un fallback riesgoso: **tienen `'default'` como único
+> valor, siempre**. Demostrado de punta a punta —una lectura en el proyecto A levanta el
+> Discovery Gate del proyecto B, en otra sesión— en la ampliación de `HUE-002`.
+>
+> Se saca del diseño: una variable de entorno no documentada no es un nivel de fallback, es
+> la causa del problema. El campo `session_id` del payload sí está documentado.
+>
+> **Consecuencia de orden:** esto pasa a ser lo primero de la tanda 0. El Discovery Gate está
+> desactivado en la práctica en toda sesión que no sea la primera de la máquina.
 
 **(b) El estado se muda de `os.tmpdir()` a `.claude/temp/session/<id>/`.**
 

@@ -88,25 +88,40 @@ describe('QUÉ NO RASTREA', () => {
   }
 });
 
-describe('BUGS ACTUALES — caracterizados, no arreglados', () => {
-  test('(bug) .includes("src/app/") rastrea rutas que no son de la app', () => {
+describe('PREFIJO, NO SUBSTRING — cerrado en la tanda 3', () => {
+  // Estos tres fijaban el comportamiento anterior. Al migrar el hook a
+  // lib/paths.js y lib/payload.js fallaron —la señal esperada— y se
+  // actualizaron a propósito.
+
+  test('docs/ejemplos/src/app/ ya NO se rastrea', () => {
     correr('docs/ejemplos/src/app/demo.component.ts');
-    assert.deepEqual(
-      tracker(), ['docs/ejemplos/src/app/demo.component.ts'],
-      'la tanda 3 lo cambia por paths.belongsToIndex, que compara por prefijo',
-    );
+    assert.equal(tracker(), null,
+      'antes entraba: .includes("src/app/") daba verdadero');
   });
 
-  test('(bug) node_modules también entra', () => {
+  test('node_modules tampoco', () => {
     correr('node_modules/algo/src/app/x.ts');
-    assert.equal(tracker().length, 1);
+    assert.equal(tracker(), null);
   });
 
-  test('guarda la ruta TAL COMO LLEGA — absoluta si vino absoluta', () => {
-    // sync-check depende de esto: hace path.isAbsolute() antes de resolver.
+  test('un archivo fuera del proyecto no es de nadie', () => {
+    correr('/otro/lado/src/app/x.ts');
+    assert.equal(tracker(), null);
+  });
+
+  test('guarda la ruta RELATIVA, que es lo que declara el contrato', () => {
+    // lib/contracts.js declara este artefacto como "array JSON de rutas
+    // relativas con separadores /". Antes se guardaba tal como llegaba, o sea
+    // absoluta si venía absoluta. sync-check acepta las dos.
     const abs = path.join(proyecto, 'src/app/x.ts');
     correr(abs);
-    assert.deepEqual(tracker(), [abs.replace(/\\/g, '/')]);
+    assert.deepEqual(tracker(), ['src/app/x.ts']);
+  });
+
+  test('una ruta relativa y su equivalente absoluta no se duplican', () => {
+    correr('src/app/x.ts');
+    correr(path.join(proyecto, 'src/app/x.ts'));
+    assert.equal(tracker().length, 1, 'antes eran dos entradas distintas');
   });
 });
 

@@ -91,7 +91,7 @@ const CONTRACTS = {
   },
 
   'LESSONS_LEARNED.md': {
-    path: 'LESSONS_LEARNED.md',
+    path: '.claude/temp/LESSONS_LEARNED.md',
     format: 'tabla markdown; el separador "|" DEBE ir escapado en el texto libre',
     producers: ['.claude/hooks/failure-tracker.js', 'scripts/lint-arch-wrapper.js'],
     consumers: ['.claude/hooks/pre-write-guard.js'],

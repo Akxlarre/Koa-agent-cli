@@ -73,7 +73,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | abierto |
 | `SEC-001` | **S1** | `H-11` | `post-edit.js` interpola la ruta del payload en una cadena de shell: una ruta con comillas ejecuta comandos arbitrarios | abierto |
 | `DEC-003` | **S1** | `H-11` | `post-edit.js` usa `import` bajo un `package.json` sin `type:module`: no carga en Node 20/21, el mínimo que el CLI exige | abierto |
-| `HUE-016` | S2 | `H-12` | Un error con `\|` corrompe `LESSONS_LEARNED.md` en el siguiente parseo; se pierden firma y conteo, y el daño es acumulativo | abierto |
+| `HUE-016` | S2 | `H-12` | **(remedido)** Un error con `\|` corrompe la fila UNA vez y se estabiliza; lo que se rompe para siempre es el dedup de esa entrada | abierto |
 | `DUP-002` | S2 | `H-12` | `failure-tracker` y `lint-arch-wrapper` escriben ambos en `LESSONS_LEARNED.md` con formatos distintos | abierto |
 | `CAR-002` | S2 | `H-17` | `context-guardian` avisa en cada respuesta indefinidamente: no tiene anti-bucle | abierto |
 | `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | abierto |
@@ -137,6 +137,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | abierto |
 | `HUE-032` | **S1** | `diseño` | Los 18 hooks corren dentro de los 5 subagentes y ninguno lee `agent_id`: todo el estado de sesión es un pozo compartido entre el hilo principal y sus subagentes | abierto |
 | `DEC-007` | S3 | `diseño` | Cuatro de las once extensiones exentas de `spec-gate` nunca disparan: `path.extname('.npmrc')` es `''`, y los dotfiles reales se llaman así enteros | abierto |
+| `DEC-008` | S2 | `diseño` | El detector de plantillas de `context-enrichment-guard` no dispara en un proyecto recién generado: `injectVars` borra el único marcador que buscaba | abierto |
 | `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | abierto |
 
 ---
@@ -1805,3 +1806,78 @@ los dos lo exime**.
 **Ya está arreglado en el núcleo.** `lib/paths.js` compara también contra el basename cuando
 el archivo empieza con punto, y tiene su propio test — de hecho ese test fue el que encontró
 el bug del lado del núcleo antes de que apareciera acá.
+
+---
+
+## DEC-008 · El Day 0 Context Guard no puede disparar el Día 0
+
+**Tipo:** `DEC` · **Severidad:** `S2` (contexto B) · **Unidad:** encontrado al escribir su
+test (tanda 2) · **Estado:** abierto
+
+`context-enrichment-guard.js` bloquea escribir código si `context/domain.md` o
+`indices/DATABASE.md` siguen siendo plantillas sin rellenar. Detecta «plantilla» así:
+
+```js
+const PLACEHOLDER_MARKERS = ['[TODO]', '{{PROJECT_NAME}}', '<!-- template -->'];
+const MIN_MEANINGFUL_LENGTH = 50;
+```
+
+**Ninguno de los dos archivos cumple ninguna de las dos condiciones**, medido sobre un
+proyecto realmente generado con `copyTemplates`:
+
+```
+context/domain.md      len=2901   marcadores: NINGUNO   → el guard lo da por LLENO
+indices/DATABASE.md    len=1353   marcadores: NINGUNO   → el guard lo da por LLENO
+```
+
+Las dos plantillas superan los 50 chars por su propio andamiaje —es el mismo mecanismo de
+`DEC-006`— y el único marcador que sí traían, `{{PROJECT_NAME}}` en `domain.md`, **lo borra
+el scaffolder**: `injectVars` lo reemplaza al generar. En `templates/` el guard todavía
+atraparía `domain.md`; en el producto no.
+
+**Lo que lo vuelve interesante:** el hook es opt-in y su docblock explica por qué.
+
+> *«Wireado por defecto, este hook bloquearía TODA escritura de código desde el minuto cero,
+> antes de que el usuario alcance a llenar nada.»*
+
+Esa justificación es falsa. Cableado por defecto **no bloquearía nada**, porque su detector
+no dispara nunca en el caso para el que fue escrito. La decisión de dejarlo apagado se tomó
+para evitar un comportamiento que el hook no tiene.
+
+**Arreglo:** `lib/budget.js` ya trae `isPlaceholder()`, que mide contenido real quitando
+comentarios, encabezados, blockquotes y bullets vacíos —las cuatro plantillas de `context/`
+caen a 0-66 chars con él—. Reemplazar el detector por esa función es el cambio; después hay
+que **volver a decidir** si el hook se cablea, esta vez sabiendo qué hace.
+
+---
+
+## HUE-016 · Remedido al escribir su test: no es acumulativo, es un punto fijo
+
+**Corrección de la ficha, hecha en la tanda 2.** `H-12` decía *«se pierden firma y conteo, y
+el daño es acumulativo»*. Trazado ronda por ronda contra el hook real:
+
+```
+ronda 0 (escritura)      | … | `Bash` | a | b | c fallo | 1 | `Bash:a | b | c fallo` |  |
+ronda 1 (tras re-parseo) | … | `Bash` | a | b | c fallo | 1 | `Bash:a` | b |
+ronda 2                  | … | `Bash` | a | b | c fallo | 1 | `Bash:a` | b |
+ronda 3                  | … | `Bash` | a | b | c fallo | 1 | `Bash:a` | b |
+```
+
+**Se corrompe una vez y se estabiliza.** No sigue degradándose: llega a un punto fijo.
+
+**Pero la consecuencia real es peor que la descrita**, y es permanente. Lo que se parte es la
+**firma**, que es la clave del dedup. La firma calculada para el mismo error sigue siendo
+`Bash:a | b | c fallo` y la guardada quedó en `Bash:a`: no vuelven a coincidir nunca.
+Medido, cinco fallas idénticas:
+
+```
+mismo error CON pipe   → 5 filas   (el dedup dejó de funcionar)
+mismo error SIN pipe   → 1 fila con contador 5
+```
+
+Y con `MAX_ENTRIES = 20`, un error recurrente que contenga `|` genera un duplicado por vez y
+**desaloja por rotación las entradas buenas**. Hay un test que lo demuestra: una lección
+valiosa registrada primero desaparece tras 22 fallas de un error con pipes.
+
+El arreglo no cambia: escapar el separador en el productor. Lo que cambia es el motivo por el
+que urge — no es que el archivo se degrade, es que la memoria institucional se vacía sola.

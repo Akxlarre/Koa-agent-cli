@@ -25,7 +25,13 @@ const budget = require('./lib/budget.js');
 // Lee su payload por stdin como el resto: de ahi sale el `session_id` que los
 // cuatro hooks del discovery flag deben compartir. Con un id distinto,
 // compact-recovery no encontraria lo que discovery-tracker escribio.
-payload.read().then((PAYLOAD) => reinyectar(PAYLOAD, PAYLOAD.cwd));
+payload.read().then((PAYLOAD) => {
+  // La dedup de budget.js significa «ya lo dije y vos todavia lo tenes». Tras una
+  // compactacion la segunda mitad es falsa, asi que se olvida: los hooks que
+  // dedupican vuelven a emitir en la proxima oportunidad.
+  budget.olvidar(PAYLOAD);
+  reinyectar(PAYLOAD, PAYLOAD.cwd);
+});
 
 function reinyectar(PAYLOAD, cwd) {
 const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';

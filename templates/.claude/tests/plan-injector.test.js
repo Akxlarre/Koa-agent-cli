@@ -2,14 +2,17 @@
 /**
  * plan-injector.test.js — Contract tests de sdd/plan-injector.js
  *
- * CAR-001 (S1). Inyecta el contrato SDD vivo en CADA Edit de codigo de produccion.
+ * CAR-001 (S1) — CERRADO en la tanda 3.
  *
- * Precision sobre la ficha: el hook SI tiene tope por seccion
- * (MAX_SECTION_CHARS = 8000, tres secciones). Lo que no tiene es DEDUP ni
- * presupuesto de sesion — asi que diez ediciones con la misma spec activa pagan
- * diez veces el mismo contenido. Eso es lo que cierra lib/budget.js.
+ * El hook inyecta el contrato SDD vivo en cada Edit de codigo de produccion.
+ * Tenia tope por seccion (MAX_SECTION_CHARS = 8000 por spec, plan y tasks) pero
+ * ninguna DEDUP: diez ediciones con la misma spec activa pagaban diez veces el
+ * mismo contenido, identico byte por byte — 246.220 chars medidos.
  *
- * TESTS DE CARACTERIZACION: describen el comportamiento ACTUAL.
+ * Migrado a lib/budget.js, que dedupica por CONTENIDO: si la spec cambia se
+ * vuelve a emitir porque es informacion nueva; si no cambio, calla. Y a
+ * lib/paths.js, que le da la misma respuesta que spec-gate sobre que es codigo
+ * de produccion — antes cada uno llevaba su lista de exentos y divergian.
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -111,22 +114,40 @@ describe('QUE INYECTA — un contrato distinto por tipo de track', () => {
   });
 });
 
-describe('CAR-001 — tope por seccion, pero ninguna dedup', () => {
+describe('CAR-001 — tope por seccion, y ahora dedup por contenido', () => {
   test('tope de 8000 chars por seccion, y lo dice', () => {
     conSpec('0001-x', 20000);
     const c = correr('src/app/x.component.ts').contexto;
     assert.match(c, /\[truncado a 8000 chars\]/);
   });
 
-  test('(bug) diez ediciones inyectan diez veces el mismo contrato', () => {
+  test('CERRADO: diez ediciones inyectan el contrato UNA vez', () => {
     conSpec('0001-x', 7900);
     const tamanos = Array.from({ length: 10 }, () => correr('src/app/x.component.ts').bytes);
 
-    assert.ok(tamanos.every((t) => t > 20000), 'cada Edit paga el contrato entero');
-    assert.equal(new Set(tamanos).size, 1, 'y siempre el mismo, byte por byte');
+    const emisiones = tamanos.filter((t) => t > 0);
+    assert.equal(emisiones.length, 1, 'antes eran diez, identicas byte por byte');
+    assert.ok(emisiones[0] > 20000, 'la primera si trae el contrato entero');
 
     const total = tamanos.reduce((a, b) => a + b, 0);
-    assert.ok(total > 200000, `${total} chars en 10 ediciones — lo cierra lib/budget.js`);
+    assert.ok(total < 30000, `${total} chars en 10 ediciones — antes eran 246.220`);
+  });
+
+  test('si la spec CAMBIA se vuelve a emitir — es informacion nueva', () => {
+    conSpec('0001-x', 200);
+    assert.ok(correr('src/app/x.component.ts').bytes > 0, 'primera vez');
+    assert.equal(correr('src/app/x.component.ts').bytes, 0, 'sin cambios, calla');
+
+    escribir('specs/specs/0001-x/tasks.md', '# TASKS\n- [x] la primera tarea quedo lista');
+    assert.ok(correr('src/app/x.component.ts').bytes > 0, 'tasks.md cambio: hay que decirlo');
+  });
+
+  test('cambiar de track tambien se emite', () => {
+    conSpec('0001-x', 200);
+    correr('src/app/x.component.ts');
+    escribir('specs/.active', 'fix-001-kpi');
+    escribir('specs/fixes/fix-001-kpi/fix.md', '# FIX\ncausa raiz distinta');
+    assert.ok(correr('src/app/x.component.ts').bytes > 0);
   });
 
   test('el techo real de una sola inyeccion ronda los 24.000 chars', () => {
@@ -151,9 +172,19 @@ describe('SOBRE QUE ARCHIVOS ACTUA', () => {
     test(`no inyecta en ${p}`, () => assert.equal(correr(p).bytes, 0));
   }
 
-  test('(bug) .mdx NO esta en su lista de exentos, pero si en la de spec-gate', () => {
-    assert.ok(correr('src/guia.mdx').bytes > 0,
-      'la divergencia que cierra lib/paths.js con la union de ambas listas');
+  test('CERRADO: .mdx ya no recibe el contrato — misma respuesta que spec-gate', () => {
+    assert.equal(correr('src/guia.mdx').bytes, 0,
+      'antes pasaba el gate como "no producto" y aun asi recibia el contrato entero');
+  });
+
+  test('los dotfiles tampoco (DEC-007)', () => {
+    for (const p of ['src/.npmrc', 'src/.env', 'src/.gitignore']) {
+      assert.equal(correr(p).bytes, 0, `${p} no es codigo de produccion`);
+    }
+  });
+
+  test('docs/ejemplos/src/app/ no es codigo de la app', () => {
+    assert.equal(correr('docs/ejemplos/src/app/demo.component.ts').bytes, 0);
   });
 });
 

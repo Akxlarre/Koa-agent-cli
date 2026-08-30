@@ -24,6 +24,8 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const session = require('./session.js');
 
 /** Marcador que los indices ya usan para separar referencia de ejemplos. */
@@ -112,6 +114,27 @@ function inject(payload, key, content, {
   return texto;
 }
 
+/**
+ * Olvida lo dicho: la proxima vez se vuelve a emitir.
+ *
+ * La dedup significa «ya lo dije Y vos todavia lo tenes». Tras una compactacion
+ * la segunda mitad es falsa: el agente perdio el contexto. Sin esto, un hook que
+ * dedupica por sesion callaria para siempre sobre algo que el agente ya no ve.
+ * Lo llama compact-recovery.
+ */
+function olvidar(payload, { scope = 'hilo' } = {}) {
+  const dir = scope === 'hilo' ? session.threadScope(payload) : session.sessionScope(payload);
+  let borradas = 0;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.startsWith('budget-') || !f.endsWith('.json')) continue;
+      fs.rmSync(path.join(dir, f), { force: true });
+      borradas++;
+    }
+  } catch { /* fail-open */ }
+  return borradas;
+}
+
 /** Ya se emitio algo bajo esta clave en este ambito? Sin efectos secundarios. */
 function yaEmitido(payload, key, { scope = 'hilo' } = {}) {
   return session.readState(payload, `budget-${key}.json`, { scope }) !== null;
@@ -123,6 +146,7 @@ function huella(s) {
 
 module.exports = {
   inject,
+  olvidar,
   yaEmitido,
   isPlaceholder,
   contenidoReal,

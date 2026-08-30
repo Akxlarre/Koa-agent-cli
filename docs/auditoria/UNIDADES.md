@@ -5,8 +5,8 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **53/53 ✅** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
-**Hallazgos abiertos** — 61: **7 `S1`**, 27 `S2`, 27 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: 0/8 · Pase general: pendiente
+**Hallazgos abiertos** — 69: **7 `S1`**, 31 `S2`, 31 `S3`. Ver `HALLAZGOS.md`.
 
 > ## NIVEL A COMPLETO — 2026-08-29
 >
@@ -231,21 +231,21 @@
 
 | | ID | Regla | `paths:` cubre |
 |---|---|---|---|
-| · | `R-01` | `architecture.md` | `src/app/**` ts + html |
-| · | `R-02` | `facades.md` | `core/facades/**`, `core/services/**`, `features/**` |
-| · | `R-03` | `models.md` | `core/models/**`, `core/facades/**` |
-| · | `R-04` | `state-management.md` | `core/**`, `features/**` |
-| · | `R-05` | `swr-pattern.md` | `core/facades/**`, `features/**` |
-| · | `R-06` | `database.md` | `supabase/**`, `core/services/*` |
-| · | `R-07` | `component-selection.md` | `shared/**`, `features/**` |
-| · | `R-08` | `screen-contract.md` | `features/**`, `shared/**`, `layout/**` |
-| · | `R-09` | `layout-blueprints.md` | `features/**` |
-| · | `R-10` | `visual-system.md` | html, scss, shared, features, layout, styles |
-| · | `R-11` | `a11y-spec.md` | html, features, layout |
-| · | `R-12` | `ai-readability.md` | html, features, shared |
-| · | `R-13` | `notifications.md` | facades de notificación, toast, features, layout |
-| · | `R-14` | `testing-tdd.md` | `core/**`, `features/**`, `*.spec.ts` |
-| · | `R-15` | `delegation.md` | `src/app/**`, `supabase/migrations/**` |
+| ✓ | `R-01` | `architecture.md` | `src/app/**` ts + html |
+| ✓ | `R-02` | `facades.md` | `core/facades/**`, `core/services/**`, `features/**` |
+| ✓ | `R-03` | `models.md` | `core/models/**`, `core/facades/**` |
+| ✓ | `R-04` | `state-management.md` | `core/**`, `features/**` |
+| ✓ | `R-05` | `swr-pattern.md` | `core/facades/**`, `features/**` |
+| ✓ | `R-06` | `database.md` | `supabase/**`, `core/services/*` |
+| ✓ | `R-07` | `component-selection.md` | `shared/**`, `features/**` |
+| ✓ | `R-08` | `screen-contract.md` | `features/**`, `shared/**`, `layout/**` |
+| ✓ | `R-09` | `layout-blueprints.md` | `features/**` |
+| ! | `R-10` | `visual-system.md` | html, scss, shared, features, layout, styles |
+| ✓ | `R-11` | `a11y-spec.md` | html, features, layout |
+| ✓ | `R-12` | `ai-readability.md` | html, features, shared |
+| ✓ | `R-13` | `notifications.md` | facades de notificación, toast, features, layout |
+| ✓ | `R-14` | `testing-tdd.md` | `core/**`, `features/**`, `*.spec.ts` |
+| ✓ | `R-15` | `delegation.md` | `src/app/**`, `supabase/migrations/**` |
 
 > **Solape a verificar:** `R-01`, `R-04`, `R-14` y `R-15` matchean casi el mismo glob.
 > Al editar un `.ts` de `core/` se inyectan varias a la vez. Medir cuánto pesa el total
@@ -255,21 +255,21 @@
 
 | | ID | Skill | Invocación |
 |---|---|---|---|
-| · | `K-01` | `plan` | user-invocable + hook validador propio |
-| · | `K-02` | `review` | user-invocable → invoca `code-judge` |
-| · | `K-03` | `verify` | user-invocable, Playwright MCP |
-| · | `K-04` | `sync-indices` | user + model |
-| · | `K-05` | `harness-feedback` | user + model |
-| · | `K-06` | `grill_me` | model-invocable |
-| · | `K-07` | `sdd` | user + model, 11 comandos |
-| · | `K-08` | `angular-component` | path-scoped, no user-invocable |
-| · | `K-09` | `angular-signals` | path-scoped |
-| · | `K-10` | `angular-forms` | path-scoped |
-| · | `K-11` | `angular-primeng` | path-scoped |
-| · | `K-12` | `design-system` | path-scoped |
-| · | `K-13` | `form-ux` | user-invocable |
-| · | `K-14` | `supabase-data-model` | path-scoped |
-| · | `K-15` | `writing-great-skills` | `disable-model-invocation: true` |
+| ✓ | `K-01` | `plan` | user-invocable + hook validador propio |
+| ✓ | `K-02` | `review` | user-invocable → invoca `code-judge` |
+| ✓ | `K-03` | `verify` | user-invocable, Playwright MCP |
+| ! | `K-04` | `sync-indices` | user + model |
+| ✓ | `K-05` | `harness-feedback` | user + model |
+| ✓ | `K-06` | `grill_me` | model-invocable |
+| ! | `K-07` | `sdd` | user + model, 11 comandos |
+| ✓ | `K-08` | `angular-component` | path-scoped, no user-invocable |
+| ✓ | `K-09` | `angular-signals` | path-scoped |
+| ✓ | `K-10` | `angular-forms` | path-scoped |
+| ✓ | `K-11` | `angular-primeng` | path-scoped |
+| ✓ | `K-12` | `design-system` | path-scoped |
+| ✓ | `K-13` | `form-ux` | user-invocable |
+| ✓ | `K-14` | `supabase-data-model` | path-scoped |
+| ✓ | `K-15` | `writing-great-skills` | `disable-model-invocation: true` |
 
 > **Solape a verificar:** `K-08` a `K-12` matchean `src/app/**/*.component.ts` casi todas.
 > ¿Se activan cinco skills a la vez? ¿Se contradicen en algo?
@@ -280,17 +280,17 @@
 
 | | ID | Comando | Escribe |
 |---|---|---|---|
-| · | `D-01` | `/spec-new` | `specs/specs/NNNN-slug/spec.md` |
-| · | `D-02` | `/spec-activate` | `specs/.active` |
-| · | `D-03` | `/spec-plan` | `plan.md` |
-| · | `D-04` | `/spec-tasks` | `tasks.md` |
-| · | `D-05` | `/spec-verify` | `acceptance.md` |
-| · | `D-06` | `/fix-new` | `specs/fixes/fix-NNN-X-slug/fix.md` |
-| · | `D-07` | `/fix-close` | cierra el track |
-| · | `D-08` | `/hotfix` | `specs/hotfixes/…` (auto-cierra en Stop) |
-| · | `D-09` | `/assign-new` | `specs/assignments/ASG-X-NNN-slug.md` |
-| · | `D-10` | `/assign-list` | — (solo lee) |
-| · | `D-11` | `/assign-claim` | genera track desde una asignación |
+| ✓ | `D-01` | `/spec-new` | `specs/specs/NNNN-slug/spec.md` |
+| ✓ | `D-02` | `/spec-activate` | `specs/.active` |
+| ✓ | `D-03` | `/spec-plan` | `plan.md` |
+| ✓ | `D-04` | `/spec-tasks` | `tasks.md` |
+| ✓ | `D-05` | `/spec-verify` | `acceptance.md` |
+| ! | `D-06` | `/fix-new` | `specs/fixes/fix-NNN-X-slug/fix.md` |
+| ! | `D-07` | `/fix-close` | cierra el track |
+| ✓ | `D-08` | `/hotfix` | `specs/hotfixes/…` (auto-cierra en Stop) |
+| ✓ | `D-09` | `/assign-new` | `specs/assignments/ASG-X-NNN-slug.md` |
+| ✓ | `D-10` | `/assign-list` | — (solo lee) |
+| ✓ | `D-11` | `/assign-claim` | genera track desde una asignación |
 
 > **A verificar en bloque:** los comandos escriben lo que `spec-gate` y `plan-injector`
 > después leen. ¿El formato que escriben es exactamente el que esos hooks esperan?

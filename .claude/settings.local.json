@@ -17,7 +17,9 @@
       "Bash(cp docs/promptdescubrimiento.md workshop/research/prompt-documento-completo.md)",
       "Bash(cp docs/PLAN-CORRECCIONES-ARQUITECTONICAS.md workshop/decisions/correcciones-v6.2.md)",
       "Bash(mv patch-guard.js patch-guard.cjs)",
-      "Bash(rm patch-guard.cjs)"
+      "Bash(rm patch-guard.cjs)",
+      "Bash(sed -i 's|/esta vacio/|/está vacío/|' context-enrichment-guard.test.js)",
+      "Bash(node --test context-enrichment-guard.test.js)"
     ]
   }
 }

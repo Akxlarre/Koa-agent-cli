@@ -5,13 +5,17 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: **8/8 ✅** · Pase general: **listo para abrir**
-**Hallazgos abiertos** — 74: **7 `S1`**, 34 `S2`, 33 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: **8/8 ✅** · Pase general: **✅ EJECUTADO**
+**Hallazgos** — 76: **7 `S1`**, 35 `S2`, 34 `S3`. Ver `HALLAZGOS.md` y `PASE-GENERAL.md`.
 
 > ## LAS 102 UNIDADES CERRADAS — 2026-08-29
 >
-> Se puede abrir `PASE-GENERAL.md`. La regla del README se cumple: los campos 5 y 6 de las
-> fichas A están llenos con nombres literales, que es lo que las cuatro lentes necesitan.
+> **Auditoría completa.** Las cuatro lentes ejecutadas en `PASE-GENERAL.md`, con dos
+> hallazgos propios (`ACO-013`, `HUE-031`) que ninguna ficha individual podía ver.
+>
+> **La conclusión que encabeza:** las herramientas están inventadas y la aplicación quedó a
+> medias — ocho instancias medidas de una lección escrita, argumentada y aplicada una sola
+> vez. Cinco de los siete `S1` son de esfuerzo bajo o trivial.
 
 > ## NIVEL A COMPLETO — 2026-08-29
 >

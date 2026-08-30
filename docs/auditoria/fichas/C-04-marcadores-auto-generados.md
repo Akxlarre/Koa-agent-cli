@@ -103,7 +103,7 @@ verificación de la ruta de fallo es por inspección de código, no por ejecuci�
 
 | Artefacto / formato | Qué asume de él | ¿Declarado en templates-contract.md? |
 |---|---|---|
-| Literal exacto `<!-- AUTO-GENERATED:BEGIN -->` | Comparación por `indexOf`, sin tolerancia a espacios | sí |
+| Literal exacto `<!-- AUTO-GENERATED:BEGIN -->` | Comparación por `indexOf`, sin tolerancia a espacios | **no** — corregido en el pase general: `templates-contract.md` no lo menciona |
 | `.claude/temp/indices-cache.json` | Caché incremental por mtime | **no → `ACO-003`** |
 
 `indices-cache.json` es un artefacto derivado que decide qué archivos se re-parsean. Si se
@@ -114,7 +114,7 @@ la tabla de dependencias.
 
 | Consumidor | Qué toma de acá | ¿Se rompe si cambio el formato? |
 |---|---|---|
-| `indices-sync.js` | Los límites de reescritura en 13 índices | sí |
+| `indices-sync.js` | Los límites de reescritura en 13 índices | sí (dependencia real, contrato no declarado) |
 | `assignments-sync.js` | Ídem en 2 secciones de `ASSIGNMENTS.md` | sí |
 | `index-syncer` (subagente) | Indirecto: corre `npm run indices:sync` | sí |
 | Cualquier humano o agente que edite un índice | Debe escribir **fuera** de los marcadores | sí |

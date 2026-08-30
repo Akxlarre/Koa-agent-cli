@@ -135,6 +135,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-008` | S3 | `C-04` | Ningún test fija la partición 13 auto-generados / 2 manuales | abierto |
 | `INC-020` | **S1** | `diseño` | `SessionStart` no corre una vez por sesión: corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin matcher | abierto |
 | `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | abierto |
+| `HUE-032` | **S1** | `diseño` | Los 18 hooks corren dentro de los 5 subagentes y ninguno lee `agent_id`: todo el estado de sesión es un pozo compartido entre el hilo principal y sus subagentes | abierto |
+| `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | abierto |
 
 ---
 
@@ -1590,3 +1592,89 @@ ausencia de presupuesto compartido que `CAR-001` y `DEC-006`, en su tercera mani
 `lib/budget.js` (`ADR-001` §4) la dedup deja de depender de que cada hook conozca al resto.
 Los dos arreglos son independientes y cualquiera de los dos reduce el costo; juntos lo
 cierran.
+
+---
+
+## HUE-032 · El estado de sesión es un pozo compartido con los subagentes
+
+**Tipo:** `HUE` · **Severidad:** `S1` (contexto B) · **Unidad:** encontrado en fase de diseño ·
+**Estado:** abierto
+
+**Qué dice la documentación de Claude Code.**
+
+> *«Hooks from settings files, managed policy settings, and plugins also run inside
+> subagents. When a subagent calls a tool, tool events such as `PreToolUse` and
+> `PostToolUse` fire the same configured hooks as in the main conversation, and the input
+> carries the `agent_id` and `agent_type` common input fields that identify the subagent.»*
+
+`agent_id` existe **para poder distinguir** los dos casos: *«Use this to distinguish
+subagent hook calls from main-thread calls»*.
+
+**Qué hace el harness.**
+
+```
+grep -rn "agent_id\|agent_type" templates/.claude/hooks/   →  0 resultados
+```
+
+Ninguno de los 18 hooks lo lee. Y todo el estado va con la sesión, que los subagentes
+comparten:
+
+| Estado | Clave | Consecuencia de compartirlo |
+|---|---|---|
+| `koa-ctx-${categoría}-${sessionId}.flag` | `pre-write-guard:438` | Un `Edit` del subagente consume el aviso de esa categoría; **el hilo principal ya no lo recibe** |
+| `koa-breaker-${sessionId}.json` | `pre-write-guard:50` | El presupuesto de fallos es uno solo para el hilo principal y los cinco subagentes |
+| `koa-discovery-${sessionId}.flag` | `discovery-tracker:39` | Ver `DUP-004` |
+| `koa-prompt-ctx-${sessionId}.json` | `prompt-context:31` | `UserPromptSubmit` no corre en subagentes: acá no hay daño |
+
+**Por qué es `S1`.** No es una ineficiencia: es la desactivación silenciosa de dos
+guardrails. Un aviso de contexto que el subagente consumió no vuelve a emitirse, y el
+hilo principal escribe sin él sin que nada lo indique — el modo de fallo que este repo ya
+tuvo con `DEC-001`.
+
+**Y toca el diseño en curso.** `ADR-001` §4 (`budget.inject`, dedup por sesión) y `ADR-002`
+§2 (`notify`, default «una vez por sesión») **reproducirían el mismo defecto ampliado**: un
+subagente consumiría la única emisión. Igual que `INC-020`, se encuentra antes de escribir
+el código, no después.
+
+**Arreglo.** `lib/session.js` distingue *ámbito de sesión* de *ámbito de hilo*: el estado de
+dedup y de avisos se indexa por `agent_id ?? 'main'`; el estado que sí es de la sesión
+entera —`session-writes.json`— se comparte a propósito y queda declarado como tal en el
+registro de contratos.
+
+---
+
+## DUP-004 · `discovery-scout` levanta el Gate del hilo que no descubrió nada
+
+**Tipo:** `DUP` · **Severidad:** `S2` (contexto B) · **Unidad:** encontrado en fase de
+diseño · **Estado:** abierto
+
+**El mecanismo, verificado en el código.** `discovery-tracker.js` corre en
+`PostToolUse:Read` y escribe el flag ante *cualquier* lectura cuya ruta contenga `indices/`
+o `context/`, sin mirar quién leyó:
+
+```js
+const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+if (filePath.includes('indices/') || filePath.includes('context/')) {
+  fs.appendFileSync(path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`), entry);
+}
+```
+
+`discovery-scout` es un subagente cuyo trabajo entero es leer índices (`tools: Read, Grep,
+Glob`). Sus `Read` disparan este hook con el mismo `sessionId`, así que **levantan el
+Discovery Gate del hilo principal** — que solo recibe el resumen del scout, no los índices.
+
+**No es un accidente de configuración: es la ruta recomendada.** El propio output de
+`session-start.js` la sugiere:
+
+> *«Para un descubrimiento dirigido usa el subagente `discovery-scout` en vez de leerlos
+> todos.»*
+
+**Lo que hay que decidir, no dar por sentado.** Puede ser correcto: el resumen del scout
+*es* descubrimiento, y delegarlo es justamente el ahorro de contexto que el harness busca.
+Pero hoy no está decidido — está ocurriendo. Y se apila sobre `HUE-001`: el Gate comprueba
+que el flag exista, no qué contiene, así que tampoco puede distinguir *«el scout resumió
+COMPONENTS»* de *«alguien abrió `context/brief.md`»*.
+
+**Arreglo.** Que el flag registre el origen (`agent_type` o `main`) y que el Gate lo lea —
+que es la misma capacidad que pide `HUE-001`. Con eso la decisión se vuelve explícita:
+*«un descubrimiento delegado cuenta»*, escrito y testeado, en vez de emergente.

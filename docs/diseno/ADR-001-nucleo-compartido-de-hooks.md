@@ -76,12 +76,18 @@ fallback `'default'`, el discovery flag, el circuit breaker y los once flags de 
 **API propuesta.**
 
 ```js
-sessionId(payload)      // string, tres niveles, nunca global
-stateDir(payload)       // ruta al directorio de estado de ESTA sesión y ESTE proyecto
-readState(payload, key) // objeto | null
-writeState(payload, key, value)
-cleanup({ source })     // borra por ANTIGÜEDAD; nunca el estado de la sesión en curso
+sessionId(payload)         // string, tres niveles, nunca global
+sessionScope(payload)      // estado de la SESIÓN  — compartido con los subagentes
+threadScope(payload)       // estado de ESTE HILO  — agent_id ?? 'main'   (ADR-003 §1)
+readState(payload, key, { scope })
+writeState(payload, key, value, { scope })
+cleanup({ source })        // borra por ANTIGÜEDAD; nunca el estado de la sesión en curso
 ```
+
+> **Segunda corrección (`HUE-032`).** `readState`/`writeState` llevan `scope` porque los
+> hooks **corren también dentro de los subagentes** y comparten el `session_id`. Un solo
+> ámbito convierte los flags de dedup en un pozo común de seis hilos: el subagente consume
+> el aviso y el hilo principal escribe sin él. Ver `ADR-003` §1.
 
 > **Corrección tras verificar el runtime (`INC-020`).** La primera versión decía
 > `cleanup()` a secas, «en `SessionStart`». `SessionStart` **no corre una vez por sesión**:
@@ -116,7 +122,7 @@ El costo es real (hay que limpiar) y lo asumimos: mata `HUE-002` por construcci�
 por mejor derivación del ID, y de paso pone los artefactos donde ya viven
 `session-writes.json` y `LESSONS_LEARNED.md`.
 
-**Cierra:** `HUE-002` (S1), `ACO-006`, `ACO-007`.
+**Cierra:** `HUE-002` (S1), `HUE-032` (S1, con `ADR-003` §1), `ACO-006`, `ACO-007`.
 
 ---
 
@@ -205,7 +211,9 @@ inject(payload, key, content, {
 }) → string | null   // null = no corresponde inyectar ahora
 ```
 
-Una sola primitiva de *«esto ya lo dije, y esto es lo máximo que puedo decir»*.
+Una sola primitiva de *«esto ya lo dije, y esto es lo máximo que puedo decir»* — con la
+dedup en **ámbito de hilo**, no de sesión: *«ya lo dije»* es una afirmación sobre un
+contexto, y el subagente tiene el suyo (`ADR-003` §1).
 
 **Cierra:** `CAR-001` (S1), `DEC-006`, `HUE-017`.
 
@@ -233,7 +241,8 @@ module.exports = {
     format: 'string[] de rutas relativas',
     producers: ['write-tracker'],
     consumers: ['sync-check', 'spec-diff-check', 'spec-reflection', 'index-syncer'],
-    lifetime: 'sesión',          // ← el campo que faltaba (ver ADR-002)
+    lifetime: 'sesión',          // ← cuándo se borra          (ADR-002 §1)
+    scope: 'sesión',             // ← quién lo comparte        (ADR-003 §1)
   },
   // … los 21
 };

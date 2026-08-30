@@ -6,12 +6,17 @@
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
 **Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: **8/8 ✅** · Pase general: **✅ EJECUTADO**
-**Hallazgos** — 78: **8 `S1`**, 36 `S2`, 34 `S3`. Ver `HALLAZGOS.md` y `PASE-GENERAL.md`.
+**Hallazgos** — 80: **9 `S1`**, 37 `S2`, 34 `S3`. Ver `HALLAZGOS.md` y `PASE-GENERAL.md`.
 
-> 76 salieron de las 102 unidades. Los dos últimos —`INC-020` (`S1`) y `CAR-004`— los
-> encontró la fase de diseño al verificar contra la documentación de Claude Code un supuesto
-> sobre el runtime que la auditoría había dado por bueno *por comportamiento observado*.
-> Ver `docs/diseno/README.md`.
+> 76 salieron de las 102 unidades. Los cuatro últimos —`INC-020` (`S1`), `CAR-004`,
+> `HUE-032` (`S1`) y `DUP-004`— los encontró la fase de diseño al verificar contra la
+> documentación de Claude Code supuestos sobre el runtime que la auditoría había dado por
+> buenos *por comportamiento observado*: cuándo corre `SessionStart`, y que los hooks corren
+> también dentro de los subagentes.
+>
+> **Es la única categoría que el método no cubría:** las 102 unidades interrogan al repo, y
+> ninguna interroga a la plataforma sobre la que el repo está construido. Ver
+> `docs/diseno/README.md`.
 
 > ## LAS 102 UNIDADES CERRADAS — 2026-08-29
 >

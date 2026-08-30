@@ -287,7 +287,7 @@ repositorio.
 
 # Qué hacer con esto
 
-## Los 8 `S1` — antes de la próxima release del blueprint
+## Los 9 `S1` — antes de la próxima release del blueprint
 
 | ID | Qué | Esfuerzo |
 |---|---|---|
@@ -299,15 +299,23 @@ repositorio.
 | `CAR-001` | dedup por track y sesión en `plan-injector` | medio |
 | `DEC-004` | fixtures para las 24 reglas sin cubrir | medio, pero incremental |
 | `INC-020` | matcher `startup` en `SessionStart` + test de `settings.json` | bajo |
+| `HUE-032` | separar ámbito de sesión y ámbito de hilo (`agent_id`) en el estado | medio |
 
-**Seis de los ocho son de esfuerzo bajo o trivial.** `DEC-003` es un archivo de tres
+**Seis de los nueve son de esfuerzo bajo o trivial.** `DEC-003` es un archivo de tres
 líneas.
 
-> `INC-020` y `CAR-004` no salieron de las 102 unidades: los encontró la fase de diseño al
-> verificar contra la documentación de Claude Code un supuesto sobre el runtime que la
-> auditoría había dado por bueno *por comportamiento observado*. Es la única categoría que
-> el método no cubría —**los supuestos sobre la plataforma, no sobre el repo**— y quedó
-> anotada como tal.
+> Cuatro hallazgos —`INC-020`, `CAR-004`, `HUE-032`, `DUP-004`— no salieron de las 102
+> unidades: los encontró la fase de diseño al verificar contra la documentación de Claude
+> Code supuestos sobre el runtime que la auditoría había dado por buenos *por comportamiento
+> observado*.
+>
+> **Es el hueco del propio método.** Las 102 unidades interrogan al repo: qué hace cada hook,
+> qué contrato tiene con cuál, qué cubre cada test. Ninguna interroga a la plataforma: cuándo
+> corre realmente cada evento, quién más dispara estos hooks. Dos de los nueve `S1` estaban
+> ahí, invisibles para la matriz de contratos y para las cuatro lentes.
+>
+> Si hubiera un **Nivel D**, sería *«los supuestos sobre el runtime»*, y sus unidades serían
+> los siete eventos cableados.
 
 ## El backlog de tests, por rentabilidad
 

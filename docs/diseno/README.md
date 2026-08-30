@@ -1,7 +1,8 @@
 # Diseño de la remediación
 
 Insumo: `docs/auditoria/` — 102 unidades revisadas, 76 hallazgos (7 `S1`, 35 `S2`, 34 `S3`),
-más dos que encontró la verificación del runtime durante el diseño: **78 (8 `S1`, 36 `S2`)**.
+más cuatro que encontró la verificación del runtime durante el diseño:
+**80 (9 `S1`, 37 `S2`, 34 `S3`)**.
 
 La auditoría **observa**. Esta carpeta **decide**. La regla que separaba las dos fases sigue
 en pie al revés: acá no se audita nada nuevo; si aparece un hallazgo mientras diseñamos, se
@@ -15,8 +16,8 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 
 | # | Cluster | Hallazgos | `S1` | Se resuelve en |
 |---|---|---|---|---|
-| 1 | Identidad de sesión | 3 | 1 | **ADR-001** §1 `lib/session.js` |
-| 2 | Ciclo de vida de los eventos | 6 | 1 | **ADR-002** |
+| 1 | Identidad de sesión | 5 | 2 | **ADR-001** §1 `lib/session.js` · **ADR-003** §1 (ámbito de hilo) |
+| 2 | Ciclo de vida de los eventos | 6 | 1 | **ADR-002** · **ADR-003** §3 |
 | 3 | Declarar los contratos | 11 | — | **ADR-001** §5 `lib/contracts.js` |
 | 4 | Clasificación de rutas | 3 | — | **ADR-001** §3 `lib/paths.js` |
 | 5 | Presupuesto de contexto | 4 | 1 | **ADR-001** §4 `lib/budget.js` |
@@ -35,6 +36,7 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 |---|---|---|
 | [`ADR-001`](./ADR-001-nucleo-compartido-de-hooks.md) | `templates/.claude/hooks/lib/` con cinco módulos, y el plan de migración en cinco tandas | propuesto |
 | [`ADR-002`](./ADR-002-semantica-de-stop.md) | Tres ciclos de vida con nombre; ningún hook de `Stop` borra estado de sesión; ninguna limpieza destructiva fuera de `startup` | propuesto |
+| [`ADR-003`](./ADR-003-superficie-de-eventos-y-subagentes.md) | Ámbito de sesión vs. ámbito de hilo; qué eventos del runtime se cablean y cuáles no | propuesto |
 
 ---
 
@@ -75,8 +77,15 @@ De ahí salió también `CAR-004`: tras una compactación corren `session-start`
 `compact-recovery`, y el 85% del output del primero es byte-idéntico al del segundo —
 ~2.000 tokens repetidos, medidos, en el momento en que el contexto es más escaso.
 
+Y al leer la lista completa de eventos, dos más: los hooks **corren dentro de los
+subagentes** y ninguno lee `agent_id`, así que el estado de dedup es un pozo compartido
+entre seis hilos (`HUE-032`, `S1`) y `discovery-scout` levanta el Gate del hilo principal
+(`DUP-004`). Es `ADR-003`.
+
 > Poner esas afirmaciones como precondición en vez de como supuesto es lo que hizo que el
-> error apareciera en un documento y no en producción. **Cada ADR lleva su lista.**
+> error apareciera en un documento y no en producción. **Cada ADR lleva su lista** — la de
+> `ADR-003` está abierta, y va en la tanda 0 porque `HUE-032` cambia la firma de
+> `lib/session.js`.
 
 ---
 
@@ -86,6 +95,7 @@ Cuando pasemos a código, el orden es el de `ADR-001` §Plan de migración:
 
 ```
 tanda 0  S1 independientes del núcleo   riesgo nulo   SEC-001 · DEC-003 · INC-020 · test de post-edit
+         + la verificación de ADR-003 (agent_id en el payload) — precondición de session.js
 tanda 1  escribir el núcleo             riesgo nulo   cinco módulos + tests, sin tocar hooks
 tanda 2  tests de los 11 hooks sin test riesgo nulo   contra el comportamiento actual, bugs incluidos
 tanda 3  migrar módulo por módulo       acotado       payload → session → paths → budget → contracts

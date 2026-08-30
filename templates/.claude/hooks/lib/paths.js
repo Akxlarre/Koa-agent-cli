@@ -18,8 +18,13 @@
  * El defecto real es que estaban escritas TRES VECES, sin nombre y sin test — y
  * por eso divergieron. Medido antes de escribir esto: editar `src/guia.mdx`
  * pasa el spec-gate («no es producto») y aun así plan-injector le inyecta el
- * contrato SDD entero («sí es producto»), porque cada uno lleva su propia lista
- * de extensiones exentas.
+ * contrato SDD entero («sí es producto»), porque `.mdx` está en la lista de
+ * exentos de uno y no en la del otro.
+ *
+ * Y ninguna de las dos listas funciona para los dotfiles: `path.extname('.npmrc')`
+ * devuelve `''`, así que `.env`, `.npmrc`, `.gitignore` y `.editorconfig` figuran
+ * como exentos en spec-gate y aun así lo bloquean (DEC-007). Acá se compara
+ * también contra el basename.
  *
  * Este módulo les pone NOMBRE, no las colapsa. Ver docs/diseno/ADR-001 §3.
  */

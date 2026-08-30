@@ -136,6 +136,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-020` | **S1** | `diseño` | `SessionStart` no corre una vez por sesión: corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin matcher | abierto |
 | `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | abierto |
 | `HUE-032` | **S1** | `diseño` | Los 18 hooks corren dentro de los 5 subagentes y ninguno lee `agent_id`: todo el estado de sesión es un pozo compartido entre el hilo principal y sus subagentes | abierto |
+| `DEC-007` | S3 | `diseño` | Cuatro de las once extensiones exentas de `spec-gate` nunca disparan: `path.extname('.npmrc')` es `''`, y los dotfiles reales se llaman así enteros | abierto |
 | `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | abierto |
 
 ---
@@ -1771,3 +1772,36 @@ hilos de una sesión — se comparte entre todo.
 `payload.session_id` —el campo documentado— y cuyo último nivel deriva del `cwd`, nunca
 `'default'`. Lo que cambia es la prioridad: pasa a ser lo primero de la tanda 0, antes que
 `SEC-001`.
+
+---
+
+## DEC-007 · Cuatro exentos de `spec-gate` que nunca disparan
+
+**Tipo:** `DEC` · **Severidad:** `S3` (contexto B) · **Unidad:** encontrado al escribir el
+test de `spec-gate` (tanda 2) · **Estado:** abierto
+
+`sdd/spec-gate.js:51` exime once extensiones. Cuatro de ellas solo existen como **nombre
+completo de archivo**, y para esos `path.extname` devuelve cadena vacía:
+
+```
+entrada .md            archivo real guia.md          extname → ".md"    exime ✓
+entrada .json          archivo real tsconfig.json    extname → ".json"  exime ✓
+entrada .gitignore     archivo real .gitignore       extname → ""       NO exime ✗
+entrada .npmrc         archivo real .npmrc           extname → ""       NO exime ✗
+entrada .env           archivo real .env             extname → ""       NO exime ✗
+entrada .editorconfig  archivo real .editorconfig    extname → ""       NO exime ✗
+```
+
+Solo dispararían para un archivo llamado `x.npmrc`, que nadie crea. En la práctica el gate
+bloquea `src/.env` pidiendo una spec para tocarlo.
+
+**Corrige una afirmación previa.** Al escribir `lib/paths.js` reporté que `src/.npmrc`
+mostraba la divergencia entre `spec-gate` y `plan-injector`. **No es así**: el sandbox de
+aquella medición tenía una spec completa y activa, así que `spec-gate` salía en `0` para
+todo. La divergencia real existe y se demuestra con `src/guia.mdx` —`.mdx` sí está en la
+lista de `spec-gate` y no en la de `plan-injector`—; `.npmrc` no diverge porque **ninguno de
+los dos lo exime**.
+
+**Ya está arreglado en el núcleo.** `lib/paths.js` compara también contra el basename cuando
+el archivo empieza con punto, y tiene su propio test — de hecho ese test fue el que encontró
+el bug del lado del núcleo antes de que apareciera acá.

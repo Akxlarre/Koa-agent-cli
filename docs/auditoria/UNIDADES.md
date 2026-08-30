@@ -5,8 +5,13 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: 0/8 · Pase general: pendiente
-**Hallazgos abiertos** — 69: **7 `S1`**, 31 `S2`, 31 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: **8/8 ✅** · Pase general: **listo para abrir**
+**Hallazgos abiertos** — 74: **7 `S1`**, 34 `S2`, 33 `S3`. Ver `HALLAZGOS.md`.
+
+> ## LAS 102 UNIDADES CERRADAS — 2026-08-29
+>
+> Se puede abrir `PASE-GENERAL.md`. La regla del README se cumple: los campos 5 y 6 de las
+> fichas A están llenos con nombres literales, que es lo que las cuatro lentes necesitan.
 
 > ## NIVEL A COMPLETO — 2026-08-29
 >
@@ -305,14 +310,14 @@
 
 | | ID | Lote | Qué buscar |
 |---|---|---|---|
-| · | `L-01` | Los 15 índices de `templates/indices/` | ¿Los 13 auto-generados tienen sus marcadores bien puestos? ¿ANTI-PATTERNS y LAYOUTS están al día? ¿Algún índice quedó sin consumidor? |
-| · | `L-02` | Los 5 archivos de `templates/context/` | ¿Los consume alguien? ¿El formato que `session-start` y `prompt-context` parsean está garantizado por la plantilla? |
-| · | `L-03` | `templates/.mcp.json` | Tres servidores. ¿Los flags de mínimo privilegio siguen siendo los correctos? ¿`@latest` sin pinear es riesgo? |
-| · | `L-04` | Adapters + `AGENTS.md` | Copilot, Cursor, Windsurf. ¿Dicen lo mismo que `.claude/CLAUDE.md` o ya divergieron? |
-| · | `L-05` | `templates/docs/` (6 documentos) | **La mayor fuente de `INC`.** Cada número, ruta y comando contra el código real |
-| · | `L-06` | `templates/boilerplate/src/` | Superficie grande. Barrido: ¿cada pieza está en su índice? ¿pasa su propio `lint:arch`? |
-| · | `L-07` | `templates/supabase/` | config + 2 migraciones. ¿Las migraciones pasan su propio SEC-RLS? |
-| · | `L-08` | Configuración suelta | `settings.local.json`, `author.local.json.example`, los 3 `package.json` de hooks/validators/tests, `gitignore.template` |
+| ✓ | `L-01` | Los 15 índices de `templates/indices/` | ¿Los 13 auto-generados tienen sus marcadores bien puestos? ¿ANTI-PATTERNS y LAYOUTS están al día? ¿Algún índice quedó sin consumidor? |
+| ! | `L-02` | Los 5 archivos de `templates/context/` | ¿Los consume alguien? ¿El formato que `session-start` y `prompt-context` parsean está garantizado por la plantilla? |
+| ! | `L-03` | `templates/.mcp.json` | Tres servidores. ¿Los flags de mínimo privilegio siguen siendo los correctos? ¿`@latest` sin pinear es riesgo? |
+| ! | `L-04` | Adapters + `AGENTS.md` | Copilot, Cursor, Windsurf. ¿Dicen lo mismo que `.claude/CLAUDE.md` o ya divergieron? |
+| ! | `L-05` | `templates/docs/` (6 documentos) | **La mayor fuente de `INC`.** Cada número, ruta y comando contra el código real |
+| ✓ | `L-06` | `templates/boilerplate/src/` | Superficie grande. Barrido: ¿cada pieza está en su índice? ¿pasa su propio `lint:arch`? |
+| ✓ | `L-07` | `templates/supabase/` | config + 2 migraciones. ¿Las migraciones pasan su propio SEC-RLS? |
+| ✓ | `L-08` | Configuración suelta | `settings.local.json`, `author.local.json.example`, los 3 `package.json` de hooks/validators/tests, `gitignore.template` |
 
 ---
 

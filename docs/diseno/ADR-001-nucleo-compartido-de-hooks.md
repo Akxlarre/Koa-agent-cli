@@ -260,6 +260,16 @@ generador ya aplica y el harness no.
 **Cierra:** los 12 `ACO` y `HUE-030` (los cinco índices ausentes en dos consumidores
 independientes: con registro, el test los detecta).
 
+Y —según el pase de cobertura, que cruzó los IDs uno por uno— nueve más de la misma forma que
+el ADR no nombraba: `ACO-002`, `ACO-003`, `ACO-005`, `ACO-008`, `ACO-009`, `ACO-010`,
+`ACO-011`, `HUE-008`, `HUE-003`. Todo hallazgo cuya frase es *«X depende del formato de Y sin
+que figure en `templates-contract.md`»* lo cierra esta pieza.
+
+**Incluido `HUE-005` (`S1`)**: `blueprint.json` no se valida dentro del proyecto generado y su
+`stack` crudo apaga reglas en silencio (`pre-write-guard.js:29`, `architect.js:72`). Es un
+artefacto del registro con `format` y dos `consumers`; validar donde se lee es exactamente lo
+que el registro habilita. Ver `COBERTURA.md` §1 bis.
+
 ---
 
 ## Lo que este ADR **no** resuelve

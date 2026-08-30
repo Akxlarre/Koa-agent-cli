@@ -12,7 +12,12 @@ anota en `HALLAZGOS.md` y se sigue.
 
 ## Los once clusters y dónde se resuelve cada uno
 
-Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
+Los hallazgos, agrupados por *«qué arreglo los cierra»*.
+
+> **El cluster no es la asignación.** Cubrir los once clusters no es lo mismo que darle
+> destino a los 80 hallazgos: al cruzar los IDs, 44 no aparecían nombrados en ningún ADR, y
+> uno era `S1`. La asignación uno por uno vive en [`COBERTURA.md`](./COBERTURA.md), y de ahí
+> salió `ADR-006`.
 
 | # | Cluster | Hallazgos | `S1` | Se resuelve en |
 |---|---|---|---|---|
@@ -39,10 +44,12 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 | [`ADR-003`](./ADR-003-superficie-de-eventos-y-subagentes.md) | Ámbito de sesión vs. ámbito de hilo; qué eventos del runtime se cablean y cuáles no | propuesto |
 | [`ADR-004`](./ADR-004-capa-de-asignaciones.md) | Integrar la capa de asignaciones tras un interruptor único, `specs/AUTHORS.md` | propuesto |
 | [`ADR-005`](./ADR-005-presupuesto-de-las-reglas-inyectadas.md) | El contexto se paga por lo que ninguna máquina puede atrapar; las fixtures van antes que el recorte | propuesto |
+| [`ADR-006`](./ADR-006-el-generador-falla-en-silencio.md) | El generador también falla en silencio: 19 parches condicionales sin `else` (**Contexto A**) | propuesto |
+| [`COBERTURA`](./COBERTURA.md) | El pase que asigna los 80 hallazgos uno por uno | ejecutado |
 
 ---
 
-## Las dos cosas que este diseño corrige de la propia auditoría
+## Las cuatro cosas que este diseño corrige de la propia auditoría
 
 **1 · Las tres definiciones de ruta no son duplicación.** La ficha `H-03` las anotó como
 «tres definiciones de lo mismo, colapsar en una». Son tres preguntas distintas y las tres
@@ -58,6 +65,13 @@ interceptarlas: el arreglo es editorial y lo diseña `ADR-005`.
 reglas, ~9.800 tokens. El peor caso es un componente de `features/` —**13 reglas, ~19.100
 tokens**— y es además el archivo que más se edita. Con `plan-injector`, un solo `Edit`
 arrastra **~26.500 tokens**. El pase general está corregido.
+
+**4 · La regla de ponderación estaba mal aplicada.** `HALLAZGOS.md` sube un nivel a todo
+hallazgo del harness porque *«el generador falla ruidoso y una vez»*. `lib/scaffolder.js`
+tiene **19 bloques `if (fs.existsSync(...))` y ninguno con `else`**, más dos `catch` que
+avisan en amarillo y siguen: un `tsconfig.json` con `$schema` deja el proyecto sin path
+aliases y sin compilar, tras una línea amarilla entre veinte verdes. La mitad *«una vez vs.
+replicado»* sigue en pie; la del ruido, no. Es `ADR-006`.
 
 ---
 
@@ -108,7 +122,9 @@ tanda 3  migrar módulo por módulo       acotado       payload → session → 
 tanda 4  lo que el núcleo no cubre                    ADR-002 · ADR-003 · ADR-004 · fixtures · docs
 ```
 
-`ADR-004` es independiente del núcleo —no toca ningún hook— así que puede adelantarse a
-cualquier tanda. Es también el único que edita `lib/` (Contexto A).
+`ADR-004` y `ADR-006` son independientes del núcleo —no tocan ningún hook— así que pueden
+adelantarse a cualquier tanda. Son también los dos únicos que editan `lib/` (Contexto A), y
+los dos `S1` re-ponderados de `ADR-006` (`HUE-020`, `HUE-022`) dejan proyectos que no
+compilan: **ese es el argumento para adelantar `ADR-006`, no dejarlo al final.**
 
 > **Nunca se migra un hook que no tenga test. Si no lo tiene, el test va primero.**

@@ -36,13 +36,20 @@ function makeProject({ indices = {}, brief, spec } = {}) {
 }
 
 function runHook(root) {
+  // Tanda 3: el session_id va en el PAYLOAD, no en una env var, y el flag vive
+  // dentro del proyecto — la misma ubicacion que leen pre-write-guard y
+  // compact-recovery (HUE-002).
   const sessionId = `ss-test-${Date.now()}-${counter++}`;
-  const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-  flags.push(flagPath);
+  const flagPath = path.join(root, '.claude', 'temp', 'session', sessionId, 'discovery.flag');
   const r = spawnSync('node', [HOOK], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: sessionId },
+    input: JSON.stringify({
+      hook_event_name: 'SessionStart',
+      source: 'startup',
+      session_id: sessionId,
+      cwd: root,
+    }),
   });
   return {
     exitCode: r.status,

@@ -19,10 +19,21 @@ const C = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'contracts.js'))
 
 const TEMPLATES = path.resolve(__dirname, '..', '..');
 
-/** Del proyecto generado a este repo: scripts/ vive en boilerplate/. */
+/**
+ * Resuelve una ruta del registro contra el arbol real.
+ *
+ * El registro declara rutas del PROYECTO GENERADO. Este archivo corre en dos
+ * contextos: en el repo del CLI —donde scripts/ vive bajo boilerplate/— y
+ * dentro de un proyecto ya generado, donde vive en la raiz. Se prueban las dos
+ * y gana la que exista; si no existe ninguna, se devuelve la directa para que
+ * el mensaje de error nombre la ruta esperada.
+ */
 function enRepo(rel) {
-  if (rel.startsWith('scripts/')) return path.join(TEMPLATES, 'boilerplate', rel);
-  return path.join(TEMPLATES, rel);
+  const directa = path.join(TEMPLATES, rel);
+  if (fs.existsSync(directa)) return directa;
+  const enBoilerplate = path.join(TEMPLATES, 'boilerplate', rel);
+  if (fs.existsSync(enBoilerplate)) return enBoilerplate;
+  return directa;
 }
 
 describe('EL REGISTRO EXISTE DE VERDAD — cada pieza declarada es un archivo', () => {

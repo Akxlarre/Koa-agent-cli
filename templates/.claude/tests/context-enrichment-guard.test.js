@@ -143,15 +143,19 @@ describe('DEC-008 — el detector no dispara en un proyecto recien generado', ()
     }
   });
 
-  test('domain.md SI trae {{PROJECT_NAME}} en templates/ — y injectVars lo borra', () => {
+  test('el marcador {{PROJECT_NAME}} distingue plantilla de proyecto generado', () => {
+    // Este archivo corre en dos contextos. En el repo del CLI, domain.md
+    // todavia trae {{PROJECT_NAME}} y el guard lo atrapa. En un proyecto ya
+    // generado, injectVars lo borro y el guard se le escapa: ese es DEC-008.
     const c = fs.readFileSync(path.join(TEMPLATES, 'context', 'domain.md'), 'utf-8');
-    assert.ok(c.includes('{{PROJECT_NAME}}'), 'el unico marcador vivo del hook');
+    const sinGenerar = c.includes('{{PROJECT_NAME}}');
 
     conPlantillasReales({ conInjectVars: false });
-    assert.equal(correr('src/app/x.component.ts').exit, 2, 'sin generar: lo atrapa');
+    assert.equal(correr('src/app/x.component.ts').exit, sinGenerar ? 2 : 0);
 
     conPlantillasReales({ conInjectVars: true });
-    assert.equal(correr('src/app/x.component.ts').exit, 0, 'generado: se le escapa');
+    assert.equal(correr('src/app/x.component.ts').exit, 0,
+      'una vez generado, el detector no dispara — DEC-008');
   });
 
   test('lib/budget.js SI las detecta — es el reemplazo del detector', () => {

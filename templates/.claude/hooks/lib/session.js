@@ -47,11 +47,18 @@ const ORIGENES_CONTINUACION = new Set(['resume', 'compact', 'fork', 'clear']);
  * tratarla como fallback fue justamente el origen de HUE-002.
  */
 function sessionId(payload) {
-  const desdePayload = payload && typeof payload.session_id === 'string'
-    ? payload.session_id.trim()
-    : '';
+  // Acepta las dos formas: el payload CRUDO de Claude Code (`session_id`) y el
+  // normalizado por lib/payload.js (`sessionId`). Sin esto, los hooks que usan
+  // payload.read() caian al id derivado del proyecto mientras los que parsean
+  // stdin a mano usaban el real — dos claves distintas para el mismo artefacto,
+  // en silencio.
+  const crudo = campo(payload, 'session_id', 'sessionId');
+  const desdePayload = typeof crudo === 'string' ? crudo.trim() : '';
   if (desdePayload) return sanear(desdePayload);
-  return 'proj-' + crypto.createHash('sha1').update(process.cwd()).digest('hex').slice(0, 8);
+  const base = payload && typeof payload.cwd === 'string' && payload.cwd
+    ? payload.cwd
+    : process.cwd();
+  return 'proj-' + crypto.createHash('sha1').update(base).digest('hex').slice(0, 8);
 }
 
 /**
@@ -59,13 +66,34 @@ function sessionId(payload) {
  * `agent_id` está documentado y llega solo dentro de un subagente.
  */
 function threadId(payload) {
-  const id = payload && typeof payload.agent_id === 'string' ? payload.agent_id.trim() : '';
+  const crudo = campo(payload, 'agent_id', 'agentId');
+  const id = typeof crudo === 'string' ? crudo.trim() : '';
   return id ? sanear(id) : 'main';
 }
 
-/** Raíz del estado, dentro del proyecto. `.claude/temp/` ya está gitignored. */
-function rootDir() {
-  return path.join(process.cwd(), '.claude', 'temp', 'session');
+/** Primer valor no vacio entre varios nombres posibles del mismo campo. */
+function campo(payload, ...nombres) {
+  if (!payload) return '';
+  for (const n of nombres) {
+    const v = payload[n];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return '';
+}
+
+/**
+ * Raíz del estado, dentro del proyecto. `.claude/temp/` ya está gitignored.
+ *
+ * El proyecto sale del payload cuando viene —Claude Code entrega `cwd` como
+ * campo común— y solo cae a `process.cwd()` si no. Usar siempre `process.cwd()`
+ * hacía que un proceso que escribe desde otro directorio (un test, un script)
+ * dejara el estado en el lugar equivocado.
+ */
+function rootDir(payload) {
+  const base = payload && typeof payload.cwd === 'string' && payload.cwd
+    ? payload.cwd
+    : process.cwd();
+  return path.join(base, '.claude', 'temp', 'session');
 }
 
 /**
@@ -73,7 +101,7 @@ function rootDir() {
  * Para lo que describe LO QUE SE HIZO: session-writes.json, el discovery flag.
  */
 function sessionScope(payload) {
-  return path.join(rootDir(), sessionId(payload));
+  return path.join(rootDir(payload), sessionId(payload));
 }
 
 /**
@@ -146,7 +174,7 @@ function readText(payload, key, { scope = 'sesion' } = {}) {
 function cleanup(payload, { source = 'startup', maxEdadMs = MAX_EDAD_MS } = {}) {
   if (ORIGENES_CONTINUACION.has(source)) return 0;
 
-  const root = rootDir();
+  const root = rootDir(payload);
   const viva = sessionId(payload);
   const corte = Date.now() - maxEdadMs;
   let borradas = 0;

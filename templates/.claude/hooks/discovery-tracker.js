@@ -9,15 +9,13 @@
  * Flujo:
  *   1. Claude hace Read("indices/COMPONENTS.md")
  *   2. Este hook detecta que es un archivo de indices/
- *   3. Crea/actualiza el flag: ${TEMP}/koa-discovery-${SESSION_ID}.flag
+ *   3. Crea/actualiza el flag: .claude/temp/session/<sid>/discovery.flag
  *   4. El Discovery Gate ya no bloquea escrituras para esta sesión
  */
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const cwd = process.cwd();
+const session = require('./lib/session.js');
 
 // SEC-04: Limit stdin to 10 MB to prevent memory exhaustion from crafted hook inputs.
 const MAX_STDIN_BYTES = 10 * 1024 * 1024;
@@ -32,16 +30,19 @@ process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
     const filePath = (input.tool_input?.file_path || '').replace(/\\/g, '/');
-    const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+    const cwd = input.cwd || process.cwd();
 
     // Detectar lectura de índices estructurales o contexto semántico
     if (filePath.includes('indices/') || filePath.includes('context/')) {
-      const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-      const timestamp = new Date().toISOString();
-      const entry = `${timestamp} | READ | ${filePath}\n`;
-
-      // Crear o appendear al flag file
-      fs.appendFileSync(flagPath, entry);
+      // HUE-002 / DUP-004: la clave sale del payload, y la linea registra el
+      // ORIGEN para que el Gate pueda distinguir una lectura del hilo principal
+      // de una de un subagente.
+      const origen = input.agent_type ? `SUBAGENT:${input.agent_type}` : 'READ';
+      session.appendState(
+        input,
+        'discovery.flag',
+        `${new Date().toISOString()} | ${origen} | ${filePath}`,
+      );
     }
 
     // ── Brief staleness check ──────────────────────────────────────────────

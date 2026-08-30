@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const session = require('./lib/session.js');
 
 // ─── Read stack from blueprint.json (fail-open) ──────────────────────────────
 let STACK = { angular: true, tailwind: true, primeng: true, gsap: false, supabase: true };
@@ -45,16 +46,12 @@ const BREAKER_THRESHOLD = 3;
  * {archivo, motivo} en esta sesion. Fail-open: ante cualquier error de FS
  * devuelve 1, de modo que el guard sigue bloqueando pero sin escalar.
  */
-function recordBlock(sessionId, filePath, reason) {
+function recordBlock(input, filePath, reason) {
   try {
-    const statePath = path.join(os.tmpdir(), `koa-breaker-${sessionId}.json`);
     const key = `${path.basename(filePath)}::${String(reason).replace(/\s+/g, ' ').slice(0, 120)}`;
-    let state = {};
-    if (fs.existsSync(statePath)) {
-      try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')) || {}; } catch { state = {}; }
-    }
+    const state = session.readState(input, 'breaker.json', { scope: 'hilo' }) || {};
     state[key] = (state[key] || 0) + 1;
-    fs.writeFileSync(statePath, JSON.stringify(state));
+    session.writeState(input, 'breaker.json', state, { scope: 'hilo' });
     return state[key];
   } catch {
     return 1;
@@ -79,7 +76,6 @@ process.stdin.on('end', () => {
     const filePath = input.tool_input?.file_path || input.tool_input?.path || '';
     const newContent = input.tool_input?.new_string || input.tool_input?.content || '';
     const toolName = input.tool_name || '';
-    const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
     const normalizedPath = filePath.replace(/\\/g, '/');
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -111,8 +107,10 @@ process.stdin.on('end', () => {
       normalizedPath.includes('supabase/migrations/');
 
     if (isSourceCode) {
-      const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-      if (!fs.existsSync(flagPath)) {
+      // HUE-002: la clave sale del payload, no de una env var inexistente.
+      // El flag vive en el proyecto, asi que dos proyectos ya no lo comparten.
+      const flag = session.readText(input, 'discovery.flag');
+      if (!flag.trim()) {
         process.stderr.write(
           `\u{1F50D} DISCOVERY GATE: Debes leer los indices del proyecto ANTES de escribir codigo.\n` +
           `Lee al menos uno de estos archivos primero:\n` +
@@ -383,7 +381,7 @@ process.stdin.on('end', () => {
       // El breaker cuenta por la PRIMERA violacion, no por la lista completa:
       // el agente suele arreglar una y dejar la otra, y el conjunto cambia en
       // cada intento aunque el problema de fondo sea siempre el mismo.
-      const attempts = recordBlock(sessionId, filePath, violations[0]);
+      const attempts = recordBlock(input, filePath, violations[0]);
 
       if (attempts >= BREAKER_THRESHOLD) {
         process.stderr.write(
@@ -435,11 +433,13 @@ process.stdin.on('end', () => {
 
     // Dedup: si ya inyectamos esta categoría en esta sesión, salir sin contexto
     if (ctxCategory) {
-      const ctxFlag = path.join(os.tmpdir(), `koa-ctx-${ctxCategory}-${sessionId}.flag`);
-      if (fs.existsSync(ctxFlag)) {
+      // Ambito de HILO (HUE-032): un aviso que consumio un subagente no debe
+      // callar al hilo principal, que es el que le habla a la persona.
+      const clave = `ctx-${ctxCategory}.json`;
+      if (session.readState(input, clave, { scope: 'hilo' })) {
         process.exit(0);
       }
-      fs.writeFileSync(ctxFlag, new Date().toISOString());
+      session.writeState(input, clave, { at: new Date().toISOString() }, { scope: 'hilo' });
     }
 
     const contextParts = [];

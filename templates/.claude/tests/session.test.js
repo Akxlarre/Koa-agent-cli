@@ -60,6 +60,28 @@ describe('IDENTIDAD — nunca global (HUE-002)', () => {
     }
   });
 
+  test('acepta las DOS formas del payload: cruda y normalizada por payload.js', () => {
+    // payload.js normaliza a camelCase; el payload crudo de Claude Code usa
+    // snake_case. Si session.js solo entendiera una, los hooks que usan
+    // payload.read() caerian al id derivado mientras los que parsean stdin a
+    // mano usarian el real — dos claves para el mismo artefacto, en silencio.
+    enProyecto(path.join(tmp, 'p'), () => {
+      assert.equal(S.sessionId({ session_id: 'abc' }), 'abc');
+      assert.equal(S.sessionId({ sessionId: 'abc' }), 'abc');
+      assert.equal(S.threadId({ agent_id: 'ag-1' }), 'ag-1');
+      assert.equal(S.threadId({ agentId: 'ag-1' }), 'ag-1');
+    });
+  });
+
+  test('las dos formas apuntan al MISMO directorio', () => {
+    enProyecto(path.join(tmp, 'p'), () => {
+      assert.equal(
+        S.sessionScope({ session_id: 's', cwd: '/proj' }),
+        S.sessionScope({ sessionId: 's', cwd: '/proj' }),
+      );
+    });
+  });
+
   test('dos proyectos distintos no comparten identidad', () => {
     const a = enProyecto(path.join(tmp, 'proyA'), () => S.sessionId({}));
     const b = enProyecto(path.join(tmp, 'proyB'), () => S.sessionId({}));

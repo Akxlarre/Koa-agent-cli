@@ -5,16 +5,15 @@
  * Es el PRODUCTOR del discovery flag, el artefacto que levanta el guardrail
  * principal del harness. La auditoría lo encontró sin test.
  *
- * Dos huecos quedan fijados acá tal como están hoy:
+ * Dos huecos CERRADOS en la tanda 3:
  *
- *   HUE-002  la clave del flag sale de CLAUDE_SESSION_ID, que no existe, así que
- *            el archivo es `koa-discovery-default.flag`: uno solo para todas las
- *            sesiones y todos los proyectos de la máquina.
- *   DUP-004  escribe el flag ante cualquier Read de indices/, sin mirar quién
- *            leyó — así que un subagente levanta el Gate del hilo principal.
- *
- * TESTS DE CARACTERIZACIÓN. La tanda 3 migra a lib/session.js y estos fallan:
- * hay que actualizarlos con intención.
+ *   HUE-002  la clave salía de CLAUDE_SESSION_ID, que no existe, así que el
+ *            archivo era `koa-discovery-default.flag` en TMPDIR: uno solo para
+ *            todas las sesiones y todos los proyectos de la máquina. Ahora sale
+ *            del payload y el flag vive dentro del proyecto.
+ *   DUP-004  escribía el flag ante cualquier Read de indices/ sin registrar quién
+ *            leyó. Ahora la línea lleva el origen, así que el Gate puede
+ *            distinguir una lectura de subagente — falta que la use.
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -27,18 +26,33 @@ const { spawnSync } = require('child_process');
 const HOOK = path.resolve(__dirname, '..', 'hooks', 'discovery-tracker.js');
 let proyecto, tmpdir;
 
+const SESION = 'sesion-1';
+
 function correr(filePath, extra = {}) {
   const r = spawnSync('node', [HOOK], {
-    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: filePath }, ...extra }),
+    input: JSON.stringify({
+      tool_name: 'Read',
+      tool_input: { file_path: filePath },
+      session_id: SESION,
+      cwd: proyecto,
+      ...extra,
+    }),
     encoding: 'utf8',
     cwd: proyecto,
-    env: { ...process.env, TMPDIR: tmpdir, CLAUDE_SESSION_ID: undefined },
+    env: { ...process.env, TMPDIR: tmpdir },
   });
   return { exit: r.status, stdout: r.stdout || '' };
 }
 
-const flags = () => (fs.existsSync(tmpdir) ? fs.readdirSync(tmpdir) : []);
-const leerFlag = (n) => fs.readFileSync(path.join(tmpdir, n), 'utf-8');
+/** Las sesiones que dejaron flag, dentro del proyecto. */
+const sesionesConFlag = () => {
+  const raiz = path.join(proyecto, '.claude', 'temp', 'session');
+  if (!fs.existsSync(raiz)) return [];
+  return fs.readdirSync(raiz).filter((d) =>
+    fs.existsSync(path.join(raiz, d, 'discovery.flag')));
+};
+const leerFlag = (sid = SESION) =>
+  fs.readFileSync(path.join(proyecto, '.claude', 'temp', 'session', sid, 'discovery.flag'), 'utf-8');
 
 function escribir(rel, contenido) {
   const full = path.join(proyecto, rel);
@@ -58,25 +72,24 @@ afterEach(() => {
 describe('QUÉ LEVANTA EL FLAG', () => {
   test('leer un índice', () => {
     correr('indices/COMPONENTS.md');
-    assert.equal(flags().length, 1);
-    assert.match(leerFlag(flags()[0]), /READ \| indices\/COMPONENTS\.md/);
+    assert.deepEqual(sesionesConFlag(), [SESION]);
+    assert.match(leerFlag(), /READ \| indices\/COMPONENTS\.md/);
   });
 
   test('leer context/ también lo levanta (HUE-001: el Gate no distingue)', () => {
     correr('context/brief.md');
-    assert.equal(flags().length, 1, 'leer el brief satisface el Discovery Gate');
+    assert.equal(sesionesConFlag().length, 1, 'leer el brief satisface el Discovery Gate');
   });
 
   test('acumula una línea por lectura', () => {
     correr('indices/COMPONENTS.md');
     correr('indices/SERVICES.md');
-    const lineas = leerFlag(flags()[0]).trim().split('\n');
-    assert.equal(lineas.length, 2);
+    assert.equal(leerFlag().trim().split('\n').length, 2);
   });
 
   test('la línea conserva el formato "indices/NOMBRE.md" que compact-recovery parsea', () => {
     correr('indices/ANTI-PATTERNS.md');
-    assert.match(leerFlag(flags()[0]), /indices\/ANTI-PATTERNS\.md/);
+    assert.match(leerFlag(), /indices\/ANTI-PATTERNS\.md/);
   });
 });
 
@@ -85,32 +98,53 @@ describe('QUÉ NO LO LEVANTA', () => {
     'docs/guia.md', 'package.json']) {
     test(`leer ${ruta}`, () => {
       correr(ruta);
-      assert.deepEqual(flags(), []);
+      assert.deepEqual(sesionesConFlag(), []);
     });
   }
 });
 
-describe('HUE-002 — la clave del flag es global', () => {
-  test('(bug) el archivo se llama koa-discovery-default.flag', () => {
+describe('HUE-002 — CERRADO: la clave sale del payload', () => {
+  test('el flag vive en el proyecto, no en TMPDIR', () => {
     correr('indices/COMPONENTS.md');
-    assert.deepEqual(flags(), ['koa-discovery-default.flag'],
-      'CLAUDE_SESSION_ID no existe, así que el id cae siempre a "default"');
+    assert.deepEqual(fs.readdirSync(tmpdir), [], 'TMPDIR queda intacto');
+    assert.deepEqual(sesionesConFlag(), [SESION]);
   });
 
-  test('(bug) dos session_id distintos escriben el MISMO archivo', () => {
+  test('dos session_id distintos escriben archivos DISTINTOS', () => {
     correr('indices/COMPONENTS.md', { session_id: 'sesion-AAA' });
     correr('indices/SERVICES.md', { session_id: 'sesion-ZZZ' });
-    assert.equal(flags().length, 1, 'el session_id del payload se ignora');
-    assert.equal(leerFlag(flags()[0]).trim().split('\n').length, 2);
+    assert.deepEqual(sesionesConFlag().sort(), ['sesion-AAA', 'sesion-ZZZ']);
+    assert.equal(leerFlag('sesion-AAA').trim().split('\n').length, 1);
+    assert.equal(leerFlag('sesion-ZZZ').trim().split('\n').length, 1);
+  });
+
+  test('sin session_id en el payload, la clave se deriva del proyecto', () => {
+    const r = spawnSync('node', [HOOK], {
+      input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'indices/X.md' }, cwd: proyecto }),
+      encoding: 'utf8', cwd: proyecto,
+    });
+    assert.equal(r.status, 0);
+    assert.match(sesionesConFlag()[0], /^proj-[0-9a-f]{8}$/, 'nunca "default"');
   });
 });
 
-describe('DUP-004 — no mira quién leyó', () => {
-  test('(bug) un subagente levanta el flag igual que el hilo principal', () => {
+describe('DUP-004 — el flag ahora registra el origen', () => {
+  test('una lectura de subagente queda marcada como tal', () => {
     correr('indices/COMPONENTS.md', { agent_id: 'ag-1', agent_type: 'discovery-scout' });
-    assert.equal(flags().length, 1);
-    assert.ok(!leerFlag(flags()[0]).includes('discovery-scout'),
-      'el flag no registra el origen, así que el Gate no puede distinguirlo');
+    assert.match(leerFlag(), /SUBAGENT:discovery-scout \| indices\/COMPONENTS\.md/,
+      'el Gate ya puede distinguir quien descubrio');
+  });
+
+  test('una lectura del hilo principal se marca READ', () => {
+    correr('indices/COMPONENTS.md');
+    assert.match(leerFlag(), /\| READ \|/);
+  });
+
+  test('el subagente comparte el flag de la sesion, a proposito', () => {
+    correr('indices/COMPONENTS.md', { agent_id: 'ag-1', agent_type: 'discovery-scout' });
+    correr('indices/SERVICES.md');
+    assert.equal(sesionesConFlag().length, 1, 'mismo session_id, mismo ambito');
+    assert.equal(leerFlag().trim().split('\n').length, 2);
   });
 });
 
@@ -148,7 +182,7 @@ describe('FAIL-OPEN', () => {
       env: { ...process.env, TMPDIR: tmpdir },
     });
     assert.equal(r.status, 0);
-    assert.deepEqual(flags(), []);
+    assert.deepEqual(sesionesConFlag(), []);
   });
 
   test('sin file_path → exit 0, sin flag', () => {
@@ -157,7 +191,7 @@ describe('FAIL-OPEN', () => {
       encoding: 'utf8', cwd: proyecto, env: { ...process.env, TMPDIR: tmpdir },
     });
     assert.equal(r.status, 0);
-    assert.deepEqual(flags(), []);
+    assert.deepEqual(sesionesConFlag(), []);
   });
 
   test('siempre sale en 0 — nunca bloquea una lectura', () => {

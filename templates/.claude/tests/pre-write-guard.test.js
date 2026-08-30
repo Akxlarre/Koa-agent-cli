@@ -18,10 +18,15 @@ const HOOK = path.resolve(__dirname, '..', 'hooks', 'pre-write-guard.js');
 let sessionCounter = 0;
 
 /**
- * Ejecuta el hook con un TOOL_INPUT simulado.
+ * Ejecuta el hook con un payload simulado.
  *
- * Cada llamada usa un CLAUDE_SESSION_ID unico para que el dedup de Context
- * Injection y el Circuit Breaker no arrastren estado entre tests.
+ * Cada llamada usa un session_id unico para que el dedup de Context Injection
+ * y el Circuit Breaker no arrastren estado entre tests.
+ *
+ * Migrado en la tanda 3: el session_id va en el PAYLOAD, no en una variable de
+ * entorno, y el discovery flag vive en el proyecto, no en TMPDIR (HUE-002). El
+ * fixture usa lib/session.js para escribirlo, o sea el mismo contrato que lee
+ * el hook — si el formato cambia, el test se entera.
  *
  * Por defecto se pre-crea el flag de descubrimiento: las capas del hook corren
  * en orden y el Discovery Gate (capa 2) bloquearia antes de llegar al Architect
@@ -32,19 +37,27 @@ let sessionCounter = 0;
  * @param {{ discovered?: boolean }} [opts]
  * @returns {{ exitCode: number, stdout: string, stderr: string, sessionId: string }}
  */
+/** Deja el discovery flag donde el hook lo busca, usando su mismo modulo. */
+function sembrarDescubrimiento(payload) {
+  const session = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'session.js'));
+  session.appendState(payload, 'discovery.flag',
+    `${new Date().toISOString()} | READ | indices/COMPONENTS.md`);
+}
+
 function runHook(input, opts = {}) {
   const { discovered = true } = opts;
   const sessionId = `test-session-${Date.now()}-${sessionCounter++}`;
+  const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-'));
+  const payload = { ...input, session_id: sessionId, cwd: proyecto };
 
   if (discovered) {
-    const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-    fs.writeFileSync(flagPath, `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`);
+    sembrarDescubrimiento(payload);
   }
 
   const result = spawnSync('node', [HOOK], {
-    input: JSON.stringify(input),
+    input: JSON.stringify(payload),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
+    cwd: proyecto,
   });
   return {
     exitCode: result.status,
@@ -60,17 +73,16 @@ function runHook(input, opts = {}) {
  */
 function runHookRepeated(input, times) {
   const sessionId = `test-breaker-${Date.now()}-${sessionCounter++}`;
-  fs.writeFileSync(
-    path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`),
-    `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`
-  );
+  const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-brk-'));
+  const payload = { ...input, session_id: sessionId, cwd: proyecto };
+  sembrarDescubrimiento(payload);
 
   const runs = [];
   for (let i = 0; i < times; i++) {
     const result = spawnSync('node', [HOOK], {
-      input: JSON.stringify(input),
+      input: JSON.stringify(payload),
       encoding: 'utf8',
-      env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
+      cwd: proyecto,
     });
     runs.push({ exitCode: result.status, stderr: result.stderr || '' });
   }

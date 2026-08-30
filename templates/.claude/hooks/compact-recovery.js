@@ -18,8 +18,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const cwd = process.cwd();
-const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+const payload = require('./lib/payload.js');
+const session = require('./lib/session.js');
+
+// Lee su payload por stdin como el resto: de ahi sale el `session_id` que los
+// cuatro hooks del discovery flag deben compartir. Con un id distinto,
+// compact-recovery no encontraria lo que discovery-tracker escribio.
+payload.read().then((PAYLOAD) => reinyectar(PAYLOAD, PAYLOAD.cwd));
+
+function reinyectar(PAYLOAD, cwd) {
 const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
 
 // Índices siempre inyectados (base de todo proyecto)
@@ -42,9 +49,8 @@ const ALL_INDEX_FILES = {
 // ─── Leer discovery flag: qué índices leyó el agente antes del compact ───────
 const touchedIndexNames = new Set(CORE_INDICES);
 try {
-  const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-  if (fs.existsSync(flagPath)) {
-    const flagContent = fs.readFileSync(flagPath, 'utf-8');
+  const flagContent = session.readText(PAYLOAD, 'discovery.flag');
+  if (flagContent) {
     for (const line of flagContent.split('\n')) {
       const match = line.match(/indices\/([\w-]+)\.md/i);
       if (match) touchedIndexNames.add(match[1].toUpperCase());
@@ -153,3 +159,4 @@ try {
 } catch { /* fail-open */ }
 
 process.stdout.write(output);
+} // fin de reinyectar()

@@ -5,11 +5,11 @@
 >
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
-**Progreso** — Nivel A: **25/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
-**Hallazgos abiertos** — 40: **6 `S1`**, 19 `S2`, 15 `S3`. Ver `HALLAZGOS.md`.
+**Progreso** — Nivel A: **36/53** · Nivel B: 0/41 · Nivel C: 0/8 · Pase general: pendiente
+**Hallazgos abiertos** — 49: **7 `S1`**, 24 `S2`, 18 `S3`. Ver `HALLAZGOS.md`.
 
-> **Bloques 0 y 1 cerrados.** Quedan los scripts (`S-*`), el CLI (`G-*`), los subagentes
-> (`A-*`) y los tests (`T-*`) para completar el nivel A.
+> **Bloques 0, 1 y 2 cerrados.** Quedan el CLI (`G-*`), los subagentes (`A-*`) y los
+> tests (`T-*`) para completar el nivel A.
 
 ---
 
@@ -106,17 +106,17 @@
 
 | | ID | Script | Qué verifica |
 |---|---|---|---|
-| · | `S-01` | `scripts/architect.js` | Reglas `ARCH-*` + SEC-RLS + A11Y-03 sobre AST — **sub-tabla obligatoria** |
-| · | `S-02` | `scripts/lint-arch-wrapper.js` | memoria de fallos → `LESSONS_LEARNED.md` |
-| · | `S-03` | `scripts/indices-sync.js` | auto-indexer AST con caché por mtime (1343 líneas) |
-| · | `S-04` | `scripts/check-bento-classes.js` | allowlist del bento (cableado como ARCH-21) |
-| · | `S-05` | `scripts/provocar-reglas.mjs` | **que las reglas puedan fallar** |
-| · | `S-06` | `scripts/smoke-scripts.mjs` | **que los scripts puedan fallar** |
-| · | `S-07` | `scripts/verificar-specs.mjs` | enlaces entre specs |
-| · | `S-08` | `scripts/assignments-sync.js` | tablas auto-generadas de `ASSIGNMENTS.md` |
-| · | `S-09` | `scripts/assignments-audit.js` | naming, colisiones, refs colgantes |
-| · | `S-10` | `scripts/set-env.js` | credenciales en build de producción |
-| · | `S-11` | `scripts/lib/*.js` (13 módulos puros) | **en lote** — una ficha, tabla de 13 filas |
+| ! | `S-01` | `scripts/architect.js` | Reglas `ARCH-*` + SEC-RLS + A11Y-03 sobre AST — **sub-tabla obligatoria** |
+| ✓ | `S-02` | `scripts/lint-arch-wrapper.js` | memoria de fallos → `LESSONS_LEARNED.md` |
+| ✓ | `S-03` | `scripts/indices-sync.js` | auto-indexer AST con caché por mtime (1343 líneas) |
+| ✓ | `S-04` | `scripts/check-bento-classes.js` | allowlist del bento (cableado como ARCH-21) |
+| ! | `S-05` | `scripts/provocar-reglas.mjs` | **que las reglas puedan fallar** |
+| ✓ | `S-06` | `scripts/smoke-scripts.mjs` | **que los scripts puedan fallar** |
+| ✓ | `S-07` | `scripts/verificar-specs.mjs` | enlaces entre specs |
+| ! | `S-08` | `scripts/assignments-sync.js` | tablas auto-generadas de `ASSIGNMENTS.md` |
+| ! | `S-09` | `scripts/assignments-audit.js` | naming, colisiones, refs colgantes |
+| ✓ | `S-10` | `scripts/set-env.js` | credenciales en build de producción |
+| ✓ | `S-11` | `scripts/lib/*.js` (13 módulos puros) | **en lote** — una ficha, tabla de 13 filas |
 
 **Sub-tabla obligatoria en la ficha `S-01`** — una fila por código, no una ficha por código:
 
@@ -130,6 +130,25 @@
 > `pre-write-guard.js` y ARCH-20 vive en `lib/a11y-guardrails.js`. La sub-tabla debe cubrir
 > solo lo que emite **este** archivo, y la ficha debe cerrar el destino de `ARCH-14`, que
 > `verify/SKILL.md` documenta y nadie implementa.
+
+> **Bloque 2 cerrado — 2026-08-29.** Las 11 unidades, **ejecutadas de verdad**: sandbox con
+> el boilerplate real y `typescript@5.9`. 9 hallazgos, uno `S1`.
+>
+> **La respuesta a la pregunta del bloque — ¿quién audita a los auditores?**
+> `smoke-scripts` (`S-06`) **sí cumple**: introduce el defecto, verifica que el script lo
+> detecte, y restaura sin residuos. `provocar-reglas` (`S-05`) **cubre 4 de 28 reglas**, y
+> las 24 sin fixture incluyen las tres de seguridad RLS y las dos que la documentación cita
+> como el episodio que motivó escribir el script. Además sale en 1 de fábrica, porque nadie
+> puso `SEC-RLS-*` en el baseline.
+>
+> **Sumando con `HUE-012` (bloque 1):** de las ~48 reglas que el harness aplica entre el
+> linter AST y el guard regex, **4 están comprobadas disparando**.
+>
+> **Deuda de `C-04` cerrada** en `S-03`, ejecutando: los 13 índices con marcadores se
+> reescriben, los 2 manuales quedan intactos.
+>
+> **Deuda nueva:** el camino de fallo de `S-02` (guardar el fallo y convertirlo en lección)
+> no se ejercitó.
 
 **Preguntas propias del bloque:**
 - `S-05` y `S-06` son los auditores del repo. **¿Quién los audita a ellos?** Si uno de

@@ -82,6 +82,15 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | abierto |
 | `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
 | `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | abierto |
+| `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | abierto |
+| `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | abierto |
+| `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | abierto |
+| `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | abierto |
+| `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | abierto |
+| `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | abierto |
+| `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | abierto |
+| `ACO-009` | S3 | `S-05` | La provocación depende de que la salida de `architect.js` nombre el código de la regla; ese formato no está declarado | abierto |
+| `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | abierto |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | abierto |
 | `HUE-002` | **S1** | `C-01` | `sessionId` sale de una env var con fallback `'default'`; el flag es global en TMPDIR y nunca se borra | abierto |
 | `HUE-005` | **S1** | `C-05` | `blueprint.json` no se valida dentro del proyecto generado, y su `stack` crudo decide qué guardrails corren | abierto |
@@ -1184,6 +1193,264 @@ quedar silenciado en otro durante 8 prompts.
 Ninguno declarado, todos con el `sessionId` de `HUE-002`. Con el fallback, el contador del
 breaker y los flags de dedup se comparten entre proyectos: el contexto de `features/` puede
 no inyectarse nunca en un proyecto porque otro ya lo consumió.
+
+**Estado:** abierto
+
+## DEC-004 · El auditor de reglas cubre 4 de 28
+
+- **Tipo / severidad:** `DEC` · **S1**
+- **Unidad:** `S-05` (`provocar-reglas.mjs`)
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`provocar-reglas.mjs` existe para responder «¿cada regla puede fallar?». Corriéndolo sobre
+el boilerplate real:
+
+```
+✅ ARCH-01, ARCH-04, ARCH-03, ARCH-05 — dispara ante su violación
+Sin fixture todavía (24/28): ARCH-11, ARCH-18, ARCH-21, ARCH-22, ARCH-15, ARCH-16,
+ARCH-17, ARCH-19, ARCH-24, ARCH-23, ARCH-25, ARCH-26, NAV-01, A11Y-03, ICON-01,
+ARCH-02, ARCH-06, ARCH-07, ARCH-08, ARCH-09, ARCH-10, SEC-RLS-01/02/03
+```
+
+**Por qué importa**
+
+Las cuatro comprobadas son las más antiguas y simples. Las 24 sin comprobar incluyen todo
+lo agregado después: los ratchets del design system, el contraste AA, las colisiones con
+Tailwind, la integridad de navegación, la accesibilidad, y **las tres reglas de seguridad
+RLS** — las únicas del linter que protegen la base de datos.
+
+Y el detalle que cierra el círculo: `ARCH-24` y `ARCH-26`, las dos que la documentación
+cita como «estuvieron muertas hasta que existió `provocar-reglas`», **siguen en el baseline
+sin fixture**. El episodio que motivó escribir el script no está cubierto por el script.
+
+Cruzado con `HUE-012` (las ~20 reglas regex de `pre-write-guard`, sin provocación de ningún
+tipo): **de las ~48 reglas que el harness aplica, 4 están comprobadas disparando.**
+
+Es `S1` porque la garantía que este script da es la que justifica confiar en todo el
+sistema de reglas, y hoy cubre el 14%.
+
+**Propuesta**
+
+Escribir fixtures. Cada uno son ~15 líneas y el ratchet del baseline ya impide que la deuda
+crezca. Es el ítem con mejor relación esfuerzo/resultado de todo el backlog.
+
+**Estado:** abierto
+
+---
+
+## INC-009 · `lint:arch:provocar` sale en 1 de fábrica
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `S-05` · **Contexto:** B
+
+**Qué encontré**
+
+`architect.js` registra `SEC-RLS-01/02/03`; `provocacion.baseline.json` tiene 21 entradas y
+ninguna es `SEC-RLS`. El ratchet las detecta como «reglas nuevas sin fixture» y sale en 1.
+
+```
+🆕 3 regla(s) nuevas sin fixture: SEC-RLS-01, SEC-RLS-02, SEC-RLS-03
+exit=1
+```
+
+**Por qué importa**
+
+`npm run lint:arch:provocar` viene rojo en cualquier proyecto scaffoldeado hoy. Un chequeo
+que siempre sale rojo se aprende a ignorar, y con él se pierde la señal cuando alguien
+agregue la regla 29 sin fixture. El ratchet funcionó; nadie le hizo caso al agregar RLS.
+
+**Propuesta**
+
+Escribir los tres fixtures (son reglas de seguridad: merecen fixture antes que baseline), o
+como mínimo correr `--actualizar-baseline` y dejar registro de por qué.
+
+**Estado:** abierto
+
+---
+
+## HUE-018 · El linter muere sin mensaje ante un major de TypeScript
+
+- **Tipo / severidad:** `HUE` · S2 · **Unidad:** `S-01` · **Contexto:** B
+
+**Qué encontré**
+
+```js
+const ts = require('typescript');   // sin try/catch, sin comprobar la API
+```
+
+Con `typescript@7.0.2` —el port nativo, cuya API CommonJS expone 2 claves y no
+`ScriptTarget`— `architect.js` muere así:
+
+```
+TypeError: Cannot read properties of undefined (reading 'Latest')
+    at analyzeTypeScript (scripts/architect.js:374:25)
+```
+
+Con `typescript@5.9.3` corre normalmente. `indices-sync.js` tiene el mismo patrón.
+
+**Por qué importa**
+
+Hoy no es un fallo activo: Angular 21 pinea TypeScript 5.x. Es la ausencia de un
+guardaespaldas en una dependencia que el repo **ya sabe** que se mueve — `lib/config.js`
+pinea `ANGULAR_MAJOR` con un comentario largo sobre exactamente este problema («el
+ecosistema tarda semanas o meses en declarar soporte para un major nuevo»), y esa misma
+lección no se aplicó a `typescript`.
+
+Cuando llegue, el usuario ve un stack trace, no un mensaje.
+
+**Propuesta**
+
+Comprobar `ts.ScriptTarget` tras el require y fallar con un mensaje que nombre la versión
+esperada.
+
+**Estado:** abierto
+
+---
+
+## INC-008 · El boilerplate incumple su propia ARCH-09
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `S-01`, confirmar en `L-06` · **Contexto:** B
+
+**Qué encontré**
+
+Corriendo `architect.js` sobre el boilerplate que el CLI reparte:
+
+```
+⚠️ [ARCH-09] Clase demasiado grande (1170 líneas). Límite recomendado: 200.
+   src/app/shared/components/section-hero/section-hero.component.ts
+⚠️ [ARCH-09] Clase demasiado grande (298 líneas). Límite recomendado: 200.
+   src/app/shared/components/tabs/tabs.component.ts
+```
+
+**Por qué importa**
+
+El producto incumple su propia regla en el archivo que entrega. Un usuario que corra
+`npm run lint:arch` el primer día ve dos advertencias que no causó. Peor: enseña por
+ejemplo que la regla es negociable.
+
+`ARCH-09` es warning y no error, así que no rompe el build — de ahí `S2` y no `S1`.
+
+**Propuesta**
+
+Decidir explícitamente: dividir `section-hero`, o subir el límite con motivo escrito, o
+excluir el boilerplate del chequeo. Lo que no puede quedar es el warning permanente.
+
+**Estado:** abierto
+
+---
+
+## HUE-019 · Reglas testeadas como función pura, pero sin provocación
+
+- **Tipo / severidad:** `HUE` · S2 · **Unidad:** `S-11` · **Contexto:** B
+
+**Qué encontré**
+
+Los 13 módulos de `scripts/lib/` tienen 79 tests que pasan. Varias reglas están **testeadas
+como función pura** y a la vez **sin fixture de provocación**: `ARCH-11`, `ARCH-15/16/17/19`,
+`ARCH-20`, `ARCH-22`, `ARCH-25`, `ARCH-26`, `NAV-01`, `ICON-01`.
+
+**Por qué importa**
+
+Hay tres niveles de garantía y solo se cuentan dos:
+
+1. la función pura devuelve lo correcto ante una entrada — **79 tests, cubierto**
+2. `architect.js` la cablea y reporta el código — **sin verificar**
+3. la regla dispara ante su propia violación — **solo 4 reglas**
+
+El nivel 2 es exactamente el hueco donde vivían `ARCH-24` y `ARCH-26` cuando estaban
+muertas: la lógica estaba bien, el cableado no.
+
+**Propuesta**
+
+Al escribir los fixtures de `DEC-004`, priorizar las reglas que ya tienen test de función
+pura: ahí el fixture solo comprueba el cableado y es el más barato de escribir.
+
+**Estado:** abierto
+
+---
+
+## INC-010 · Los scripts de asignaciones fallan en proyectos que no las usan
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `S-08`/`S-09` · **Contexto:** B
+
+**Qué encontré**
+
+```
+assignments-audit  exit=1 | No se encontró specs/ASSIGNMENTS.md o specs/AUTHORS.md.
+assignments-sync   exit=1 | No se encontró specs/ASSIGNMENTS.md o specs/assignments/.
+verificar-specs    exit=0 | Sin specs/: nada que verificar.
+```
+
+**Por qué importa**
+
+La capa de asignaciones es opcional dentro de un motor SDD que ya es opcional —
+`sdd/SKILL.md` lo dice: «si el equipo no la necesita, simplemente no se usa». Sus dos
+scripts tratan la ausencia como error, mientras el tercer script de la misma familia la
+trata como caso normal. Cualquier CI que corra los scripts de `package.json` en un proyecto
+sin asignaciones se pone rojo por dos comandos que no tenían nada que hacer.
+
+Misma raíz que `DUP-001`: falta de criterio común sobre qué hacer cuando el SDD no está
+activo.
+
+**Propuesta**
+
+Adoptar el criterio de `verificar-specs`: sin `specs/ASSIGNMENTS.md`, mensaje y `exit 0`.
+
+**Estado:** abierto
+
+---
+
+## DEC-005 · `smoke-scripts` sale verde con 0 comprobados
+
+- **Tipo / severidad:** `DEC` · S3 · **Unidad:** `S-06` · **Contexto:** B
+
+**Qué encontré**
+
+```
+🔥 Smoke de scripts — ¿pueden fallar, o sólo pasar?
+✅ 0 script(s) comprobados
+exit=0
+```
+
+**Por qué importa**
+
+Es, en pequeño, el patrón que el script existe para condenar: un chequeo verde que no
+comprobó nada. Un `package.json` sin los scripts esperados, o un `--solo` mal escrito,
+producen un visto bueno vacío.
+
+`S3` porque en un proyecto generado real los scripts existen; requiere que alguien los haya
+borrado o se haya equivocado en el flag. Pero es el único caso de la auditoría donde un
+auditor comete el error que audita.
+
+**Propuesta**
+
+`exit 1` cuando no hay nada que comprobar, con el mensaje explicando por qué.
+
+**Estado:** abierto
+
+---
+
+## ACO-009 · La provocación depende del formato de salida del linter
+
+- **Tipo / severidad:** `ACO` · S3 · **Unidad:** `S-05` · **Contexto:** B
+
+`provocar-reglas.mjs` exige que la salida de `architect.js` **nombre el código** de la
+regla. Ese formato de salida no está declarado en ninguna parte: si alguien cambia cómo
+`reportError` imprime, la provocación empieza a reportar reglas muertas que no lo están.
+
+**Estado:** abierto
+
+---
+
+## ACO-010 · `smoke-scripts` depende de nombres de script y de ARCH-04
+
+- **Tipo / severidad:** `ACO` · S3 · **Unidad:** `S-06` · **Contexto:** B
+
+Depende de los nombres exactos de `package.json` (`lint:arch`, `typecheck`, `test:ci`) y de
+que **`ARCH-04` siga activa** — su defecto de arquitectura es un componente sin `OnPush`.
+Si alguien desactivara `ARCH-04`, el smoke reportaría que `lint:arch` es decorativo cuando
+el decorativo sería el smoke. Ninguna de las dos dependencias está declarada.
 
 **Estado:** abierto
 

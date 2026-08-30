@@ -133,6 +133,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-003` | S3 | `C-04` | `indices-cache.json` decide qué se re-parsea y no está declarado como dependencia | abierto |
 | `HUE-007` | S3 | `C-04` | Nada impide editar dentro de los marcadores y perder el trabajo en el siguiente sync | abierto |
 | `HUE-008` | S3 | `C-04` | Ningún test fija la partición 13 auto-generados / 2 manuales | abierto |
+| `INC-020` | **S1** | `diseño` | `SessionStart` no corre una vez por sesión: corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin matcher | abierto |
+| `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | abierto |
 
 ---
 
@@ -1509,3 +1511,82 @@ el decorativo sería el smoke. Ninguna de las dos dependencias está declarada.
 **Estado:** abierto
 
 ═══ fin de plantilla ═══ -->
+
+---
+
+## INC-020 · `SessionStart` no corre una vez por sesión
+
+**Tipo:** `INC` · **Severidad:** `S1` (contexto B) · **Unidad:** encontrado en fase de diseño ·
+**Estado:** abierto
+
+**Qué dice la documentación de Claude Code.** `SessionStart` acepta un matcher sobre *cómo
+arrancó la sesión*, con cinco valores:
+
+```
+startup · resume · clear · compact · fork
+```
+
+**Qué hace el harness.** `templates/.claude/settings.json` registra `SessionStart` **sin
+matcher**, así que `session-start.js` corre en los cinco casos. Su propio docblock supone
+uno solo: *«al abrir la sesión se inyectan los índices core»*.
+
+**Por qué es `S1` y no deriva de documentación.** Hoy el daño está acotado —el hook
+*agrega* (`appendFileSync` al discovery flag) y no borra nada, así que un `resume` o un
+`compact` solo cuestan la inyección de más (`CAR-004`)—. Pero el diseño que estábamos por
+implementar convierte eso en pérdida de datos: `ADR-001` §1 pone `cleanup()` en
+`SessionStart`, y `ADR-002` §1 muda ahí la limpieza de todo el estado de ciclo `sesión`
+sobre la premisa —escrita textualmente— de que `SessionStart` *«es el único evento que
+ocurre una vez por sesión»*. **Con un `compact` a mitad de sesión, esa limpieza borra el
+discovery flag y `session-writes.json` mientras el trabajo sigue vivo.**
+
+Se registra como `S1` porque desactiva un guardrail sin que nadie se entere: tras el
+borrado, el Discovery Gate vuelve a bloquear escrituras pidiendo un descubrimiento que ya
+ocurrió, y `sync-check` deja de ver los archivos escritos antes de la compactación.
+
+**Cómo se verificó.** Consulta a la documentación de hooks de Claude Code
+(`code.claude.com/docs/en/hooks`), contrastada con `templates/.claude/settings.json:3-12` y
+el docblock de `session-start.js:1-25`. La misma consulta confirmó los otros dos supuestos
+de `ADR-002` (que `Stop` corre por turno y que `exit 2` en `Stop` continúa la conversación)
+y encontró que **`SessionEnd` sí existe**, lo que habilita la opción (a) que `ADR-002` §3
+había dejado condicionada.
+
+**Arreglo.** Matcher explícito en `settings.json` y lectura del origen en el hook: la
+limpieza destructiva solo con `startup`; en `resume`/`compact`/`fork` el estado se preserva.
+Es la corrección que `ADR-001` y `ADR-002` incorporan antes de implementarse.
+
+---
+
+## CAR-004 · Tras una compactación se inyecta el mismo contexto dos veces
+
+**Tipo:** `CAR` · **Severidad:** `S2` (contexto B) · **Unidad:** encontrado en fase de
+diseño · **Estado:** abierto
+
+**Consecuencia directa de `INC-020`.** Una compactación dispara `PostCompact`
+(`compact-recovery.js`) **y** `SessionStart` con origen `compact` (`session-start.js`).
+Los dos inyectan los mismos tres índices core cortados en `<!-- DETAIL:BEGIN -->`, y los
+dos inyectan `context/brief.md`.
+
+**Medido** con tres índices core de ~7,3 KB cada uno y un `brief.md` con contenido real:
+
+```
+session-start.js   (SessionStart origen=compact)    9.363 chars
+compact-recovery.js (PostCompact)                  13.738 chars
+                                          TOTAL    23.101 chars  ≈ 5.775 tokens
+
+de las 94 líneas de contenido de session-start, 80 (85%) son
+byte-idénticas a líneas de compact-recovery  →  8.097 chars ≈ 2.024 tokens duplicados
+```
+
+**Por qué duele más de lo que el número sugiere.** Esto ocurre exactamente en el momento en
+que el contexto es más escaso: el runtime acaba de compactar porque no había espacio, y el
+harness responde ocupando ~5.800 tokens de los que ~2.000 son repetidos.
+
+Ninguno de los dos hooks sabe del otro: `session-start.js` tiene tope por índice
+(`MAX_INDEX_CHARS = 2500`) y `compact-recovery.js` **no tiene ninguno** —inyecta la Quick
+Reference completa de hasta 10 índices y los cuatro `context/*.md` en crudo—. Es la misma
+ausencia de presupuesto compartido que `CAR-001` y `DEC-006`, en su tercera manifestación.
+
+**Arreglo.** Con el matcher de `INC-020`, `session-start.js` no corre en `compact`. Con
+`lib/budget.js` (`ADR-001` §4) la dedup deja de depender de que cada hook conozca al resto.
+Los dos arreglos son independientes y cualquiera de los dos reduce el costo; juntos lo
+cierran.

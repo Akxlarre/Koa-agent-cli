@@ -6,13 +6,14 @@
 
 ## Contexto
 
-La auditoría cerró 102 unidades y produjo 76 hallazgos. Al agruparlos por *«qué arreglo
-los cierra»*, los 76 se reducen a **once piezas de trabajo**:
+La auditoría cerró 102 unidades y produjo 76 hallazgos —78 tras los dos que encontró la
+verificación del runtime durante el diseño (`INC-020`, `CAR-004`)—. Al agruparlos por
+*«qué arreglo los cierra»*, se reducen a **once piezas de trabajo**:
 
 | Cluster | Hallazgos | `S1` |
 |---|---|---|
 | 1 · Identidad de sesión | 3 | 1 |
-| 2 · Semántica de `Stop` | 4 | — |
+| 2 · Ciclo de vida de los eventos | 6 | 1 |
 | 3 · Declarar los contratos | 11 | — |
 | 4 · Clasificación de rutas | 3 | — |
 | 5 · Presupuesto de contexto | 4 | 1 |
@@ -79,8 +80,15 @@ sessionId(payload)      // string, tres niveles, nunca global
 stateDir(payload)       // ruta al directorio de estado de ESTA sesión y ESTE proyecto
 readState(payload, key) // objeto | null
 writeState(payload, key, value)
-cleanup()               // borra sesiones anteriores a N días
+cleanup({ source })     // borra por ANTIGÜEDAD; nunca el estado de la sesión en curso
 ```
+
+> **Corrección tras verificar el runtime (`INC-020`).** La primera versión decía
+> `cleanup()` a secas, «en `SessionStart`». `SessionStart` **no corre una vez por sesión**:
+> corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin
+> matcher. Un `cleanup()` ciego ahí borra el discovery flag y `session-writes.json` cada vez
+> que el runtime compacta, a mitad del trabajo. Por eso la firma lleva `source` y el criterio
+> de borrado es la antigüedad, no «arrancó una sesión». Ver `ADR-002` §1.
 
 **Dos decisiones de fondo:**
 
@@ -102,7 +110,7 @@ dos proyectos distintos nunca comparten estado.
 | Aislamiento entre proyectos | **ninguno** con el fallback | por construcción: la ruta es del proyecto |
 | Inspeccionable al depurar | difícil de encontrar | está en el proyecto |
 | Ya gitignored | n/a | **sí** — `gitignore.template:30` |
-| Se limpia solo | lo hace el SO | **hay que hacerlo** → `cleanup()` en `SessionStart` |
+| Se limpia solo | lo hace el SO | **hay que hacerlo** → `cleanup({source})`, por antigüedad |
 
 El costo es real (hay que limpiar) y lo asumimos: mata `HUE-002` por construcción en vez de
 por mejor derivación del ID, y de paso pone los artefactos donde ya viven
@@ -251,7 +259,7 @@ trabajo propio:
 
 | Cluster | Por qué queda fuera | Dónde va |
 |---|---|---|
-| 2 · Semántica de `Stop` | Es un malentendido conceptual, no código compartido | **ADR-002** |
+| 2 · Ciclo de vida de los eventos | Es un malentendido conceptual, no código compartido | **ADR-002** |
 | 7 · `post-edit` | Dos `S1` de 2 líneas + 1 archivo; no espera al núcleo | **tanda 0** |
 | 8 · Provocación de reglas | Escribir 24 fixtures. Trabajo mecánico, sin diseño | backlog |
 | 9 · Backlog de tests | 11 archivos. Es la **precondición** de la migración, no su consecuencia | ver fases |
@@ -274,8 +282,13 @@ Es la lección de la propia auditoría aplicada a la reparación.
 ### Tanda 0 · Los `S1` que no dependen del núcleo *(riesgo nulo)*
 
 `SEC-001` (`execFileSync` en vez de interpolar en shell) · `DEC-003` (`package.json` de tres
-líneas en `.claude/scripts/`) · el test de `post-edit` que no existía.
-**No toca ningún otro hook.** Va primero porque son dos `S1` y no dependen de nada.
+líneas en `.claude/scripts/`) · `INC-020` (matcher `startup` en `SessionStart`, más el test
+que valida `settings.json` contra la lista de eventos del runtime) · el test de `post-edit`
+que no existía.
+
+**No toca ningún otro hook.** Va primero porque son tres `S1` y no dependen de nada — y
+`INC-020` además es precondición de `session.js`: mover el estado a `.claude/temp/` con
+`SessionStart` sin matcher sería estrictamente peor que dejarlo en `os.tmpdir()`.
 
 ### Tanda 1 · Escribir el núcleo *(riesgo nulo)*
 
@@ -324,7 +337,8 @@ decisión sobre asignaciones.
 | **Migrar rompe un hook y se replica a todos los proyectos** | Tanda 2 antes de tanda 3. Ningún hook se migra sin test |
 | **El núcleo agrega superficie** (5 archivos nuevos que también pueden fallar) | Son funciones puras salvo `session.js`. Tests propios desde la tanda 1. El precedente `scripts/lib/` tiene 79 tests y cero hallazgos graves |
 | **`paths.js` cambia comportamiento en silencio** | Los tests de tanda 2 capturan el comportamiento actual **antes** de migrar. Toda diferencia queda visible como test que cambia |
-| **Mover el estado a `.claude/temp/` lo hace crecer** | `cleanup()` en `SessionStart`, con umbral explícito. Es la razón por la que `session.js` tiene esa función |
+| **Mover el estado a `.claude/temp/` lo hace crecer** | `cleanup({source})` con umbral de antigüedad explícito. Es la razón por la que `session.js` tiene esa función |
+| **Un matcher de `settings.json` mal escrito no falla: el hook no corre** | Test en tanda 1 que valida las claves de `settings.json` contra la lista de eventos del runtime (`INC-020` se encontró justamente ahí) |
 | **`require('./lib/...')` desde `sdd/` y `validators/`** | Rutas relativas (`../lib/`). Verificar en tanda 1 con un test que cargue los 18 hooks |
 | **El scaffolder no copia `lib/`** | `copyRecursiveSync` es recursivo — pero hay que **comprobarlo**, no suponerlo. Test en tanda 1 |
 
@@ -340,7 +354,10 @@ decisión sobre asignaciones.
 - [ ] Ninguna inyección sin pasar por `budget.js`
 - [ ] El registro de contratos cubre los 21, y su test falla si aparece un consumidor sin declarar
 - [ ] `templates-contract.md` se genera desde el registro
-- [ ] Los `S1` del núcleo cerrados: `DEC-001`, `HUE-002`, `CAR-001`, `SEC-001`, `DEC-003`
+- [ ] Ningún hook corre en un evento que no declara entender: `settings.json` con matcher
+      explícito donde el origen cambia el comportamiento, y un test que lo valida
+- [ ] Los `S1` del núcleo cerrados: `DEC-001`, `HUE-002`, `CAR-001`, `SEC-001`, `DEC-003`,
+      `INC-020`
 - [ ] `npm run claude:test-hooks` y `npm test` en verde
 - [ ] Cada hallazgo cerrado, marcado `resuelto` en `HALLAZGOS.md` con el commit
 

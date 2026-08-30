@@ -6,7 +6,12 @@
 > Estado: `·` pendiente · `~` en curso · `✓` cerrada · `!` cerrada con hallazgo grave
 
 **Progreso** — Nivel A: **53/53 ✅** · Nivel B: **41/41 ✅** · Nivel C: **8/8 ✅** · Pase general: **✅ EJECUTADO**
-**Hallazgos** — 76: **7 `S1`**, 35 `S2`, 34 `S3`. Ver `HALLAZGOS.md` y `PASE-GENERAL.md`.
+**Hallazgos** — 78: **8 `S1`**, 36 `S2`, 34 `S3`. Ver `HALLAZGOS.md` y `PASE-GENERAL.md`.
+
+> 76 salieron de las 102 unidades. Los dos últimos —`INC-020` (`S1`) y `CAR-004`— los
+> encontró la fase de diseño al verificar contra la documentación de Claude Code un supuesto
+> sobre el runtime que la auditoría había dado por bueno *por comportamiento observado*.
+> Ver `docs/diseno/README.md`.
 
 > ## LAS 102 UNIDADES CERRADAS — 2026-08-29
 >

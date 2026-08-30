@@ -287,7 +287,7 @@ repositorio.
 
 # Qué hacer con esto
 
-## Los 7 `S1` — antes de la próxima release del blueprint
+## Los 8 `S1` — antes de la próxima release del blueprint
 
 | ID | Qué | Esfuerzo |
 |---|---|---|
@@ -298,9 +298,16 @@ repositorio.
 | `HUE-005` | validar el `stack` del blueprint donde se lee | bajo |
 | `CAR-001` | dedup por track y sesión en `plan-injector` | medio |
 | `DEC-004` | fixtures para las 24 reglas sin cubrir | medio, pero incremental |
+| `INC-020` | matcher `startup` en `SessionStart` + test de `settings.json` | bajo |
 
-**Cinco de los siete son de esfuerzo bajo o trivial.** `DEC-003` es un archivo de tres
+**Seis de los ocho son de esfuerzo bajo o trivial.** `DEC-003` es un archivo de tres
 líneas.
+
+> `INC-020` y `CAR-004` no salieron de las 102 unidades: los encontró la fase de diseño al
+> verificar contra la documentación de Claude Code un supuesto sobre el runtime que la
+> auditoría había dado por bueno *por comportamiento observado*. Es la única categoría que
+> el método no cubría —**los supuestos sobre la plataforma, no sobre el repo**— y quedó
+> anotada como tal.
 
 ## El backlog de tests, por rentabilidad
 

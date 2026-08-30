@@ -25,7 +25,7 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 | 7 | `post-edit` | 2 | 2 | ADR-001 · tanda 0 |
 | 8 | Provocación de reglas | 5 | 1 | backlog (24 fixtures, trabajo mecánico) |
 | 9 | Backlog de tests | 6 | — | ADR-001 · tanda 2 (**precondición** de la migración) |
-| 10 | Capa de asignaciones | 4 | — | **pendiente** — decisión de producto, no técnica |
+| 10 | Capa de asignaciones | 4 | — | **ADR-004** — decidido: integrar |
 | 11 | Deriva de documentación | 11 | — | backlog · incluye el arreglo editorial de `CAR-003` |
 
 ---
@@ -37,6 +37,7 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 | [`ADR-001`](./ADR-001-nucleo-compartido-de-hooks.md) | `templates/.claude/hooks/lib/` con cinco módulos, y el plan de migración en cinco tandas | propuesto |
 | [`ADR-002`](./ADR-002-semantica-de-stop.md) | Tres ciclos de vida con nombre; ningún hook de `Stop` borra estado de sesión; ninguna limpieza destructiva fuera de `startup` | propuesto |
 | [`ADR-003`](./ADR-003-superficie-de-eventos-y-subagentes.md) | Ámbito de sesión vs. ámbito de hilo; qué eventos del runtime se cablean y cuáles no | propuesto |
+| [`ADR-004`](./ADR-004-capa-de-asignaciones.md) | Integrar la capa de asignaciones tras un interruptor único, `specs/AUTHORS.md` | propuesto |
 
 ---
 
@@ -99,7 +100,10 @@ tanda 0  S1 independientes del núcleo   riesgo nulo   SEC-001 · DEC-003 · INC
 tanda 1  escribir el núcleo             riesgo nulo   cinco módulos + tests, sin tocar hooks
 tanda 2  tests de los 11 hooks sin test riesgo nulo   contra el comportamiento actual, bugs incluidos
 tanda 3  migrar módulo por módulo       acotado       payload → session → paths → budget → contracts
-tanda 4  lo que el núcleo no cubre                    ADR-002 · fixtures · docs · asignaciones
+tanda 4  lo que el núcleo no cubre                    ADR-002 · ADR-003 · ADR-004 · fixtures · docs
 ```
+
+`ADR-004` es independiente del núcleo —no toca ningún hook— así que puede adelantarse a
+cualquier tanda. Es también el único que edita `lib/` (Contexto A).
 
 > **Nunca se migra un hook que no tenga test. Si no lo tiene, el test va primero.**

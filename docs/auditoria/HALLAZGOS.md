@@ -1678,3 +1678,35 @@ COMPONENTS»* de *«alguien abrió `context/brief.md`»*.
 **Arreglo.** Que el flag registre el origen (`agent_type` o `main`) y que el Gate lo lea —
 que es la misma capacidad que pide `HUE-001`. Con eso la decisión se vuelve explícita:
 *«un descubrimiento delegado cuenta»*, escrito y testeado, en vez de emergente.
+
+---
+
+## INC-017 · Generador y detector de IDs de track no hablan el mismo idioma
+
+**Tipo:** `INC` · **Severidad:** `S2` (contexto B) · **Unidad:** `D-06` · **Estado:** abierto
+· **Detalle ampliado al diseñar `ADR-004`**
+
+La ficha registró *«tres convenciones de ID»*. Verificado contra el código, es más nítido:
+
+| Pieza | Qué produce o exige | Código de autor |
+|---|---|---|
+| `/spec-new:44` | `specs/specs/NNNN-slug/` | **no** |
+| `/fix-new:45` | `fix-NNN-<slug>` | **no** |
+| `/hotfix:48` | `hotfix-NNN-<slug>` | **no** |
+| `/assign-claim:131` | `specs/specs/NNNN-<mi_codigo>-slug/` | sí |
+| `/assign-new:56` | `ASG-<codigo>-NNN` | sí |
+| `assignments-audit.js:59` | `^(\d{N})-([a-z]+)-(.+)$` | **lo exige** |
+
+`processTrack` (`assignments-audit.js:125-130`) empuja un `namingViolation` por **cada**
+directorio que no matchea. **Todo track creado por los tres comandos normales del SDD es una
+violación de naming para el auditor** — el caso común, no un borde.
+
+Y `/assign-claim:124` afirma que su regla con código de autor es *«exactamente la misma regla
+que ya usan `/spec-new`, `/fix-new` y `/hotfix`»*. Los tres comandos que cita no la siguen.
+
+**Lo que hace al hallazgo instructivo:** el bug de colisión ya ocurrió, y la reparación fue
+endurecer el detector sin tocar el generador. Ninguna pieza fija que los dos hablen el mismo
+idioma — no hay test que cruce lo que un comando genera con lo que el auditor acepta.
+
+**Arreglo:** `ADR-004` §2 — dos formas válidas, el interruptor `specs/AUTHORS.md` decide
+cuál, una sola implementación, y el test que cruza generador y detector.

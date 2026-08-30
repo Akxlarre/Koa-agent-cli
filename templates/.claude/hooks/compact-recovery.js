@@ -20,6 +20,7 @@ const os = require('os');
 
 const payload = require('./lib/payload.js');
 const session = require('./lib/session.js');
+const budget = require('./lib/budget.js');
 
 // Lee su payload por stdin como el resto: de ahi sale el `session_id` que los
 // cuatro hooks del discovery flag deben compartir. Con un id distinto,
@@ -28,6 +29,10 @@ payload.read().then((PAYLOAD) => reinyectar(PAYLOAD, PAYLOAD.cwd));
 
 function reinyectar(PAYLOAD, cwd) {
 const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
+
+// El mismo techo por indice que session-start. Sin el, HUE-017: los indices
+// entraban enteros y los cuatro context/*.md en crudo.
+const MAX_INDEX_CHARS = 2500;
 
 // Índices siempre inyectados (base de todo proyecto)
 const CORE_INDICES = new Set(['COMPONENTS', 'SERVICES', 'FACADES']);
@@ -74,12 +79,12 @@ for (const [name, relativePath] of Object.entries(ALL_INDEX_FILES)) {
   const fullPath = path.join(cwd, relativePath);
   if (!fs.existsSync(fullPath)) continue;
 
-  let content = fs.readFileSync(fullPath, 'utf-8').trim();
+  // HUE-017: no habia tope. Se corta en DETAIL:BEGIN y se aplica el mismo
+  // techo por indice que usa session-start, para que una compactacion no
+  // devuelva mas contexto del que el runtime acaba de liberar.
+  const content = budget.recortar(fs.readFileSync(fullPath, 'utf-8').trim(),
+    { maxChars: MAX_INDEX_CHARS });
   if (!content) continue;
-
-  // Cortar en DETAIL:BEGIN — inyectar solo la Quick Reference
-  const cutoff = content.indexOf(DETAIL_MARKER);
-  if (cutoff > -1) content = content.slice(0, cutoff).trim();
 
   output += `--- ${relativePath} ---\n`;
   output += content + '\n\n';
@@ -111,19 +116,19 @@ for (const cf of CONTEXT_FILES) {
   if (!fs.existsSync(fullPath)) continue;
 
   const raw = fs.readFileSync(fullPath, 'utf-8').trim();
-  // Saltar archivos que son solo plantilla (sin contenido real).
-  // Se eliminan comentarios HTML antes de medir: las plantillas de context/
-  // son casi enteramente <!-- instrucciones -->, asi que sin contenido real
-  // el resultado queda por debajo del umbral.
-  const stripped = raw.replace(/<!--[\s\S]*?-->/g, '').trim();
-  if (stripped.length < 80) continue;
+  // DEC-006: el filtro anterior solo quitaba comentarios HTML, y las plantillas
+  // de context/ pasaban igual porque su andamiaje markdown —encabezados y
+  // blockquotes de instrucciones— ya supera los 80 chars por si solo. Medido:
+  // brief 456, domain 760, constraints 327, learnings 457. budget.isPlaceholder
+  // quita tambien ese andamiaje; las cuatro caen a 0-66.
+  if (budget.isPlaceholder(raw)) continue;
 
   if (!contextAdded) {
     output += '\n─── Contexto del proyecto (context/) ───\n\n';
     contextAdded = true;
   }
   output += '--- ' + cf.label + ' ---\n';
-  output += raw + '\n\n';
+  output += budget.recortar(raw, { maxChars: MAX_INDEX_CHARS, cutAt: null }) + '\n\n';
 }
 
 if (contextAdded) {

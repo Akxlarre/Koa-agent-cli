@@ -23,10 +23,10 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 | 5 | Presupuesto de contexto | 4 | 1 | **ADR-001** §4 `lib/budget.js` |
 | 6 | Entrada de los hooks | 3 | 1 | **ADR-001** §2 `lib/payload.js` |
 | 7 | `post-edit` | 2 | 2 | ADR-001 · tanda 0 |
-| 8 | Provocación de reglas | 5 | 1 | backlog (24 fixtures, trabajo mecánico) |
+| 8 | Provocación de reglas | 5 | 1 | **ADR-005** §1 — **precondición** del cluster 11, no paralelo |
 | 9 | Backlog de tests | 6 | — | ADR-001 · tanda 2 (**precondición** de la migración) |
 | 10 | Capa de asignaciones | 4 | — | **ADR-004** — decidido: integrar |
-| 11 | Deriva de documentación | 11 | — | backlog · incluye el arreglo editorial de `CAR-003` |
+| 11 | Deriva de documentación | 11 | — | **ADR-005** (`CAR-003`) · el resto, backlog en lote |
 
 ---
 
@@ -38,6 +38,7 @@ Los 76 hallazgos, agrupados por *«qué arreglo los cierra»*:
 | [`ADR-002`](./ADR-002-semantica-de-stop.md) | Tres ciclos de vida con nombre; ningún hook de `Stop` borra estado de sesión; ninguna limpieza destructiva fuera de `startup` | propuesto |
 | [`ADR-003`](./ADR-003-superficie-de-eventos-y-subagentes.md) | Ámbito de sesión vs. ámbito de hilo; qué eventos del runtime se cablean y cuáles no | propuesto |
 | [`ADR-004`](./ADR-004-capa-de-asignaciones.md) | Integrar la capa de asignaciones tras un interruptor único, `specs/AUTHORS.md` | propuesto |
+| [`ADR-005`](./ADR-005-presupuesto-de-las-reglas-inyectadas.md) | El contexto se paga por lo que ninguna máquina puede atrapar; las fixtures van antes que el recorte | propuesto |
 
 ---
 
@@ -49,10 +50,14 @@ son legítimas: *¿es código de producto?*, *¿necesita descubrimiento?*, *¿va
 El defecto es que están escritas tres veces sin nombre y sin test. `lib/paths.js` les pone
 nombre, no las colapsa (ADR-001 §3).
 
-**2 · El presupuesto de contexto no cierra `CAR-003`.** Las seis reglas path-scoped que
-suman ~9.800 tokens al editar un componente de `shared/` las inyecta Claude Code al matchear
-`paths:` en el frontmatter, no un hook. Ningún módulo nuestro puede interceptarlas: el
-arreglo es editorial y va en el cluster 11.
+**2 · El presupuesto de contexto no cierra `CAR-003`.** Las reglas path-scoped las inyecta
+Claude Code al matchear `paths:` en el frontmatter, no un hook. Ningún módulo nuestro puede
+interceptarlas: el arreglo es editorial y lo diseña `ADR-005`.
+
+**3 · `CAR-003` estaba medido a la mitad.** La ficha `R-01` midió `src/app/shared/`: 6
+reglas, ~9.800 tokens. El peor caso es un componente de `features/` —**13 reglas, ~19.100
+tokens**— y es además el archivo que más se edita. Con `plan-injector`, un solo `Edit`
+arrastra **~26.500 tokens**. El pase general está corregido.
 
 ---
 

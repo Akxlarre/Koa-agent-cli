@@ -217,12 +217,13 @@ contexto, y el subagente tiene el suyo (`ADR-003` §1).
 
 **Cierra:** `CAR-001` (S1), `DEC-006`, `HUE-017`.
 
-**Lo que NO cierra, y hay que decirlo:** `CAR-003` —las seis reglas path-scoped que suman
-~9.800 tokens al editar un componente de `shared/`— **queda fuera del alcance de este
+**Lo que NO cierra, y hay que decirlo:** `CAR-003` —las **13** reglas path-scoped que suman
+~19.100 tokens al editar un componente de `features/`— **queda fuera del alcance de este
 módulo**. Esas reglas las inyecta Claude Code al matchear el frontmatter `paths:`, no un
-hook: ningún módulo nuestro puede interceptarlas. Su arreglo es editorial (partir
-`visual-system.md`, que son 21.521 chars, y estrechar el glob de `delegation.md`) y va en
-el cluster 11.
+hook: ningún módulo nuestro puede interceptarlas. Su arreglo es editorial y lo diseña
+**`ADR-005`**, que además encontró que el recorte barato está bloqueado por el cluster 8:
+once de las doce reglas `ARCH-*` citadas en `rules/` no tienen fixture que demuestre que
+pueden fallar.
 
 ---
 

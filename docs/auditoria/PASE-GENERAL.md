@@ -160,7 +160,7 @@ ninguno intenta evadirlo, así que la evasión con la palabra «cuando» sobrevi
 | Descriptions de 14 skills | **cada turno** | 4.842 chars (~1.210 tk) | n/a — es su naturaleza |
 | `session-start` | cada sesión | 3.991 chars medidos | tope 2.500/índice + `DETAIL:BEGIN` |
 | `prompt-context` | cada N prompts | decenas de líneas | dedup + `REPEAT_EVERY=8` |
-| Reglas path-scoped | al matchear | **39.197 chars (~9.800 tk)** en `shared/` | **ninguno** |
+| Reglas path-scoped | al matchear | **76.391 chars (~19.100 tk)** en `features/*.ts` | **ninguno** |
 | `plan-injector` | **cada Edit** | **24.622 chars (~6.155 tk)** | **ninguno** |
 | `compact-recovery` | cada compactación | 12.964 chars medidos | `DETAIL:BEGIN`, **sin tope** |
 | Plantillas vacías de `context/` | dentro de las dos anteriores | ~3.240 tk | el filtro **no filtra** |
@@ -168,16 +168,23 @@ ninguno intenta evadirlo, así que la evasión con la palabra «cuando» sobrevi
 
 ### El peor caso, sumado
 
-Editar un componente de `shared/` en un proyecto con spec SDD activa:
+> **Corregido al diseñar `ADR-005`.** Esta sección midió el caso de `src/app/shared/`, que
+> es el **segundo** peor. Al cruzar los `paths:` de las 15 reglas contra rutas
+> representativas, el peor es un componente de `features/` —13 reglas en vez de 6— y además
+> es el archivo que más se edita en un proyecto Angular. **El peor caso es el caso común.**
+
+Editar un componente de `features/` en un proyecto con spec SDD activa:
 
 ```
-  reglas path-scoped (6 archivos)      ~9.800 tk
+  reglas path-scoped (13 archivos)    ~19.100 tk
   plan-injector (spec+plan+tasks)      ~6.155 tk
   descriptions de skills (siempre)     ~1.210 tk
   capa 4 de pre-write-guard            ~   80 tk
   ─────────────────────────────────────────────
-                                      ~17.200 tk   en UNA edición
+                                      ~26.500 tk   en UNA edición
 ```
+
+Para comparar, el caso que midió `R-01` —`src/app/shared/`, 6 reglas— suma ~17.200 tk.
 
 Y `plan-injector` **no tiene dedup**: diez ediciones en una sesión son ~61.000 tokens del
 mismo contrato repetido.

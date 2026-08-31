@@ -64,7 +64,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-010` | S2 | `H-03` | Los 3 hooks de `sdd/` y `context-enrichment-guard` leen stdin sin el cap SEC-04 | resuelto · `spec-gate` y `context-enrichment-guard` migrados a `lib/payload.js`; ningún hook acumula stdin sin tope |
 | `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | resuelto · los tres hooks de `sdd/` tienen test: 42 + 35 + 16 = 93 |
 | `HUE-012` | S2 | `H-04` | Las ~20 reglas regex de `pre-write-guard` no las cubre `provocar-reglas.mjs` | resuelto · las 19 reglas mudas ahora dicen su ID y hay un fixture por regla que las provoca de verdad (`guard-rules.test.js`) |
-| `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | abierto |
+| `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | resuelto · las dependencias de orden declaradas y testeadas; una de las tres se disolvió con `ACO-001` en vez de documentarse |
 | `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | abierto |
 | `HUE-009` | S3 | `H-00` | Ningún test verifica que los comandos cableados apunten a archivos existentes | resuelto · `settings.test.js`: ruta, sintaxis, evento y los dos matchers con semántica |
 | `HUE-013` | S3 | `H-05` | `GATE-B1` bloquearía una regla que documenta un hook; latente, no activo hoy | abierto |
@@ -97,7 +97,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | abierto · el test de integración genera un proyecto real, pero no genera una feature ni le corre `architect.js` encima: eso necesita `npm install` (el linter usa la API de TypeScript) |
 | `HUE-023` | S3 | `A-01` | La calidad del resumen de los subagentes no es verificable por ningún mecanismo del repo | abierto |
 | `HUE-024` | S3 | `A-01` | Nadie verifica que los comandos que los procedimientos de los subagentes mencionan existan en `package.json` | abierto |
-| `HUE-026` | S3 | `T-01` | `doc-links.test.js` verifica «regla emitida → documentada» pero no la inversa; por eso no atrapó `ARCH-14` | abierto |
+| `HUE-026` | S3 | `T-01` | `doc-links.test.js` verifica «regla emitida → documentada» pero no la inversa; por eso no atrapó `ARCH-14` | resuelto · `doc-links.test.js` verifica las dos direcciones; encontró un segundo fantasma, `A11Y-04`, que la auditoría no tenía |
 | `INC-011` | S3 | `G-01` | `bin/index.js` tiene 169 líneas contra el techo de ~150 que declara `cli-architecture.md` | resuelto · los prompts salieron a `lib/prompts.js`; 169 → 122 líneas, con test contra el techo de la regla |
 | `INC-012` | S3 | `G-02` | Los nombres reservados de Windows solo se validan **en** Windows | resuelto · se validan siempre, no solo en win32 |
 | `INC-013` | S3 | `G-07` | La mitigación de `deriveSingular` («el prompt permite corregirlo») no existe en modo no-interactivo | resuelto · `--singular <Nombre>` + se imprime lo derivado en modo no-interactivo |
@@ -1072,7 +1072,7 @@ Tres dependencias de orden, de las cuales solo una está escrita:
 
 | Dependencia | ¿Documentada? | Qué se rompe al reordenar |
 |---|---|---|
-| `spec-reflection` (Stop 2º) antes que `sync-check` (Stop 3º) | **no** | `sync-check` borra `session-writes.json`; si sube, `spec-reflection` pierde su evidencia |
+| ~~`spec-reflection` (Stop 2º) antes que `sync-check` (Stop 3º)~~ | **no** | **Ya no aplica**: desde `ACO-001`, `sync-check` no borra `session-writes.json`. La dependencia se disolvió en vez de documentarse |
 | `spec-gate` (1º) antes que `plan-injector` (4º) | sí, en el docblock de `plan-injector` | el injector inyectaría sobre escrituras que el gate iba a bloquear |
 | `discovery-tracker` (PostToolUse Read) antes de cualquier Edit | **no** | el Gate depende de que el PostToolUse ya haya corrido |
 

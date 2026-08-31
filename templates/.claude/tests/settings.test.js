@@ -102,6 +102,69 @@ describe('LOS EVENTOS EXISTEN', () => {
   });
 });
 
+describe('EL ORDEN QUE LLEVA SEMANTICA (ACO-004)', () => {
+  // El orden de los hooks dentro de un evento era un contrato tacito: tres
+  // dependencias reales y solo una escrita, en el docblock de plan-injector.
+  // Reordenar settings.json no rompia ningun test — rompia el harness en silencio.
+  //
+  // Se declaran las que existen HOY. Una de las tres que encontro la auditoria ya
+  // no existe: `sync-check` borraba session-writes.json y por eso tenia que ir
+  // DESPUES de spec-reflection; desde ACO-001 no borra nada y la dependencia se
+  // disolvio en vez de documentarse. Un contrato que deja de ser necesario se
+  // saca, no se hereda.
+  const DEPENDENCIAS = [
+    {
+      evento: 'PreToolUse',
+      matcher: 'Edit|Write|MultiEdit',
+      antes: 'sdd/spec-gate.js',
+      despues: 'sdd/plan-injector.js',
+      porque: 'el injector inyectaria el contrato SDD sobre una escritura que el gate iba a bloquear',
+    },
+    {
+      evento: 'PostToolUse',
+      matcher: 'Edit|Write|MultiEdit',
+      antes: 'write-tracker.js',
+      despues: 'post-edit.js',
+      porque: 'post-edit corre prettier y puede tardar: el tracker registra la escritura primero',
+    },
+  ];
+
+  /** Los comandos de un evento+matcher, en orden. */
+  function ordenDe(evento, matcher) {
+    const grupo = (SETTINGS.hooks[evento] || [])
+      .find((g) => (g.matcher || null) === (matcher || null));
+    return grupo ? (grupo.hooks || []).map((h) => h.command) : [];
+  }
+
+  for (const d of DEPENDENCIAS) {
+    test(`${d.antes} antes que ${d.despues} — ${d.porque}`, () => {
+      const orden = ordenDe(d.evento, d.matcher);
+      const i = orden.findIndex((c) => c.includes(d.antes));
+      const j = orden.findIndex((c) => c.includes(d.despues));
+      assert.ok(i !== -1, `${d.antes} no esta cableado en ${d.evento}`);
+      assert.ok(j !== -1, `${d.despues} no esta cableado en ${d.evento}`);
+      assert.ok(i < j, `el orden actual es ${orden.join(' → ')}`);
+    });
+  }
+
+  test('el detector lee el orden real, no uno inventado', () => {
+    const orden = ordenDe('PreToolUse', 'Edit|Write|MultiEdit');
+    assert.ok(orden.length >= 4, `solo ${orden.length} hooks en PreToolUse`);
+    assert.ok(orden[0].includes('spec-gate'), orden.join(' → '));
+  });
+
+  test('la dependencia ENTRE eventos tambien queda escrita', () => {
+    // discovery-tracker (PostToolUse Read) tiene que haber corrido antes de que
+    // el Gate (PreToolUse Edit) mire el flag. No es orden DENTRO de un evento:
+    // es que el evento que lo escribe ocurra antes que el que lo lee, y eso no
+    // se puede fijar en settings.json — solo documentarse.
+    const doc = fs.readFileSync(path.join(CLAUDE, '..', 'docs', 'HOOKS-SYSTEM.md'), 'utf-8');
+    assert.match(doc, /Orden que importa/,
+      'HOOKS-SYSTEM.md debe declarar las dependencias de orden');
+    assert.match(doc, /discovery-tracker/);
+  });
+});
+
 describe('LOS MATCHERS QUE LLEVAN SEMANTICA', () => {
   test('SessionStart excluye compact (INC-020, CAR-004)', () => {
     const g = SETTINGS.hooks.SessionStart[0];

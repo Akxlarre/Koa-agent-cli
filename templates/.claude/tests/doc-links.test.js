@@ -38,6 +38,23 @@ function walk(dir, out = []) {
 const FILES = walk(PAYLOAD);
 
 /**
+ * Los directorios donde vive el codigo que EMITE reglas.
+ *
+ * Este archivo corre en dos contextos: en el repo del CLI, donde los scripts
+ * viven bajo `boilerplate/scripts/`, y dentro de un proyecto generado, donde
+ * viven en `scripts/`. Mirar solo el primero hacia que en un proyecto generado
+ * las reglas de `architect.js` parecieran no emitidas por nadie — lo cazo correr
+ * la suite en el layout de un proyecto real, que es para lo que se corre ahi.
+ */
+function dirsDeCodigo() {
+  return [
+    path.join(PAYLOAD, '.claude', 'hooks'),
+    path.join(PAYLOAD, 'boilerplate', 'scripts'),
+    path.join(PAYLOAD, 'scripts'),
+  ].filter((d) => fs.existsSync(d));
+}
+
+/**
  * Anclas disponibles en un markdown: las explicitas `<a id="...">` y los slugs
  * que GitHub deriva de los encabezados.
  */
@@ -120,12 +137,7 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
    */
   function emittedRuleIds() {
     const ids = new Map(); // ID -> { file, anchor }
-    const sources = [
-      path.join(PAYLOAD, '.claude', 'hooks'),
-      path.join(PAYLOAD, 'boilerplate', 'scripts'),
-    ];
-    for (const dir of sources) {
-      if (!fs.existsSync(dir)) continue;
+    for (const dir of dirsDeCodigo()) {
       for (const file of walk(dir)) {
         const txt = fs.readFileSync(file, 'utf-8');
 
@@ -191,5 +203,91 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
       if (!cache.get(full).has(anchor)) missing.push(`${id} (${file}#${anchor})`);
     }
     assert.deepEqual(missing.sort(), [], `reglas sin ancla explicita:\n  ${missing.join('\n  ')}`);
+  });
+
+  // ── HUE-026 — la direccion inversa, que es la que nadie miraba ─────────────
+  //
+  // Los dos tests de arriba preguntan «regla emitida → esta documentada?». La
+  // pregunta que faltaba es «regla documentada → la emite alguien?», y su
+  // ausencia es la razon exacta por la que ARCH-14 vivio meses como fantasma:
+  // citada en verify/SKILL.md, con seccion propia en la doc, y sin un solo
+  // detector detras.
+  //
+  // Una regla documentada que nadie emite es peor que una sin documentar: el
+  // agente lee que existe un guardrail, confia en el, y no hay nadie del otro
+  // lado.
+
+  /** Los IDs con seccion propia en los docs del payload. */
+  function documentedRuleIds() {
+    const docs = new Map(); // ID -> archivo donde se documenta
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.startsWith('docs/')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/^#{2,4}\s+((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2}):/gm)) {
+        if (!docs.has(m[1])) docs.set(m[1], rel);
+      }
+    }
+    return docs;
+  }
+
+  /**
+   * Los IDs que alguien EMITE de verdad, mirando el codigo y no la doc.
+   * Se busca la forma en que un mensaje o un registro nombra una regla; una
+   * mencion en un comentario no cuenta como emitir.
+   */
+  function reallyEmittedIds() {
+    const emitidos = new Set();
+    const sinComentarios = (src) => src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+
+    for (const dir of dirsDeCodigo()) {
+      for (const file of walk(dir)) {
+        if (!file.endsWith('.js') && !file.endsWith('.mjs')) continue;
+        const txt = sinComentarios(fs.readFileSync(file, 'utf-8'));
+        for (const m of txt.matchAll(/\[((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})\]/g)) {
+          emitidos.add(m[1]);
+        }
+        for (const m of txt.matchAll(/'((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})'/g)) {
+          emitidos.add(m[1]);
+        }
+      }
+    }
+    return emitidos;
+  }
+
+  test('toda regla documentada la emite alguien', () => {
+    const documentadas = documentedRuleIds();
+    const emitidas = reallyEmittedIds();
+
+    assert.ok(documentadas.size > 10, `solo ${documentadas.size} reglas documentadas — revisa el regex`);
+    assert.ok(emitidas.size > 10, `solo ${emitidas.size} reglas emitidas — revisa el regex`);
+
+    const fantasmas = [...documentadas.entries()]
+      .filter(([id]) => !emitidas.has(id))
+      .map(([id, archivo]) => `${id} (documentada en ${archivo})`);
+
+    assert.deepEqual(fantasmas.sort(), [],
+      `reglas documentadas que no emite nadie:\n  ${fantasmas.join('\n  ')}\n` +
+      'El agente lee que existe el guardrail y no hay nadie del otro lado.');
+  });
+
+  test('y ninguna pieza del harness cita una regla que no existe', () => {
+    // ARCH-14 no solo estaba documentada sin detector: verify/SKILL.md la citaba
+    // como si fuera el mecanismo que atrapa los iconos sin registrar. El que los
+    // atrapa es ICON-01.
+    const conocidas = new Set([...documentedRuleIds().keys(), ...reallyEmittedIds()]);
+    const citas = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/\b((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})\b/g)) {
+        if (!conocidas.has(m[1])) citas.push(`${m[1]} citada en ${rel}`);
+      }
+    }
+    assert.deepEqual([...new Set(citas)].sort(), [],
+      'una regla citada y no existente manda al agente a buscar algo que no esta');
   });
 });

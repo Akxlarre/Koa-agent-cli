@@ -343,7 +343,7 @@ Duplicarlos en el navegador gasta ciclos y da falsos negativos (solo ve el DOM m
 | Check | Dueño |
 |---|---|
 | Colores hardcodeados / tokens inválidos | ARCH-18 + `theme-tokens.js` |
-| Íconos sin registrar en `provideIcons()` | ARCH-14 + `icon-registry.js` |
+| Íconos sin registrar en `provideIcons()` | ICON-01 + `icon-registry.js` |
 | Emojis, `*ngIf`, `@Input()`, Supabase en UI | Architect Guard (hook) |
 | Esquema SQL vs `indices/DATABASE.md` | `sql-schema.js` |
 

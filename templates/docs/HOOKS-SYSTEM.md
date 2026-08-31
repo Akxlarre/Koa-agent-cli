@@ -48,6 +48,28 @@ Claude recibe un prompt del humano
         └─ PostCompact → compact-recovery.js → re-inyecta índices
 ```
 
+## Orden que importa
+
+El orden de los hooks dentro de un evento **no es cosmético en todos los casos**, y
+reordenar `settings.json` no rompe ningún build: rompe el harness en silencio. Estas
+son las dependencias reales, y `settings.test.js` las verifica.
+
+| Dependencia | Qué se rompe al invertirla |
+|---|---|
+| `sdd/spec-gate.js` **antes** que `sdd/plan-injector.js` (PreToolUse) | El injector inyectaría el contrato SDD sobre una escritura que el gate iba a bloquear: contexto pagado por un `Edit` que no va a ocurrir |
+| `write-tracker.js` **antes** que `post-edit.js` (PostToolUse) | `post-edit` corre prettier y puede tardar; el tracker registra la escritura primero |
+
+Y una dependencia **entre** eventos, que `settings.json` no puede expresar:
+
+| Dependencia | Por qué |
+|---|---|
+| `discovery-tracker.js` (PostToolUse `Read`) antes de cualquier `Edit` | El Discovery Gate lee el flag que ese hook escribe. Si el `Read` del índice y el `Edit` ocurren en el mismo turno, el orden lo decide el runtime, no el harness — por eso `session-start` siembra el flag al arrancar en vez de confiar en que el agente lea primero |
+
+Una dependencia que la auditoría encontró y que **ya no existe**: `sync-check` iba después
+de `spec-reflection` porque borraba `session-writes.json`. Desde que dejó de borrarlo
+(`ACO-001`) el orden entre esos dos da igual. Un contrato que deja de ser necesario se
+saca, no se hereda.
+
 ## Hooks Activos
 
 ### 0. Session Start (`session-start.js`) y Prompt Context (`prompt-context.js`)

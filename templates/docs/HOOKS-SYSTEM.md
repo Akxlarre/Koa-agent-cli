@@ -130,15 +130,15 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 
 | Archivo editado | Rules inyectadas | Skills referenciadas |
 |----------------|-----------------|---------------------|
-| `features/*.component.ts` | architecture.md (Smart), visual-system.md (tokens, bento, GSAP) | angular-component, design-system, angular-signals |
-| `shared/*.component.ts` | architecture.md (Dumb: solo input/output), visual-system.md (cards, radios) | angular-component, design-system |
-| `layout/*.component.ts` | architecture.md (Layout), visual-system.md (dark mode) | — |
+| `features/*.component.ts` | architecture.md (Smart), visual-tokens.md, visual-patterns.md (bento, GSAP) | angular-component, design-system, angular-signals |
+| `shared/*.component.ts` | architecture.md (Dumb: solo input/output), visual-tokens.md | angular-component, design-system |
+| `layout/*.component.ts` | architecture.md (Layout), visual-tokens.md (dark mode), visual-patterns.md | — |
 | `core/services/*.facade.ts` | architecture.md (Facade pattern, toSignal) | angular-signals |
 | `core/services/*.service.ts` | architecture.md (Core service, no UI injection) | angular-signals |
 | `core/directives/*.ts` | architecture.md (directivas) | angular-component |
 | `supabase/migrations/*.sql` | database.md (naming, RLS, idempotencia) | supabase-data-model |
-| `*.html` (templates) | architecture.md (@if/@for), visual-system.md (tokens, bento), ai-readability.md (data-llm-*) | angular-primeng |
-| `*.scss` / `*.css` | visual-system.md (tokens, layouts, motion) | design-system |
+| `*.html` (templates) | architecture.md (@if/@for), visual-tokens.md, ai-readability.md (data-llm-*) | angular-primeng |
+| `*.scss` / `*.css` | visual-tokens.md (tokens, temas) | design-system |
 
 ### 2. Discovery Tracker (`discovery-tracker.js`)
 - **Evento**: PostToolUse
@@ -305,7 +305,7 @@ de markup no auditarían nada.
 | ARCH-18 | Alias prohibidos dentro del propio `@theme` |
 | ARCH-21 | Clase `.bento-*` definida sin aprobar en `scripts/lib/bento-classes.allowlist.json`. Freno contra el sprawl del grid — ver el árbol de decisión en `indices/STYLES.md` |
 | ARCH-22 | Una clase del DS con el nombre de una utilidad "pelada" de Tailwind. Tailwind genera SU regla homónima en `@layer utilities` y **se suma** a la tuya en vez de reemplazarla |
-| ARCH-23 | Celda hija de un grid `.bento-grid--fill-screen*` que ocupa 2 filas (`.bento-hero`/`.bento-feature`/`.bento-tall` o `data-row-span="2"`). Desborda el `grid-template-rows` explícito: las filas implícitas se superponen sin lanzar ningún error — ver el patrón App-like en `.claude/rules/visual-system.md` |
+| ARCH-23 | Celda hija de un grid `.bento-grid--fill-screen*` que ocupa 2 filas (`.bento-hero`/`.bento-feature`/`.bento-tall` o `data-row-span="2"`). Desborda el `grid-template-rows` explícito: las filas implícitas se superponen sin lanzar ningún error — ver el patrón App-like en `.claude/rules/visual-patterns.md` |
 | ARCH-25 | Par texto/fondo por debajo de WCAG AA, **en cualquiera de los dos temas**. Compone los fondos semi-transparentes antes de medir. Ratcheado con `scripts/lib/contrast.baseline.json` |
 | ARCH-26 | Token del `@theme` con el nombre de un valor de escala nativa. `--color-base` genera `text-base` como utilidad de **color**, que le gana a la de tamaño: es el bug que dejó los inputs del login en 1.15:1, invisibles en producción |
 

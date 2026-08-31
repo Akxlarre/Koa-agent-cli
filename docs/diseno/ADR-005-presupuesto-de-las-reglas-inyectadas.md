@@ -1,6 +1,6 @@
 # ADR-005 · El presupuesto de las reglas inyectadas
 
-**Estado:** §1 implementado (fixtures en verde); §§2-4 pendientes · **Fecha:** 2026-08-30 · **Clusters:** 11 (editorial de `CAR-003`) y 8
+**Estado:** implementado — §§1-4 · **Fecha:** 2026-08-30 · **Clusters:** 11 (editorial de `CAR-003`) y 8
 (fixtures) · **Depende de:** nada del núcleo — es el único ADR que no toca código de hooks
 
 ---
@@ -161,6 +161,51 @@ solapan:
 El objetivo no es tener tres archivos: es que **editar un `.scss` deje de traer el patrón
 app-like** y que editar un `.ts` de feature deje de traer la paleta de colores.
 
+#### Hecho — con una corrección: la segunda mitad de ese objetivo era falsa
+
+**«Editar un `.ts` de feature deje de traer la paleta» no se puede cumplir, y no debería.** El
+boilerplate usa `template:` inline en todos sus componentes y no tiene un solo `.html` — el
+markup vive en el `.ts`. El propio `architect.js` lo dice en el docblock de
+`analyzeInlineTemplate`: *«sin esta separación, un proyecto 100% inline pasa la auditoría de
+templates sin que se haya revisado una sola línea de markup»*. Sacar los `.ts` de
+`visual-tokens.md` habría dejado sin reglas de color y tipografía justamente al archivo donde
+se escribe el markup: menos contexto, y menos guardrail.
+
+Así que `visual-tokens.md` conserva los globs de hoy y lo que se acotó es
+`visual-patterns.md`: `features/**` y `layout/**`, donde hay una pantalla que componer.
+
+| Archivo | Chars | `paths:` |
+|---|---|---|
+| `visual-tokens.md` | 7.847 | los seis de hoy — el markup vive en el `.ts` |
+| `visual-patterns.md` | 10.818 | `features/**`, `layout/**` |
+| `visual-system.md` | 1.137 | los seis — prioridad de UI y la regla 3-2-1 |
+
+#### Lo medido, antes y después
+
+Contando el recorte editorial (§1), el traslado de `delegation.md` (§3) y la partición:
+
+| Archivo editado | Antes | Ahora | |
+|---|---|---|---|
+| `features/reportes/reportes.ts` | 76.391 | **71.975** | −6% |
+| `features/reportes/reportes.html` | 44.612 | 40.196 | −10% |
+| `core/facades/reportes.facade.ts` | 42.308 | 39.316 | −7% |
+| `layout/sidebar/sidebar.ts` | 36.474 | 32.058 | −12% |
+| `shared/ui/kpi-card/kpi-card.ts` | 39.873 | **24.639** | −38% |
+| `core/models/reporte.model.ts` | 21.204 | 18.212 | −14% |
+| `styles/tokens/_variables.scss` | 21.228 | **8.986** | −58% |
+| `supabase/migrations/001_init.sql` | 7.514 | **4.522** | −40% |
+
+**El peor caso se movió poco, y hay que decirlo.** Un componente de feature usa casi todo lo
+que se le inyecta: es el archivo donde convergen arquitectura, facades, SWR, tests, sistema
+visual y patrones de pantalla. Lo que la partición arregla es que **shared/** y **`.scss`**
+dejen de pagar por una pantalla que no están componiendo, y ahí sí el recorte es de un tercio
+y de más de la mitad.
+
+La palanca que queda para el peor caso está a la vista en la medición: `facades.md` son 13.244
+chars y matchea `features/**/*.ts` — un componente **consume** un facade, no lo escribe. Es el
+mismo corte por glob de esta sección aplicado al segundo archivo más grande, y queda anotado
+como el próximo paso, no hecho acá.
+
 ### 3 · Estrechar `delegation.md`
 
 Matchea `src/app/**/*.ts`, `src/app/**/*.html` y `supabase/migrations/**`: **aparece en los
@@ -169,6 +214,11 @@ subagente — una decisión de flujo de trabajo, no algo que dependa del archivo
 
 Va a `CLAUDE.md`, que se carga una vez por sesión, y sale de `rules/`. Ahorra 2.992 chars
 **por cada archivo abierto** a cambio de 2.992 una sola vez.
+
+**Hecho.** El contenido está en `.claude/CLAUDE.md` bajo «Cuándo delegar» / «Cuándo NO
+delegar» y `rules/delegation.md` ya no existe. El caso más visible es la migración SQL: pasó
+de 7.514 a 4.522 chars, y ahora la única regla que trae es `database.md` — hay un test que lo
+fija.
 
 ### 4 · La regla que impide la reincidencia
 
@@ -187,13 +237,30 @@ cómo se llegó a 76.391 chars.
 **El tope es el entregable, no los tres archivos.** Partir `visual-system.md` sin fijar el
 tope es reordenar el problema.
 
+**Hecho.** `scripts/lib/rules-budget.js` traduce los `paths:` a regex, mide cada ruta
+representativa y declara el techo en `TOPES`; `rules-budget.test.mjs` lo verifica y corre con
+`npm run lint:arch:test`, que ya barre `scripts/lib/*.test.mjs`.
+
+Dos detalles de método:
+
+- **La medición se validó contra este ADR antes de usarse para nada.** El tool, escrito
+  después y por otro camino, reprodujo las seis filas de la tabla de arriba al carácter
+  (76.391 / 44.612 / 42.308 / 39.873 / 21.204 / 7.514). Una herramienta de medición que no
+  reproduce una medición previa está midiendo otra cosa.
+- **El tope se provocó.** Agregar una regla inventada de 50.000 chars con
+  `src/app/**/*.ts` rompe cinco de los ocho topes. Un tope que no se puede hacer fallar es
+  la misma decoración que este ADR persigue en las reglas del linter.
+
+Los números son la medición de hoy más ~2% de aire: no son un objetivo, son un techo, y
+bajarlo es parte del trabajo cuando una regla se recorta de verdad.
+
 ---
 
 ## Qué cierra
 
 | Hallazgo | Cómo |
 |---|---|
-| `CAR-003` (S2) | Partición por glob + `delegation.md` a `CLAUDE.md` + el tope testeado |
+| `CAR-003` (S2) | ✅ Partición por glob + `delegation.md` a `CLAUDE.md` + el tope testeado. Peor caso 76.391 → 71.975; `shared/` −38%, `.scss` −58%, SQL −40% |
 | `DEC-004` (**S1**) | ✅ Las once del orden + las tres de RLS: 4/28 → 18/28, corrida en verde |
 | `DEC-002`, `HUE-019` y el resto del cluster 8 | Quedan bajo el mismo orden |
 

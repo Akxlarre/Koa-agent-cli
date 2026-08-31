@@ -183,7 +183,7 @@ Esas clases solo se usan directamente en composiciones custom que no encajan en 
 **PROHIBIDO crear un `*-skeleton.component.ts` aparte.** El skeleton vive DENTRO del
 componente, detrás de un input `loading`: si vive aparte se desincroniza en silencio
 cuando el componente real cambia de estructura, y el layout shift vuelve sin que nadie
-lo note. Ver "Skeletons y Estados de Carga" en `visual-system.md`.
+lo note. Ver "Skeletons y Estados de Carga" en `visual-patterns.md`.
 
 ### Empty State — Componente (OBLIGATORIO usar app-empty-state)
 

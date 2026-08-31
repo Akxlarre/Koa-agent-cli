@@ -444,7 +444,7 @@ process.stdin.on('end', () => {
     if (normalizedPath.endsWith('.component.ts')) {
       if (normalizedPath.includes('features/')) {
         contextParts.push(
-          'SMART component (features/) — reglas completas en: architecture.md + visual-system.md.',
+          'SMART component (features/) — reglas completas en: architecture.md + visual-tokens.md + visual-patterns.md.',
           'Componentes disponibles en shared/ (no recrear):',
           '  <app-kpi-card [value] label [trend] /> | <app-empty-state message /> | <app-alert-card title />',
           '  <app-drawer [isOpen] title /> | <app-icon name="kebab-case" [size]="20" /> | <skeleton-block variant />',
@@ -546,7 +546,7 @@ process.stdin.on('end', () => {
     // --- Estilos SCSS ---
     if (normalizedPath.includes('src/') && (normalizedPath.endsWith('.scss') || normalizedPath.endsWith('.css'))) {
       contextParts.push(
-        'Estilos — reglas completas en: visual-system.md (auto-cargada).',
+        'Estilos — reglas completas en: visual-tokens.md (auto-cargada).',
         'Tokens: var(--*) de _variables.scss. NO hex hardcodeados.',
         'Layouts: .page-centered / .page-narrow / .page-wide. Grids: .bento-grid.',
         ...(STACK.gsap

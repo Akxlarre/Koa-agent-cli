@@ -222,10 +222,10 @@ Se inyectan automáticamente **solo cuando el archivo editado coincide** con su 
 
 | Al editar… | Reglas que se activan |
 |---|---|
-| `src/app/**/*.ts` + `.html` | `architecture`, `facades`, `swr-pattern`, `testing-tdd`, `state-management`, `delegation` |
+| `src/app/**/*.ts` + `.html` | `architecture`, `facades`, `swr-pattern`, `testing-tdd`, `state-management` |
 | `core/models/**`, `core/facades/**` | `models`, `facades` |
 | `shared/**`, `features/**` | `component-selection`, `screen-contract` |
-| `**/*.html`, `styles/**` | `visual-system`, `ai-readability`, `a11y-spec` |
+| `**/*.html`, `styles/**` | `visual-system`, `visual-tokens`, `ai-readability`, `a11y-spec` |
 | `features/**`, `layout/**` | `notifications`, `layout-blueprints` |
 | `supabase/**`, `core/services/**` | `database` |
 

@@ -103,7 +103,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-013` | S3 | `G-07` | La mitigación de `deriveSingular` («el prompt permite corregirlo») no existe en modo no-interactivo | abierto |
 | `ACO-011` | S3 | `A-01` | `.claude/temp/review-diff.patch` es el canal entre `/review` y `code-judge` y no está declarado | abierto |
 | `ACO-012` | S3 | `T-01` | Ningún test fija el formato del payload que reciben los hooks; cada uno lo construye a mano | abierto |
-| `CAR-003` | S2 | `R-01` | **(remedido)** Editar un componente de `features/` inyecta **13 reglas** completas (~19.100 tokens); `visual-system.md` sola es el 28% y matchea seis globs | abierto |
+| `CAR-003` | S2 | `R-01` | **(remedido)** Editar un componente de `features/` inyecta **13 reglas** completas (~19.100 tokens); `visual-system.md` sola es el 28% y matchea seis globs | resuelto · peor caso 76.391 → 71.975; `shared/` −38%, `.scss` −58%, SQL −40%; con tope testeado por ruta |
 | `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | abierto |
 | `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | abierto |
 | `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | abierto |

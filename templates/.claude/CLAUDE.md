@@ -81,13 +81,41 @@ llenar tu contexto principal de output que solo necesitas una vez.
 El juez usa a propósito un modelo más capaz que el que genera el código: un
 evaluador que razona igual que el generador no detecta los errores del generador.
 
-**Delegar no es gratis** — cada subagente es una llamada completa que arranca sin
-nada de lo que ya sabes. `.claude/rules/delegation.md` (se carga sola al editar
-código) dice cuándo vale la pena y cuándo hacerlo tú.
+### Cuándo delegar
 
-`code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff como archivo
-(`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría escribir
-usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un hecho.
+| Situación | Subagente |
+|---|---|
+| Vas a crear un componente, facade o servicio | `discovery-scout` — te dice qué reutilizar antes de que escribas un duplicado |
+| Terminaste de escribir y quieres validar | `arch-auditor` — devuelve violaciones accionables, no output de compilador |
+| Vas a escribir un Repository, una query o una migración | `supabase-schema` — el esquema real sale de las migraciones, no de tu memoria |
+| Vas a commitear algo no trivial | `/review` → `code-judge` — juzga el diseño, que es lo que el regex no ve |
+| Cerraste la tarea y tocaste `src/app/` | `index-syncer` — reconcilia `indices/` con el código real |
+
+### Cuándo NO delegar
+
+**Delegar no es gratis** — cada subagente es una llamada completa que arranca sin
+nada de lo que ya sabes. Hazlo tú mismo cuando:
+
+- **Ya tienes la respuesta en contexto.** Si Session Start te inyectó `COMPONENTS.md`
+  y la pregunta es "¿existe un `app-kpi-card`?", léelo.
+- **El cambio es de un archivo y ya lo entiendes.** Renombrar una variable no
+  necesita comité.
+- **Necesitas el detalle, no el resumen.** Los subagentes comprimen a propósito: si
+  vas a refactorizar un servicio, lee el archivo.
+- **Estás dentro de un subagente.** No encadenes: devuelve tu resultado y deja que el
+  agente principal decida el siguiente paso.
+
+Los subagentes **reportan**, no deciden: `arch-auditor` dice qué está mal, elegir el
+arreglo es tuyo. Si uno te devuelve algo que contradice lo que ves en el filesystem,
+**gana el filesystem** — los índices se desincronizan, el código no miente. Y delegar
+no te exime: el Discovery Gate y el Architect Guard se aplican igual a lo que escribas
+después de consultar.
+
+Dos tienen permisos de escritura acotados a propósito. `index-syncer` escribe **solo**
+en `indices/`. Y `code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff
+como archivo (`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría
+escribir usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un
+hecho.
 
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 
@@ -99,10 +127,9 @@ Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las i
 | `src/app/**/*.ts` + `.html` | `architecture`, `facades`, `swr-pattern`, `testing-tdd`, `state-management` |
 | `src/app/core/models/**` + `core/facades/**` | `models`, `facades` |
 | `src/app/shared/**` + `features/**` | `component-selection` |
-| `src/app/**/*.html` + `shared/**` + `styles/**` | `visual-system`, `ai-readability` |
-| `src/app/features/**` + `layout/**` | `notifications`, `layout-blueprints` |
+| `src/app/**/*.html` + `shared/**` + `styles/**` | `visual-system`, `visual-tokens`, `ai-readability` |
+| `src/app/features/**` + `layout/**` | `notifications`, `layout-blueprints`, `visual-patterns` |
 | `supabase/**` + `core/services/**` | `database` |
-| `src/app/**/*.ts` + `.html` + `supabase/migrations/**` | `delegation` (cuándo usar un subagente y cuándo no) |
 
 ## Referencias (leer bajo demanda — no cargadas automáticamente)
 

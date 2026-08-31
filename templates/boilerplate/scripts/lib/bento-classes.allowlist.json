@@ -4,7 +4,7 @@
   "_grupos": {
     "contenedor": "bento-grid y sus modificadores de comportamiento",
     "proporciones": "forma de la celda + alias numéricos legacy (NxM)",
-    "app-like": "fill-screen y la celda que llena — ver visual-system.md",
+    "app-like": "fill-screen y la celda que llena — ver visual-patterns.md",
     "componentes": "card y media, elementos internos de una celda"
   },
   "classes": [

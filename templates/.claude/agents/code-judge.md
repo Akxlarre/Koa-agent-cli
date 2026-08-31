@@ -21,7 +21,7 @@ Estas son las fuentes de verdad. Leelas antes de juzgar — no califiques de mem
 | C1 Arquitectura de capas | `.claude/rules/architecture.md` |
 | C2 Contrato de Facade / Repository | `.claude/rules/facades.md`, `swr-pattern.md` |
 | C3 Smart vs Dumb component | `.claude/rules/component-selection.md` |
-| C4 Sistema visual y tokens | `.claude/rules/visual-system.md` |
+| C4 Sistema visual y tokens | `.claude/rules/visual-tokens.md`, `.claude/rules/visual-patterns.md` |
 | C5 Accesibilidad | `.claude/rules/a11y-spec.md` |
 | C6 Legibilidad para agentes | `.claude/rules/ai-readability.md` |
 | C7 Cobertura de tests | `.claude/rules/testing-tdd.md` |

@@ -129,7 +129,9 @@
 | `architecture.md` | `src/app/**/*.ts`, `.html` | Patrón Facade, OnPush, Signals vs RxJS |
 | `facades.md` | `core/facades/**`, `core/services/**` | Estructura SWR, signals privados/públicos |
 | `models.md` | `core/models/**` | Interfaces globales, tipados strict |
-| `visual-system.md` | `src/app/**/*.html`, `styles/**` | Tokens, Bento Grid, cards |
+| `visual-system.md` | `src/app/**/*.html`, `styles/**` | Prioridad de UI y la regla 3-2-1 — lo que ningún chequeo verifica |
+| `visual-tokens.md` | `src/app/**/*.html`, `styles/**`, `features/**/*.ts`, `shared/**/*.ts` | Color, iconos, tipografía, temas, y lo que el linter ya detecta sobre clases del DS |
+| `visual-patterns.md` | `features/**`, `layout/**` | App-like, skeletons, bento, cards, animaciones — la composición de pantalla |
 | `ai-readability.md` | `src/app/**/*.html` | data-llm-* atributos semánticos |
 | `component-selection.md` | `src/app/shared/**`, `features/**` | Cuándo usar PrimeNG vs custom |
 | `testing-tdd.md` | `**/*.spec.ts` | Vitest, equivalencias Jasmine→Vitest |
@@ -139,7 +141,6 @@
 | `database.md` | `supabase/**`, `core/services/**` | Migrations SQL, RLS obligatorio |
 | `layout-blueprints.md` | `src/app/features/**` | 8 arquetipos de página: hero, grid, componentes por tipo |
 | `a11y-spec.md` | `src/app/**/*.html` | Reglas de accesibilidad: aria-label en iconos de acción, caption en tablas |
-| `delegation.md` | `src/app/**/*.ts`, `.html`, `supabase/migrations/**` | Cuándo delegar en un subagente y —más importante— cuándo no. Permisos acotados de `index-syncer` y `code-judge` |
 
 ## Subagentes en templates/.claude/agents/
 

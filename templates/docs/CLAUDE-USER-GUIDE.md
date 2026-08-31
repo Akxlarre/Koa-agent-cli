@@ -66,7 +66,7 @@ El linter arquitectonico (v2.0) valida 8 reglas via AST: Facade pattern, OnPush,
 
 A medida que tu app escale:
 1. Agrega mas skills en `.claude/skills/` (ej: `testing-cypress.md` o `ngrx-rules.md`).
-2. Actualiza `.claude/rules/visual-system.md` si cambias tu esquema visual base.
+2. Actualiza `.claude/rules/visual-tokens.md` si cambias tu esquema visual base.
 3. Agrega reglas nuevas al Architect Guard en `.claude/hooks/pre-write-guard.js`.
 4. Expande el linter AST en `scripts/architect.js` para reglas que requieran analisis profundo.
 

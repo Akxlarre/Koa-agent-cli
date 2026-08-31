@@ -93,12 +93,12 @@ try {
 const RULES = {
     'ARCH-11': {
         name: 'Dead token classes',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'La clase no existe en @theme (src/tailwind.css) — Tailwind no genera CSS para ella. Usa un token real o agrégalo al @theme.',
     },
     'ARCH-18': {
         name: 'Forbidden bare aliases in @theme',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Un alias "pelado" en @theme colisiona con utilidades nativas de Tailwind. Renombra el token.',
     },
     'ARCH-21': {
@@ -108,47 +108,47 @@ const RULES = {
     },
     'ARCH-22': {
         name: 'DS class collides with bare Tailwind utility',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Renombra la clase del design system: Tailwind genera su propia regla homónima en @layer utilities y se SUMA a la tuya (no la reemplaza).',
     },
     'ARCH-15': {
         name: 'Ad-hoc pill/badge',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Usa el componente de badge del proyecto en vez de recomponer rounded-full + micro-texto + px- a mano.',
     },
     'ARCH-16': {
         name: 'Size utilities over btn-*',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'No pises el tamaño de un .btn-* con px-/py-/text-*/rounded-*. Si hace falta otra medida, es una variante del DS.',
     },
     'ARCH-17': {
         name: 'Arbitrary font size',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Reemplaza text-[NNpx] por un token de la escala tipográfica.',
     },
     'ARCH-19': {
         name: 'Ad-hoc typography cluster',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Usa .micro-label / .item-title / .section-eyebrow / .kpi-value en vez de recomponer el cluster de utilities.',
     },
     'ARCH-24': {
         name: 'Ad-hoc input cluster',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Usa .field-input (y .field-label) en vez de recomponer el cluster de borde + fondo + padding + radio sobre un campo.',
     },
     'ARCH-23': {
         name: 'Fill-screen bento cell spanning 2 rows',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-patterns.md',
         fix: 'En un grid App-like toda celda hija ocupa UNA fila: usa .bento-banner y anida adentro (KPIs como grid/flex dentro del banner). .bento-hero/.bento-feature/.bento-tall ocupan 2 filas y desbordan el template explícito.',
     },
     'ARCH-25': {
         name: 'Contrast below WCAG AA',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Ajusta el token de texto o el de fondo hasta 4.5:1 (3.0:1 si el texto es grande). Que un token exista en los dos temas no significa que se pueda leer.',
     },
     'ARCH-26': {
         name: 'Theme token collides with a native Tailwind utility',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Renombra el token: un --color-X donde X es un valor de una escala nativa (base, sm, lg, xl…) genera una utilidad de COLOR que le gana a la nativa. `--color-base` hacía que `text-base` pintara texto del color del fondo.',
     },
     'NAV-01': {

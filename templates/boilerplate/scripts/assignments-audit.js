@@ -17,11 +17,20 @@
  *                    sigue en la tabla "Pendientes" de ASSIGNMENTS.md (nunca se movió
  *                    a Completadas).
  *
+ * Interruptor: sin `specs/AUTHORS.md` la capa está apagada y esto sale en 0 con un
+ * mensaje. Antes salía en 1 y ponía rojo el CI de un proyecto que jamás pidió la
+ * capa (INC-010). La forma del nombre —con o sin código de autor— también sale de
+ * ahí: exigirlo siempre convertía en violación a TODO track creado por el flujo
+ * normal del SDD (INC-017). Ver scripts/lib/assignments-switch.js.
+ *
  * Uso: npm run assignments:audit
  */
 
 import fs from 'fs';
 import path from 'path';
+import {
+  capaEncendida, autoresDeclarados, parseTrackName, formatoEsperado, avisoApagada,
+} from './lib/assignments-switch.js';
 
 const ROOT = process.cwd();
 const SPECS_DIR = path.join(ROOT, 'specs');
@@ -37,30 +46,12 @@ const yellow = (s) => `\x1b[33m${s}\x1b[0m`;
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
-function readAuthorCodes(authorsContent) {
-  const codes = new Set();
-  const rowRe = /^\|\s*`([a-z]+)`\s*\|/gm;
-  let m;
-  while ((m = rowRe.exec(authorsContent)) !== null) codes.add(m[1]);
-  return codes;
-}
-
 function listDirs(dir) {
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
-}
-
-/** Parsea un nombre de dir de track contra <prefix>-NNN-autor-slug (specs sin prefix: NNNN-autor-slug). */
-function parseTrackName(prefix, name, numDigits) {
-  const re = prefix
-    ? new RegExp(`^${prefix}-(\\d{${numDigits}})-([a-z]+)-(.+)$`)
-    : new RegExp(`^(\\d{${numDigits}})-([a-z]+)-(.+)$`);
-  const m = name.match(re);
-  if (!m) return null;
-  return { number: m[1], author: m[2], slug: m[3] };
 }
 
 function readField(content, field) {
@@ -94,13 +85,22 @@ function extractAsgIdsFromSection(md, sectionHeader, nextHeaders) {
 }
 
 function main() {
-  if (!fs.existsSync(ASSIGNMENTS_MD) || !fs.existsSync(AUTHORS_MD)) {
-    console.error(red('No se encontró specs/ASSIGNMENTS.md o specs/AUTHORS.md.'));
+  // Interruptor: sin AUTHORS.md la capa no se usa, y eso no es un error (INC-010).
+  if (!capaEncendida(SPECS_DIR)) {
+    console.log(avisoApagada('assignments-audit'));
+    process.exit(0);
+  }
+
+  // Encendida pero incompleta SÍ es un problema: alguien declaró autores y no hay
+  // tablero. «Nada que hacer» y «algo roto» son cosas distintas (DUP-001).
+  if (!fs.existsSync(ASSIGNMENTS_MD)) {
+    console.error(red('specs/AUTHORS.md existe pero falta specs/ASSIGNMENTS.md.'));
+    console.error(yellow('  La capa está encendida y le falta su tablero. Creá ASSIGNMENTS.md o borrá AUTHORS.md.'));
     process.exit(1);
   }
 
-  const authorsContent = fs.readFileSync(AUTHORS_MD, 'utf-8');
-  const validAuthors = readAuthorCodes(authorsContent);
+  const validAuthors = autoresDeclarados(SPECS_DIR);
+  const CON_AUTOR = validAuthors.size > 0;
   const assignmentsContent = fs.readFileSync(ASSIGNMENTS_MD, 'utf-8');
 
   const pendientes = extractAsgIdsFromSection(assignmentsContent, '## Pendientes', [
@@ -123,13 +123,21 @@ function main() {
   const seen = new Map();
 
   function processTrack(type, prefix, numDigits, dirName, fullPath, fileName) {
-    const parsed = parseTrackName(prefix, dirName, numDigits);
+    const parsed = parseTrackName(prefix, dirName, numDigits, { conAutor: CON_AUTOR });
     if (!parsed) {
-      namingViolations.push({ type, dir: dirName });
+      namingViolations.push({ type, dir: dirName, formato: formatoEsperado(prefix, CON_AUTOR) });
       return;
     }
-    if (!validAuthors.has(parsed.author)) {
-      namingViolations.push({ type, dir: dirName, reason: `autor '${parsed.author}' no está en specs/AUTHORS.md` });
+    if (CON_AUTOR && !validAuthors.has(parsed.author)) {
+      // El caso más común de esto NO es un autor mal escrito: es un track creado
+      // por /fix-new o /hotfix, que no ponen código de autor. `fix-001-kpi-en-cero`
+      // matchea la forma con autor y lee `kpi` como el código. Por eso el mensaje
+      // dice también qué forma se espera: sin eso, nombra un síntoma raro (INC-017).
+      namingViolations.push({
+        type, dir: dirName,
+        reason: `autor '${parsed.author}' no está en specs/AUTHORS.md `
+              + `— se esperaba ${formatoEsperado(prefix, true)}`,
+      });
     }
     const key = `${type}:${parsed.author}:${parsed.number}`;
     if (!seen.has(key)) seen.set(key, []);
@@ -217,7 +225,7 @@ function main() {
   console.log(bold(`Naming violations (${namingViolations.length})`));
   if (namingViolations.length === 0) console.log(green('  ninguna'));
   for (const v of namingViolations) {
-    console.log(red(`  [${v.type}] ${v.dir}${v.reason ? ` — ${v.reason}` : ' — no matchea <tipo>-NNN-autor-slug'}`));
+    console.log(red(`  [${v.type}] ${v.dir}${v.reason ? ` — ${v.reason}` : ` — no matchea ${v.formato}`}`));
   }
 
   console.log(bold(`\nColisiones de numeración (${collisions.length})`));

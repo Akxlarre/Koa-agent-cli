@@ -25,15 +25,19 @@
 
 ## Reclamadas / En curso
 
+<!-- AUTO-GENERATED:BEGIN -->
 | ID | Título | Reclamado por | Track resultante | Fecha |
 |----|--------|----------------|-------------------|-------|
+<!-- AUTO-GENERATED:END -->
 
 ---
 
 ## Completadas
 
+<!-- AUTO-GENERATED:BEGIN -->
 | ID | Título | Track resultante | Cerrada |
 |----|--------|-------------------|---------|
+<!-- AUTO-GENERATED:END -->
 
 ---
 

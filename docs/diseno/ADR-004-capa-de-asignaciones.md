@@ -1,6 +1,6 @@
 # ADR-004 · Integrar la capa de asignaciones
 
-**Estado:** propuesto · **Fecha:** 2026-08-30 · **Cluster:** 10 · **Decisión tomada con:** el
+**Estado:** implementado · **Fecha:** 2026-08-30 · **Cluster:** 10 · **Decisión tomada con:** el
 humano, sobre tres opciones (integrar · sacar · dejarla opcional explícita)
 
 ---
@@ -154,10 +154,11 @@ Sin esto, en seis meses la capa vuelve a estar donde está:
 
 | Hallazgo | Cómo |
 |---|---|
-| `INC-010` (S2) | Interruptor: sin `AUTHORS.md`, mensaje y `exit 0` |
-| `INC-015` (S2) | Los dos npm scripts en `lib/scaffolder.js` |
-| `INC-017` (S2) | Una convención con dos formas, y el interruptor decide cuál — más el test que lo fija |
-| `DUP-001` (S3) | «Nada que hacer» ≠ «algo roto», en los dos scripts |
+| `INC-010` (S2) | ✅ Interruptor: sin `AUTHORS.md`, mensaje y `exit 0` |
+| `INC-015` (S2) | ✅ Los dos npm scripts en `lib/scaffolder.js`, con test que ata comando y script |
+| `INC-017` (S2) | ✅ Una convención con dos formas, y el interruptor decide cuál — con test de las dos ramas |
+| `DUP-001` (S3) | ✅ «Nada que hacer» ≠ «algo roto», en los dos scripts |
+| `INC-022` (**S2**) | 🆕 Lo destapó encender la capa: la plantilla del tablero no tenía marcadores `AUTO-GENERATED` |
 
 ---
 
@@ -181,3 +182,53 @@ línea del scaffolder va en la suite del CLI; los del interruptor, en `scripts/l
 | **`assignments-sync` reescribe tablas de `ASSIGNMENTS.md` en proyectos que ya las editaron a mano** | Mismo problema que `HUE-007` con los marcadores de índices. Se resuelve igual, y esta vez con test |
 | **Dos formas de ID válidas son dos caminos que mantener** | Una sola implementación con un parámetro, y el test cubre las dos ramas. Es la lección de `paths.js` en `ADR-001` §3: el problema nunca fueron las variantes, sino escribirlas varias veces sin nombre ni test |
 | **La decisión de integrar se toma sin uso real medido** | El humano la tomó con la evidencia arriba a la vista. Queda registrada acá; si en la práctica la capa no se usa, sacarla después cuesta menos que hoy, porque estará testeada y aislada tras un interruptor |
+
+
+---
+
+## Lo hecho
+
+`scripts/lib/assignments-switch.js` es la pieza nueva: **una sola implementación** del
+interruptor y de la convención de ID, con `parseTrackName(prefix, name, digitos, { conAutor })`
+como la única función que sabe leer un nombre de track. Antes cada consumidor llevaba su
+propio regex, y de ahí salió `INC-017`.
+
+Los tres estados quedan fijados por test, que es la partición completa:
+
+```
+apagada (sin AUTHORS.md)        → mensaje y exit 0     ← INC-010
+encendida y sana                → exit 0, trabajo hecho
+encendida y a medias            → exit 1 con motivo    ← DUP-001
+```
+
+### Lo que apareció al encenderla — `INC-022`
+
+El riesgo declarado arriba era *«encender los scripts destapa fallos que hoy nadie ve»*, y
+apareció en la primera corrida contra un tablero creado con la plantilla oficial:
+
+```
+Error: No se encontró la sección "## Reclamadas / En curso" en ASSIGNMENTS.md
+```
+
+`assignments-sync` solo reescribe lo que está entre `<!-- AUTO-GENERATED:BEGIN/END -->` —el
+mismo patrón que `indices-sync`— y **la plantilla canónica `sdd/templates/ASSIGNMENTS.md` no
+traía ni un marcador**. Es decir: el único camino de escritura de la capa fallaba también en
+un proyecto que hubiera hecho todo bien, no solo en uno sin los npm scripts. La plantilla ya
+los trae, y el error dejó de ser un stack trace: dice qué falta y cómo envolver la tabla.
+
+Es la confirmación de la lectura que motivó este ADR — *el diseño estaba bien y el cableado
+quedó a medias*—: tres cortes distintos en el mismo camino (el npm script inexistente, el
+`exit 1` sin capa, los marcadores ausentes), ninguno de los cuales fallaba ruidosamente.
+
+### El mensaje de naming, corregido
+
+Con la capa encendida, `fix-001-kpi-en-cero` **matchea** la forma con autor y lee `kpi` como
+código. El auditor decía *«autor 'kpi' no está en specs/AUTHORS.md»*, que es cierto y no
+sirve: el caso común no es un autor mal escrito, es un track creado por `/fix-new`, que no
+pone código de autor. Ahora el mensaje nombra además la forma esperada.
+
+### Cobertura
+
+`smoke-scripts` clasifica los dos como `verificable` sin tocar nada —clasifica por patrón, no
+por lista— así que entran en `npm run smoke:scripts` por el solo hecho de existir en
+`package.json`. Verificado, no supuesto.

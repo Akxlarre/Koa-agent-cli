@@ -119,3 +119,30 @@ describe('INC-013 — la corrección del singular existe en los dos modos', () =
             'esa era la mitigación que el modo no-interactivo no tenía');
     });
 });
+
+describe('INC-015 — la capa de asignaciones tiene por dónde invocarse', () => {
+    // `sdd/SKILL.md` la instruye tres veces y `/assign-claim` manda correr
+    // `npm run assignments:sync`. Ese script no existía en ningún proyecto
+    // generado: el único camino de escritura de la capa no se podía recorrer.
+    const scaffolder = leer('lib/scaffolder.js');
+
+    for (const script of ['assignments:audit', 'assignments:sync']) {
+        test(`el scaffolder escribe ${script}`, () => {
+            assert.match(scaffolder, new RegExp(`'${script}':\\s*'node scripts/`));
+        });
+    }
+
+    test('y los scripts que apuntan existen en el payload', () => {
+        for (const f of ['assignments-audit.js', 'assignments-sync.js']) {
+            assert.ok(fs.existsSync(path.join(RAIZ, 'templates', 'boilerplate', 'scripts', f)), f);
+        }
+    });
+
+    test('los comandos que los mandan correr siguen nombrándolos igual', () => {
+        // Si alguien renombra el npm script y no el comando, la ruta se vuelve a
+        // romper exactamente como estaba.
+        const claim = leer('templates/.claude/commands/assign-claim.md');
+        assert.match(claim, /assignments:sync/);
+        assert.match(scaffolder, /'assignments:sync'/);
+    });
+});

@@ -87,7 +87,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | abierto |
 | `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | abierto |
 | `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | abierto |
-| `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | abierto |
+| `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | resuelto · interruptor `specs/AUTHORS.md`: apagada → mensaje y `exit 0` |
 | `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | abierto |
 | `ACO-009` | S3 | `S-05` | La provocación depende de que la salida de `architect.js` nombre el código de la regla; ese formato no está declarado | abierto |
 | `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | abierto |
@@ -104,8 +104,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-011` | S3 | `A-01` | `.claude/temp/review-diff.patch` es el canal entre `/review` y `code-judge` y no está declarado | abierto |
 | `ACO-012` | S3 | `T-01` | Ningún test fija el formato del payload que reciben los hooks; cada uno lo construye a mano | abierto |
 | `CAR-003` | S2 | `R-01` | **(remedido)** Editar un componente de `features/` inyecta **13 reglas** completas (~19.100 tokens); `visual-system.md` sola es el 28% y matchea seis globs | resuelto · peor caso 76.391 → 71.975; `shared/` −38%, `.scss` −58%, SQL −40%; con tope testeado por ruta |
-| `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | abierto |
-| `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | abierto |
+| `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | resuelto · los dos npm scripts en `lib/scaffolder.js`, con test que ata comando y script |
+| `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | resuelto · una convención con dos formas y el interruptor decide; `parseTrackName` compartido, con test de las dos ramas |
 | `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | abierto |
 | `HUE-027` | S3 | `R-01` | Nada distingue las 10 reglas mecanizadas de las 5 que son contrato social | abierto |
 | `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | abierto |
@@ -128,7 +128,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | abierto |
 | `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | abierto |
 | `INC-003` | S2 | `C-05` | `pre-write-guard.js` no figura como consumidor del blueprint en ninguna documentación | abierto |
-| `DUP-001` | S3 | `C-04` | Dos fail modes para el mismo contrato: `indices-sync` avisa y sigue, `assignments-sync` lanza | abierto |
+| `DUP-001` | S3 | `C-04` | Dos fail modes para el mismo contrato: `indices-sync` avisa y sigue, `assignments-sync` lanza | resuelto · «nada que hacer» ≠ «algo roto» en los dos scripts, y el fallo de `sync` dejó de ser un stack trace |
 | `ACO-002` | S3 | `C-03` | `spec-reflection-seen.json` no está declarado como artefacto | abierto |
 | `ACO-003` | S3 | `C-04` | `indices-cache.json` decide qué se re-parsea y no está declarado como dependencia | abierto |
 | `HUE-007` | S3 | `C-04` | Nada impide editar dentro de los marcadores y perder el trabajo en el siguiente sync | abierto |
@@ -141,6 +141,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | abierto |
 | `DEC-009` | S2 | `diseño` | El provocador de reglas leía solo stdout: una regla que reporta con `reportWarning` no podía darse por probada nunca — el linter sale en 0 y su aviso va a stderr | resuelto · se leen las dos salidas; ARCH-11 pasó de muda a verde sin tocar la regla |
 | `INC-021` | S3 | `diseño` | `writeBlueprintJson(targetDir, projectName, isFull, stack)` acepta `projectName` y no lo usa: el `name` del blueprint es una constante. Una firma que promete algo que la función ignora | abierto |
+| `INC-022` | **S2** | `diseño` | La plantilla canónica de `ASSIGNMENTS.md` no traía **ningún** marcador `AUTO-GENERATED`, y `assignments-sync` se niega a escribir sin ellos: el único camino de escritura de la capa fallaba incluso en un proyecto que hubiera hecho todo bien | resuelto · marcadores en la plantilla + el error dice cómo arreglar un tablero viejo |
 
 ---
 

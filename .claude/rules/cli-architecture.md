@@ -17,6 +17,7 @@ Sin lógica de negocio. Si supera ~150 líneas, extraer a lib/.
 | `lib/preflight.js` | Checks de sistema (Node, npm, git). Sin instalaciones. |
 | `lib/installer.js` | SOLO npm/npx. Importa `run` de runner.js. |
 | `lib/scaffolder.js` | SOLO filesystem (copiar, parchear). Sin npm. |
+| `lib/prompts.js` | SOLO inquirer y los modos de test. Sin FS, sin spawn. |
 | `lib/ui.js` | SOLO chalk/console. Sin FS, sin spawn. |
 
 ## ESM — Reglas de importación
@@ -34,5 +35,5 @@ Sin lógica de negocio. Si supera ~150 líneas, extraer a lib/.
 
 - `lib/scaffolder.js` NO ejecuta npm (eso es installer.js)
 - `lib/installer.js` NO copia archivos (eso es scaffolder.js)
-- `bin/index.js` NO contiene lógica de patching (eso es scaffolder.js)
+- `bin/index.js` NO contiene lógica de patching (eso es scaffolder.js) ni arma prompts (eso es prompts.js)
 - `lib/preflight.js` NO instala nada (solo verifica disponibilidad)

@@ -1,10 +1,11 @@
 {
   "name": "koa-agent-cli",
   "version": "1.0.0",
-  "description": "Scaffold Angular projects that are native to AI agents — agentic harness, real-time guardrails, and living indexes out of the box.",
+  "description": "Scaffold Angular projects that are native to AI agents \u2014 agentic harness, real-time guardrails, and living indexes out of the box.",
   "main": "index.js",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:integracion": "node --test test/integracion/*.test.mjs"
   },
   "keywords": [
     "angular",

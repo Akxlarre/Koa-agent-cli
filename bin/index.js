@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora from 'ora';
 import fs from 'fs';
@@ -9,6 +8,7 @@ import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 
 import { resolveStack, validateProjectName, BLUEPRINT_VERSION } from '../lib/config.js';
+import { askWhatToBuild, esFullScaffold, applyAiTools } from '../lib/prompts.js';
 import { preflight } from '../lib/preflight.js';
 import { printBanner, printSuccess } from '../lib/ui.js';
 import { copyTemplates, injectBoilerplate, writeBlueprintJson } from '../lib/scaffolder.js';
@@ -44,57 +44,10 @@ async function main() {
         console.log('');
     }
 
-    let answers;
-    if (process.env.TEST_MODE === 'inject') {
-        answers = { action: 'Solo inyectar Memoria Claude en carpeta actual' };
-    } else if (process.env.TEST_MODE) {
-        answers = {
-            action: 'Full Scaffold (Angular 20 + PrimeNG + Supabase)',
-            projectName: process.env.TEST_PROJECT_NAME || 'test-project',
-        };
-    } else {
-        answers = await inquirer.prompt([
-            {
-                type: 'rawlist',
-                name: 'action',
-                message: '¿Qué deseas hacer?',
-                choices: [
-                    'Full Scaffold (Angular + Tailwind + Supabase + Boilerplate AI)',
-                    'Solo inyectar Memoria Koa Blueprint en carpeta actual',
-                ],
-            },
-            {
-                type: 'input',
-                name: 'projectName',
-                message: '¿Cuál es el nombre del proyecto?',
-                default: path.basename(process.cwd()),
-                when: (ans) => ans.action.includes('Full Scaffold'),
-                validate: (input) => {
-                    const res = validateProjectName(input);
-                    return res.ok ? true : res.reason;
-                },
-                filter: (input) => String(input ?? '').trim(),
-            },
-            {
-                type: 'checkbox',
-                name: 'aiTools',
-                message: '¿Qué otros AI tools usarás? (Claude Code ya está incluido)',
-                choices: [
-                    { name: 'Cursor  (.cursor/rules/*.mdc)', value: 'cursor' },
-                    { name: 'Windsurf (.windsurf/rules/*.md)', value: 'windsurf' },
-                ],
-                default: [],
-            },
-        ]);
-    }
+    const answers = await askWhatToBuild();
+    applyAiTools(stack, answers.aiTools);
 
-    // Merge AI tool selections from prompt into stack (flags take precedence via resolveStack, prompt adds on top)
-    if (answers.aiTools?.length) {
-        if (answers.aiTools.includes('cursor'))   stack.cursor   = true;
-        if (answers.aiTools.includes('windsurf')) stack.windsurf = true;
-    }
-
-    const isFull = answers.action?.includes('Full Scaffold');
+    const isFull = esFullScaffold(answers.action);
     let targetDir = process.cwd();
     let tempDir = null;
     let tempParentDir = null;

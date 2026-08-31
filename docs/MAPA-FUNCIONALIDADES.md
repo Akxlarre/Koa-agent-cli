@@ -50,7 +50,7 @@ existe para convertir *guidelines* en *guardrails*.
 | Invocación | Qué hace | Requisitos |
 |---|---|---|
 | `npx create-koa-agent` | Modo interactivo: **Full Scaffold** o **Inject-only** | Node 20+, npm, npx |
-| `npx create-koa-agent generate feature [nombre] [--type list\|detail\|form]` | Genera un vertical slice completo dentro de un proyecto ya creado | `blueprint.json` + `src/app/` |
+| `npx create-koa-agent generate feature [nombre] [--type list\|detail\|form] [--singular Nombre]` | Genera un vertical slice completo dentro de un proyecto ya creado | `blueprint.json` + `src/app/` |
 | `TEST_MODE=inject node bin/index.js` | Prueba el CLI sin scaffolding completo | — |
 
 ### Flags de stack

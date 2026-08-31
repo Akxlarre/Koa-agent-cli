@@ -60,9 +60,9 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-001` | S2 | `S-01` | **(reescrito)** El namespace ARCH está repartido en tres implementaciones sin registro único; `ARCH-14` está documentado y no lo emite nadie | abierto |
 | `CAR-001` | **S1** | `H-06` | `plan-injector` inyecta ~6.155 tokens en CADA Edit, sin dedup ni techo — la única pieza del harness sin ningún control de costo | resuelto · `lib/budget.js` — 246.220 → 24.330 chars en 10 ediciones |
 | `DEC-002` | S2 | `H-05` | `GATE-A1` de `harness-gate` se satisface con la palabra «cuando»; 12 de 15 reglas reales ya lo cumplen sin intentarlo | abierto |
-| `INC-005` | S2 | `H-03` | `spec-gate` y `plan-injector` clasifican el mismo archivo con listas de exención distintas | abierto |
-| `HUE-010` | S2 | `H-03` | Los 3 hooks de `sdd/` y `context-enrichment-guard` leen stdin sin el cap SEC-04 | abierto |
-| `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | abierto |
+| `INC-005` | S2 | `H-03` | `spec-gate` y `plan-injector` clasifican el mismo archivo con listas de exención distintas | resuelto · las dos preguntas son `paths.isProductCode`; hay un test que compara gate contra injector archivo por archivo |
+| `HUE-010` | S2 | `H-03` | Los 3 hooks de `sdd/` y `context-enrichment-guard` leen stdin sin el cap SEC-04 | resuelto · `spec-gate` y `context-enrichment-guard` migrados a `lib/payload.js`; ningún hook acumula stdin sin tope |
+| `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | resuelto · los tres hooks de `sdd/` tienen test: 42 + 35 + 16 = 93 |
 | `HUE-012` | S2 | `H-04` | Las ~20 reglas regex de `pre-write-guard` no las cubre `provocar-reglas.mjs` | abierto |
 | `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | abierto |
 | `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | abierto |
@@ -111,7 +111,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | abierto |
 | `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | abierto |
 | `INC-016` | S3 | `D-07` | `fix-close.md` manda registrar en `indices/DOMAIN-GOTCHAS.md`, que no existe | abierto |
-| `DEC-006` | S2 | `L-02` | El umbral de 80 chars no salta las plantillas de `context/`: se inyectan enteras, ~3.240 tokens por compactación en un proyecto sin contexto llenado | abierto |
+| `DEC-006` | S2 | `L-02` | El umbral de 80 chars no salta las plantillas de `context/`: se inyectan enteras, ~3.240 tokens por compactación en un proyecto sin contexto llenado | resuelto · el detector es `budget.sinLlenar`, que mide contenido real |
 | `HUE-030` | S2 | `L-05` | `AGENTS.md` y `compact-recovery.js` omiten exactamente los mismos cinco índices; agregar uno obliga a actualizar consumidores independientes y nada lo verifica | abierto |
 | `INC-018` | S2 | `L-03` | Dos de tres servidores MCP usan `@latest`, incluido `@angular/cli@latest`, que `lib/config.js` prohíbe con tres párrafos | resuelto · `@angular/cli@{{ANGULAR_MAJOR}}`, sustituido por el scaffolder |
 | `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | abierto |
@@ -137,7 +137,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | resuelto · 26.006 → 8.783 chars por compactación |
 | `HUE-032` | **S1** | `diseño` | Los 18 hooks corren dentro de los 5 subagentes y ninguno lee `agent_id`: todo el estado de sesión es un pozo compartido entre el hilo principal y sus subagentes | resuelto · `threadScope()`; el estado de «lo ya dicho» es por hilo |
 | `DEC-007` | S3 | `diseño` | Cuatro de las once extensiones exentas de `spec-gate` nunca disparan: `path.extname('.npmrc')` es `''`, y los dotfiles reales se llaman así enteros | resuelto · `lib/paths.js` compara también el basename |
-| `DEC-008` | S2 | `diseño` | El detector de plantillas de `context-enrichment-guard` no dispara en un proyecto recién generado: `injectVars` borra el único marcador que buscaba | abierto |
+| `DEC-008` | S2 | `diseño` | El detector de plantillas de `context-enrichment-guard` no dispara en un proyecto recién generado: `injectVars` borra el único marcador que buscaba | resuelto · `budget.sinLlenar` mide las tres formas de estar vacío; el motivo del opt-in pasó a ser cierto |
 | `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | resuelto · decidido y testeado: el descubrimiento delegado SÍ cuenta, y el flag registra quién descubrió (ADR-003 §2) |
 | `DEC-009` | S2 | `diseño` | El provocador de reglas leía solo stdout: una regla que reporta con `reportWarning` no podía darse por probada nunca — el linter sale en 0 y su aviso va a stderr | resuelto · se leen las dos salidas; ARCH-11 pasó de muda a verde sin tocar la regla |
 | `INC-021` | S3 | `diseño` | `writeBlueprintJson(targetDir, projectName, isFull, stack)` acepta `projectName` y no lo usa: el `name` del blueprint es una constante. Una firma que promete algo que la función ignora | abierto |

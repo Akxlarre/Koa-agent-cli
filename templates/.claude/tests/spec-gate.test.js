@@ -99,17 +99,58 @@ describe('LA DIVERGENCIA CON plan-injector (la cierra lib/paths.js)', () => {
     assert.equal(correr('src/guia.mdx').exit, 0);
   });
 
-  // DEC-007: cuatro entradas de la lista de exentos nunca disparan, porque
-  // path.extname('.npmrc') es '' y los dotfiles reales se llaman asi enteros.
-  // Solo funcionarian para un archivo llamado "x.npmrc", que nadie crea.
+  // DEC-007 — CERRADO. Cuatro entradas de la lista de exentos no disparaban
+  // nunca: `path.extname('.npmrc')` devuelve '' y los dotfiles reales se llaman
+  // asi enteros, asi que figuraban como exentos y el gate los bloqueaba igual.
+  // Solo funcionaban para un archivo llamado "x.npmrc", que nadie crea.
   for (const p of ['src/.npmrc', 'src/.env', 'src/.editorconfig', 'src/.gitignore']) {
-    test(`(bug) ${p} esta en la lista de exentos y aun asi bloquea — DEC-007`, () => {
-      assert.equal(correr(p).exit, 2);
+    test(`CERRADO: ${p} esta exento y ahora si pasa — DEC-007`, () => {
+      assert.equal(correr(p).exit, 0);
     });
   }
 
-  test('esas mismas extensiones SI eximen con un nombre que las use como sufijo', () => {
+  test('esas mismas extensiones siguen eximiendo como sufijo', () => {
     assert.equal(correr('src/config.npmrc').exit, 0, 'extname devuelve ".npmrc" aca');
+  });
+
+  test('un dotfile que NO esta exento sigue bloqueando', () => {
+    // El arreglo compara el basename contra la lista de exentos; no exime a
+    // cualquier archivo que empiece con punto.
+    assert.equal(correr('src/.secreto.ts').exit, 2);
+  });
+});
+
+describe('HUE-010 / INC-005 — el gate usa el nucleo compartido', () => {
+  test('lee stdin con el cap SEC-04', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '..', 'hooks', 'sdd', 'spec-gate.js'), 'utf-8');
+    assert.match(src, /require\('\.\.\/lib\/payload\.js'\)/,
+      'era uno de los dos hooks que acumulaban stdin sin tope');
+    assert.ok(!/process\.stdin\.on/.test(src));
+  });
+
+  test('y la pregunta de "que es codigo de produccion" sale de lib/paths.js', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '..', 'hooks', 'sdd', 'spec-gate.js'), 'utf-8');
+    assert.match(src, /paths\.isProductCode/);
+    assert.ok(!/exemptPathPrefixes|exemptExtensions/.test(src),
+      'la lista propia es lo que divergio de la de plan-injector');
+  });
+
+  test('gate e injector dan la MISMA respuesta sobre el mismo archivo', () => {
+    // INC-005 medido: `src/guia.mdx` pasaba el gate y aun asi recibia el
+    // contrato SDD entero. Ahora las dos preguntas son la misma funcion.
+    //
+    // Con specs/ y SIN spec activa: es el unico estado donde el gate contesta
+    // «esto es codigo de produccion» con un bloqueo observable.
+    escribir('specs/.gitkeep', '');
+    const paths = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'paths.js'));
+    for (const p of ['src/guia.mdx', 'src/.npmrc', 'src/app/x.component.ts',
+      'docs/x.ts', 'supabase/migrations/1.sql']) {
+      const esProducto = paths.isProductCode(path.join(proyecto, p), proyecto);
+      const bloquea = correr(p).exit === 2;
+      assert.equal(bloquea, esProducto, `${p}: el gate y paths.js no coinciden`);
+    }
   });
 });
 

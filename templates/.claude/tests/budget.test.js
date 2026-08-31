@@ -180,3 +180,39 @@ describe('ENTRADAS DEGENERADAS', () => {
     });
   });
 });
+
+describe('sinLlenar — las tres formas de estar vacio (DEC-008)', () => {
+  const B = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'budget.js'));
+
+  test('prosa que es solo andamiaje', () => {
+    assert.equal(B.sinLlenar('# Titulo\n\n> instruccion al humano\n\n- \n'), true);
+  });
+
+  test('una tabla sin filas de datos', () => {
+    assert.equal(B.sinLlenar('# DB\n\n| tabla | cols |\n|---|---|\n'), true);
+  });
+
+  test('una tabla CON filas de datos ya no lo esta', () => {
+    // `contenidoReal` quita las filas de tabla a proposito —en context/ una tabla
+    // vacia es andamiaje— pero en un INDICE la tabla ES el contenido.
+    assert.equal(B.sinLlenar('# DB\n\n| tabla | cols |\n|---|---|\n| reportes | id |\n'), false);
+  });
+
+  test('el marcador de indices:sync gana sobre las filas', () => {
+    // DATABASE.md recien generado trae una fila sembrada Y el marcador.
+    const conAmbos = '| t | c |\n|---|---|\n| profiles | id |\n\n_Sin entradas auto-detectadas aun._';
+    assert.equal(B.filasDeTabla(conAmbos), 1);
+    assert.equal(B.sinLlenar(conAmbos), true);
+  });
+
+  test('prosa real no esta vacia', () => {
+    assert.equal(B.sinLlenar(
+      'Un reporte agrupa mediciones por periodo. El cliente llama "corte" al cierre mensual.'), false);
+  });
+
+  test('filasDeTabla no cuenta encabezado ni separador', () => {
+    assert.equal(B.filasDeTabla('| a | b |\n|---|---|'), 0);
+    assert.equal(B.filasDeTabla('| a | b |\n|:--|--:|\n| 1 | 2 |\n| 3 | 4 |'), 2);
+    assert.equal(B.filasDeTabla('sin tablas'), 0);
+  });
+});

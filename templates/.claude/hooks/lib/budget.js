@@ -59,6 +59,55 @@ function isPlaceholder(texto, { minChars = MIN_CONTENIDO_REAL } = {}) {
   return contenidoReal(texto).length < minChars;
 }
 
+/**
+ * Marcador que los indices traen mientras `indices:sync` no encontro nada.
+ * Lo escribe el propio blueprint en 8 de los 15 indices.
+ */
+const SIN_ENTRADAS = 'Sin entradas auto-detectadas';
+
+/**
+ * Filas de DATOS de una tabla markdown: sin encabezado ni separador.
+ *
+ * `contenidoReal` quita las filas de tabla a proposito —en las plantillas de
+ * `context/` una tabla vacia es andamiaje— pero en un INDICE la tabla ES el
+ * contenido. Esta funcion existe para esa asimetria, no para deshacerla.
+ */
+function filasDeTabla(texto) {
+  const filas = String(texto || '').split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('|') && l.endsWith('|'));
+
+  let datos = 0;
+  let despuesDelSeparador = false;
+  for (const f of filas) {
+    if (/^\|[\s|:-]+\|$/.test(f)) { despuesDelSeparador = true; continue; }
+    if (despuesDelSeparador) datos++;
+  }
+  return datos;
+}
+
+/**
+ * Esta superficie sigue sin llenar?
+ *
+ * DEC-008 / DEC-006 — tres formas de estar vacio, y los detectores que habia
+ * atrapaban una sola:
+ *
+ *   prosa que es solo andamiaje         → isPlaceholder
+ *   una tabla sin ninguna fila de datos → filasDeTabla
+ *   el marcador que deja indices:sync   → SIN_ENTRADAS
+ *
+ * Las tres tienen que fallar para que la superficie cuente como llena. Un
+ * `indices/DATABASE.md` recien generado tiene una fila (`profiles`, que el
+ * blueprint siembra) y aun asi trae el marcador: sigue vacio de dominio, y eso
+ * es lo que el Day 0 Guard pregunta.
+ */
+function sinLlenar(texto, { minChars = MIN_CONTENIDO_REAL } = {}) {
+  const s = String(texto || '');
+  if (s.includes(SIN_ENTRADAS)) return true;
+  if (filasDeTabla(s) > 0) return false;
+  return isPlaceholder(s, { minChars });
+}
+
 /** Corta en DETAIL:BEGIN y aplica el techo, con marca explicita de recorte. */
 function recortar(texto, { maxChars = 0, cutAt = DETAIL_MARKER } = {}) {
   let out = String(texto || '');
@@ -173,6 +222,9 @@ module.exports = {
   olvidar,
   yaEmitido,
   isPlaceholder,
+  sinLlenar,
+  filasDeTabla,
+  SIN_ENTRADAS,
   contenidoReal,
   recortar,
   DETAIL_MARKER,

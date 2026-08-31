@@ -2,20 +2,22 @@
 /**
  * context-enrichment-guard.test.js — Contract tests de context-enrichment-guard.js
  *
- * DEC-008. El hook bloquea escribir codigo si context/domain.md o
- * indices/DATABASE.md siguen siendo plantillas sin rellenar. Su detector:
+ * DEC-008 / DEC-006 — CERRADO. El hook bloquea escribir codigo si
+ * context/domain.md o indices/DATABASE.md siguen siendo plantillas sin
+ * rellenar. Su detector era:
  *
  *     PLACEHOLDER_MARKERS = ['[TODO]', '{{PROJECT_NAME}}', '<!-- template -->']
  *     MIN_MEANINGFUL_LENGTH = 50
  *
- * Ninguna de las dos condiciones se cumple en un proyecto recien generado: las
+ * Ninguna de las dos condiciones se cumplia en un proyecto recien generado: las
  * plantillas pasan los 50 chars por su propio andamiaje, y el unico marcador que
- * traian —{{PROJECT_NAME}} en domain.md— lo borra injectVars al generar.
+ * traian —{{PROJECT_NAME}} en domain.md— lo borra injectVars al generar. El hook
+ * es opt-in y su docblock justificaba eso diciendo que cableado bloquearia todo
+ * desde el minuto cero: no bloqueaba nada.
  *
- * El hook es opt-in, y su docblock justifica eso diciendo que cableado
- * bloquearia todo desde el minuto cero. No bloquearia nada.
- *
- * TESTS DE CARACTERIZACION.
+ * Ahora usa `budget.sinLlenar`, que mide las TRES formas de estar vacio: prosa
+ * que es solo andamiaje, tabla sin filas de datos, y el marcador que deja
+ * indices:sync.
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -78,15 +80,25 @@ describe('CUANDO BLOQUEA', () => {
     escribir('indices/DATABASE.md', '# DB\n');
     const r = correr('src/app/x.component.ts');
     assert.equal(r.exit, 2);
-    assert.match(r.stderr, /está vacío/);
+    assert.match(r.stderr, /sin rellenar/);
   });
 
-  test('un marcador explicito lo delata', () => {
+  test('prosa que es solo andamiaje no cuenta como dominio escrito', () => {
     conContextoLleno();
-    escribir('context/domain.md', '# Dominio\n\n[TODO] describir el lenguaje ubicuo del negocio aqui.\n');
+    escribir('context/domain.md', '# Dominio\n\n[TODO] describir el negocio aqui.\n');
     const r = correr('src/app/x.component.ts');
     assert.equal(r.exit, 2);
-    assert.match(r.stderr, /sigue siendo el template/);
+    assert.match(r.stderr, /sin rellenar/);
+  });
+
+  test('el marcador de indices:sync delata un indice vacio aunque tenga filas', () => {
+    // DATABASE.md recien generado trae UNA fila —`profiles`, que el blueprint
+    // siembra— y el marcador. Sigue vacio de dominio, que es lo que se pregunta.
+    escribir('context/domain.md',
+      '# Dominio\n\nUn reporte agrupa mediciones por periodo; el cierre mensual se llama corte.\n');
+    escribir('indices/DATABASE.md',
+      '# DB\n\n| tabla | cols |\n|---|---|\n| profiles | id |\n\n_Sin entradas auto-detectadas aun._\n');
+    assert.equal(correr('src/app/x.component.ts').exit, 2);
   });
 
   test('tambien vigila las migraciones', () => {
@@ -111,7 +123,7 @@ describe('CUANDO DEJA PASAR', () => {
   });
 });
 
-describe('DEC-008 — el detector no dispara en un proyecto recien generado', () => {
+describe('DEC-008 — CERRADO: ahora SI dispara en un proyecto recien generado', () => {
   // Se copian las plantillas REALES del repo, aplicando la misma sustitucion
   // de variables que hace el scaffolder.
   function conPlantillasReales({ conInjectVars }) {
@@ -123,13 +135,13 @@ describe('DEC-008 — el detector no dispara en un proyecto recien generado', ()
     }
   }
 
-  test('(bug) con las plantillas tal como quedan al generar, NO bloquea', () => {
+  test('CERRADO: con las plantillas tal como quedan al generar, bloquea', () => {
     conPlantillasReales({ conInjectVars: true });
-    assert.equal(correr('src/app/x.component.ts').exit, 0,
+    assert.equal(correr('src/app/x.component.ts').exit, 2,
       'es exactamente el escenario para el que se escribio el hook');
   });
 
-  test('las dos plantillas superan MIN_MEANINGFUL_LENGTH por su andamiaje', () => {
+  test('las dos plantillas superan los 50 chars del umbral viejo por su andamiaje', () => {
     for (const rel of ['context/domain.md', 'indices/DATABASE.md']) {
       const len = fs.readFileSync(path.join(TEMPLATES, rel), 'utf-8').trim().length;
       assert.ok(len > 50, `${rel}: ${len} chars — el umbral de 50 no discrimina`);
@@ -143,19 +155,16 @@ describe('DEC-008 — el detector no dispara en un proyecto recien generado', ()
     }
   });
 
-  test('el marcador {{PROJECT_NAME}} distingue plantilla de proyecto generado', () => {
-    // Este archivo corre en dos contextos. En el repo del CLI, domain.md
-    // todavia trae {{PROJECT_NAME}} y el guard lo atrapa. En un proyecto ya
-    // generado, injectVars lo borro y el guard se le escapa: ese es DEC-008.
-    const c = fs.readFileSync(path.join(TEMPLATES, 'context', 'domain.md'), 'utf-8');
-    const sinGenerar = c.includes('{{PROJECT_NAME}}');
-
-    conPlantillasReales({ conInjectVars: false });
-    assert.equal(correr('src/app/x.component.ts').exit, sinGenerar ? 2 : 0);
-
-    conPlantillasReales({ conInjectVars: true });
-    assert.equal(correr('src/app/x.component.ts').exit, 0,
-      'una vez generado, el detector no dispara — DEC-008');
+  test('el detector ya no depende de que injectVars deje o no el marcador', () => {
+    // Era el nudo de DEC-008: el unico marcador que las plantillas traian de
+    // verdad era {{PROJECT_NAME}}, y el scaffolder lo reemplaza al generar. El
+    // detector solo funcionaba ANTES de generar, que es cuando no hay nadie
+    // escribiendo codigo.
+    for (const conInjectVars of [false, true]) {
+      conPlantillasReales({ conInjectVars });
+      assert.equal(correr('src/app/x.component.ts').exit, 2,
+        `con injectVars=${conInjectVars} deberia bloquear igual`);
+    }
   });
 
   test('lib/budget.js SI las detecta — es el reemplazo del detector', () => {

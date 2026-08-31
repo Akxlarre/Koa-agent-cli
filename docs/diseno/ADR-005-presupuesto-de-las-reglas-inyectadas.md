@@ -1,6 +1,6 @@
 # ADR-005 · El presupuesto de las reglas inyectadas
 
-**Estado:** propuesto · **Fecha:** 2026-08-30 · **Clusters:** 11 (editorial de `CAR-003`) y 8
+**Estado:** §1 implementado (fixtures en verde); §§2-4 pendientes · **Fecha:** 2026-08-30 · **Clusters:** 11 (editorial de `CAR-003`) y 8
 (fixtures) · **Depende de:** nada del núcleo — es el único ADR que no toca código de hooks
 
 ---
@@ -125,6 +125,28 @@ Cada fixture que pasa a verde autoriza a recortar su párrafo. **La medida del p
 de ser «fixtures escritas» y pasa a ser «chars que salieron del contexto»** — que es lo que
 `CAR-003` pedía.
 
+#### Hecho — las once están en verde
+
+```
+antes   ✅ 4/28   (14%)   — y la corrida salía en 1 por SEC-RLS sin fixture (INC-009)
+ahora   ✅ 18/28  (64%)   — «18 regla(s) provocadas y todas disparan», exit 0
+```
+
+Las once, más las tres de seguridad RLS que hacían fallar la corrida entera. **El bloqueo
+del recorte editorial está levantado**: los 4.854 chars de `visual-system.md:93-200` ya se
+pueden cambiar por el mensaje de error, porque ahora hay prueba de que el mensaje sale.
+
+Dos cosas que solo aparecieron al escribirlos:
+
+- **El provocador leía solo stdout** (`DEC-009`). Una regla que reporta con `reportWarning`
+  hace salir al linter en 0, y su aviso va a stderr: `execFileSync` lo descartaba. `ARCH-11`
+  disparaba desde siempre y el provocador la daba por muda. Se leen las dos salidas.
+- **Un fixture no siempre es un archivo.** `ARCH-11` compara el uso de una clase contra el
+  `@theme`, que vive en otro archivo; el fixture admite ahora `archivos: []`.
+
+El orden se respetó: ninguna de las diez que quedan (`ARCH-02 06 07 08 09 10 21`, `NAV-01`,
+`A11Y-03`, `ICON-01`) está citada en `rules/`, así que ninguna bloquea el recorte.
+
 ### 2 · Partir `visual-system.md` por glob, no por tema
 
 Sus 18 secciones se agrupan en tres archivos cuyos `paths:` son disjuntos donde hoy se
@@ -172,7 +194,7 @@ tope es reordenar el problema.
 | Hallazgo | Cómo |
 |---|---|
 | `CAR-003` (S2) | Partición por glob + `delegation.md` a `CLAUDE.md` + el tope testeado |
-| `DEC-004` (**S1**) | Le da orden y criterio de progreso a las 24 fixtures |
+| `DEC-004` (**S1**) | ✅ Las once del orden + las tres de RLS: 4/28 → 18/28, corrida en verde |
 | `DEC-002`, `HUE-019` y el resto del cluster 8 | Quedan bajo el mismo orden |
 
 ---

@@ -82,8 +82,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | abierto |
 | `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
 | `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | abierto |
-| `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | abierto |
-| `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | abierto |
+| `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → **18/28**; las 3 de RLS y las 2 que motivaron el script, cubiertas. Las 10 restantes siguen en el baseline |
+| `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | resuelto · las tres RLS tienen fixture; la corrida sale en 0 |
 | `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | abierto |
 | `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | abierto |
 | `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | abierto |
@@ -139,6 +139,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DEC-007` | S3 | `diseño` | Cuatro de las once extensiones exentas de `spec-gate` nunca disparan: `path.extname('.npmrc')` es `''`, y los dotfiles reales se llaman así enteros | resuelto · `lib/paths.js` compara también el basename |
 | `DEC-008` | S2 | `diseño` | El detector de plantillas de `context-enrichment-guard` no dispara en un proyecto recién generado: `injectVars` borra el único marcador que buscaba | abierto |
 | `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | abierto |
+| `DEC-009` | S2 | `diseño` | El provocador de reglas leía solo stdout: una regla que reporta con `reportWarning` no podía darse por probada nunca — el linter sale en 0 y su aviso va a stderr | resuelto · se leen las dos salidas; ARCH-11 pasó de muda a verde sin tocar la regla |
 
 ---
 
@@ -1269,7 +1270,32 @@ sistema de reglas, y hoy cubre el 14%.
 Escribir fixtures. Cada uno son ~15 líneas y el ratchet del baseline ya impide que la deuda
 crezca. Es el ítem con mejor relación esfuerzo/resultado de todo el backlog.
 
-**Estado:** abierto
+**Lo hecho** — 14 fixtures nuevos, en el orden que fijó `ADR-005` §1: primero las once cuya
+prosa en `visual-system.md` queremos cambiar por el mensaje de error del linter, después las
+tres de seguridad.
+
+```
+antes   ✅ 4/28   (14%)   — y la corrida salía en 1 (INC-009)
+ahora   ✅ 18/28  (64%)   — «18 regla(s) provocadas y todas disparan», exit 0
+```
+
+Cubiertas: `ARCH-11 15 16 17 18 19 22 23 24 25 26` + `SEC-RLS-01/02/03`. Con eso quedan
+cerrados los dos huecos que la ficha nombraba: las tres reglas de seguridad, y `ARCH-24` y
+`ARCH-26` —las dos que motivaron escribir el script y no estaban cubiertas por él—.
+
+Quedan diez en el baseline (`ARCH-02 06 07 08 09 10 21`, `NAV-01`, `A11Y-03`, `ICON-01`).
+Siguen siendo deuda declarada, y el trinquete impide que crezca.
+
+Dos cosas aparecieron al escribirlos:
+
+- **El provocador tenía su propio punto ciego** (`DEC-009`): leía solo stdout, y una regla
+  que reporta con `reportWarning` sale en 0 y escribe en stderr. `ARCH-11` disparaba desde
+  siempre y el provocador la veía muda. Que el mecanismo que busca reglas decorativas
+  tuviera una ceguera decorativa propia es demasiado apropiado para no dejarlo escrito.
+- **Un fixture no siempre es un archivo.** `ARCH-11` compara el uso de una clase contra el
+  `@theme`, que vive en otro archivo. El fixture pasó a admitir `archivos: []`.
+
+**Estado:** resuelto en lo que la ficha nombraba — 18/28, corrida en verde
 
 ---
 

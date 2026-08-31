@@ -1,6 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { auditarProvocacion, disparo, FIXTURES } from './provocacion.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { archivosDe, auditarProvocacion, disparo, FIXTURES } from './provocacion.js';
+
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
 
 describe('disparo', () => {
   test('reconoce la regla en la salida del linter', () => {
@@ -46,18 +51,68 @@ describe('auditarProvocacion', () => {
   });
 });
 
+describe('archivosDe', () => {
+  test('normaliza la forma corta', () => {
+    assert.deepEqual(archivosDe({ ruta: 'a.ts', contenido: 'x' }), [{ ruta: 'a.ts', contenido: 'x' }]);
+  });
+
+  test('y devuelve la forma larga tal cual', () => {
+    const largos = [{ ruta: 'a.css', contenido: '1' }, { ruta: 'b.html', contenido: '2' }];
+    assert.deepEqual(archivosDe({ archivos: largos }), largos);
+  });
+
+  test('un fixture vacío no rompe: devuelve []', () => {
+    assert.deepEqual(archivosDe({}), []);
+    assert.deepEqual(archivosDe(undefined), []);
+  });
+});
+
 describe('FIXTURES', () => {
-  test('cada fixture viola su regla y no arrastra otras evidentes', () => {
+  test('cada fixture declara al menos un archivo con contenido', () => {
+    for (const [ruleId, f] of Object.entries(FIXTURES)) {
+      const archivos = archivosDe(f);
+      assert.ok(archivos.length > 0, `${ruleId} sin archivos`);
+      for (const a of archivos) {
+        assert.ok(a.ruta, `${ruleId} con un archivo sin ruta`);
+        assert.ok(a.contenido && a.contenido.trim().length > 0, `${ruleId}: ${a.ruta} vacío`);
+      }
+    }
+  });
+
+  test('ningún fixture arrastra ARCH-04 de rebote', () => {
     // Un fixture que viola tres reglas no permite saber cuál disparó, y el día
     // que una se rompa las otras dos la tapan.
     for (const [ruleId, f] of Object.entries(FIXTURES)) {
-      assert.ok(f.ruta && f.contenido, `${ruleId} sin ruta o contenido`);
-      // Todos menos el propio ARCH-04 tienen que traer OnPush, o dispararían
-      // ARCH-04 de rebote.
-      if (ruleId !== 'ARCH-04' && f.ruta.endsWith('.component.ts')) {
-        assert.match(f.contenido, /ChangeDetectionStrategy\.OnPush/,
+      if (ruleId === 'ARCH-04') continue;
+      for (const { ruta, contenido } of archivosDe(f)) {
+        if (!ruta.endsWith('.component.ts')) continue;
+        assert.match(contenido, /ChangeDetectionStrategy\.OnPush/,
           `${ruleId} dispararía ARCH-04 de rebote`);
       }
+    }
+  });
+
+  test('lo que tiene fixture no sigue contado como deuda en el baseline', () => {
+    // El baseline es un trinquete: cada fixture que se escribe tiene que salir
+    // de la lista. Uno que no se achica es una lista de excusas.
+    const baseline = JSON.parse(
+      fs.readFileSync(path.join(AQUI, '..', 'provocacion.baseline.json'), 'utf8')).sinFixture;
+    const duplicadas = Object.keys(FIXTURES).filter((r) => baseline.includes(r));
+    assert.deepEqual(duplicadas, []);
+  });
+
+  test('las once que desbloquean el recorte de visual-system.md tienen fixture', () => {
+    // ADR-005 §1: cambiar la prosa de estas once por el mensaje de error del
+    // linter solo es honesto una vez que la detección está probada.
+    const once = ['ARCH-11', 'ARCH-15', 'ARCH-16', 'ARCH-17', 'ARCH-18',
+      'ARCH-19', 'ARCH-22', 'ARCH-23', 'ARCH-24', 'ARCH-25', 'ARCH-26'];
+    const faltan = once.filter((r) => !(r in FIXTURES));
+    assert.deepEqual(faltan, []);
+  });
+
+  test('y las tres de seguridad tambien', () => {
+    for (const r of ['SEC-RLS-01', 'SEC-RLS-02', 'SEC-RLS-03']) {
+      assert.ok(r in FIXTURES, `${r} sin fixture: su silencio es lectura publica`);
     }
   });
 });

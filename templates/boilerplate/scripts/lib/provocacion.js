@@ -25,7 +25,10 @@
  * Chico a propósito: si un fixture viola tres reglas, no se sabe cuál disparó, y
  * el día que una se rompa las otras dos la tapan.
  *
- * `ruta` es relativa a la raíz del sandbox.
+ * `ruta` es relativa a la raíz del sandbox. Algunas reglas no se pueden violar
+ * con un archivo solo —ARCH-11 compara el uso de una clase contra el `@theme`,
+ * que vive en otro archivo—, así que un fixture puede declarar `archivos: []`
+ * en vez de `ruta`/`contenido`. `archivosDe()` normaliza las dos formas.
  */
 export const FIXTURES = {
   'ARCH-01': {
@@ -87,7 +90,134 @@ import { trigger } from '@angular/animations';
 export class FixtureComponent {}
 `,
   },
+
+  // ── Las once que desbloquean el recorte de visual-system.md (ADR-005 §1) ────
+  //
+  // No están acá por ser las más fáciles. Son las once cuya prosa en
+  // `rules/visual-system.md` querríamos cambiar por el mensaje de error del
+  // linter — 4.854 chars que se inyectan en cada edición de un template. Ese
+  // cambio no se puede hacer mientras la detección no esté probada: cambiar
+  // prevención por detección sin probar la detección apaga el guardrail y deja
+  // la sensación de que sigue ahí.
+
+  'ARCH-11': {
+    // La clase muerta y el @theme que la desmiente viven en archivos distintos:
+    // `brand-weak` no es un token, y `brand` sí es vocabulario del DS — que es
+    // justo lo que hace que la clase parezca válida al leerla.
+    archivos: [
+      {
+        ruta: 'src/tailwind.css',
+        contenido: `@theme {\n  --color-brand-strong: #123456;\n}\n`,
+      },
+      {
+        ruta: 'src/app/features/fixture.html',
+        contenido: `<p class="text-brand-weak">Tailwind no genera CSS para esta clase.</p>\n`,
+      },
+    ],
+  },
+
+  'ARCH-15': {
+    // rounded-full + micro-texto + padding horizontal: un badge recompuesto.
+    ruta: 'src/app/features/fixture.html',
+    contenido: `<span class="rounded-full text-xs px-2">Activo</span>\n`,
+  },
+
+  'ARCH-16': {
+    // px- sobre un .btn-*: mutila el contrato de tamaño del componente.
+    ruta: 'src/app/features/fixture.html',
+    contenido: `<button class="btn-primary px-4">Guardar</button>\n`,
+  },
+
+  'ARCH-17': {
+    ruta: 'src/app/features/fixture.html',
+    contenido: `<p class="text-[13px]">Fuera de la escala tipográfica.</p>\n`,
+  },
+
+  'ARCH-19': {
+    // El cluster del overline escrito a mano, en vez de .micro-label.
+    ruta: 'src/app/features/fixture.html',
+    contenido: `<p class="uppercase text-text-muted text-xs">Resumen</p>\n`,
+  },
+
+  'ARCH-18': {
+    // Alias bare dentro del propio @theme: resucita una clase declarada muerta.
+    ruta: 'src/tailwind.css',
+    contenido: `@theme {\n  --color-brand: #123456;\n  --color-secondary: var(--text-secondary);\n}\n`,
+  },
+
+  'ARCH-22': {
+    // `.grid` es también una utilidad nativa de Tailwind: las dos reglas se
+    // suman en vez de reemplazarse. Es el caso de `.overline` (fix-115-b).
+    ruta: 'src/styles/tokens/_variables.scss',
+    contenido: `.grid {\n  display: block;\n}\n`,
+  },
+
+  'ARCH-23': {
+    // En un grid --fill-screen toda celda ocupa UNA fila; .bento-hero ocupa dos.
+    ruta: 'src/app/features/fixture.html',
+    contenido: `<div class="bento-grid--fill-screen">\n  <div class="bento-hero">Desborda el template explícito.</div>\n</div>\n`,
+  },
+
+  'ARCH-24': {
+    // Borde + fondo + padding + radio sobre un campo: .field-input a mano.
+    ruta: 'src/app/features/fixture.html',
+    contenido: `<input class="border-divider bg-surface px-3 rounded-lg">\n`,
+  },
+
+  'ARCH-25': {
+    // #cccccc sobre #ffffff da 1.61:1, contra el mínimo AA de 4.5.
+    // El tema oscuro tiene que existir aunque no aporte: el parser exige los dos
+    // bloques y sin el segundo la regla no corre (fail-open) en vez de fallar.
+    ruta: 'src/styles/tokens/_variables.scss',
+    contenido: `:root {\n  --bg-base: #ffffff;\n  --text-primary: #cccccc;\n}\n\n[data-mode="dark"] {\n  --bg-base: #111111;\n}\n`,
+  },
+
+  'ARCH-26': {
+    // --color-base genera `text-base`, que le gana a la utilidad nativa de la
+    // escala tipográfica: el texto sale del color del fondo.
+    ruta: 'src/tailwind.css',
+    contenido: `@theme {\n  --color-brand: #123456;\n  --color-base: #ffffff;\n}\n`,
+  },
+
+  // ── Las tres de seguridad ──────────────────────────────────────────────────
+  //
+  // Se agregaron al linter después de que se generara el baseline, así que
+  // entraron por la puerta que el propio provocador vigila: «regla nueva sin
+  // fixture». Eso hacía fallar la corrida entera — el chequeo estaba en rojo y
+  // lo que reportaba era cierto. Son, además, las tres reglas cuyo silencio
+  // cuesta más caro: una tabla sin RLS es lectura pública.
+
+  'SEC-RLS-03': {
+    ruta: 'supabase/migrations/001_fixture.sql',
+    contenido: `CREATE TABLE public.notas (\n  id uuid PRIMARY KEY\n);\n`,
+  },
+
+  'SEC-RLS-01': {
+    // RLS activado y ninguna política: la tabla queda inaccesible para todos, que
+    // es distinto de insegura — y también es un error.
+    ruta: 'supabase/migrations/001_fixture.sql',
+    contenido: `CREATE TABLE public.notas (\n  id uuid PRIMARY KEY\n);\n\nALTER TABLE public.notas ENABLE ROW LEVEL SECURITY;\n`,
+  },
+
+  'SEC-RLS-02': {
+    // `USING (true)` en un FOR UPDATE: cualquiera edita la fila de cualquiera.
+    ruta: 'supabase/migrations/001_fixture.sql',
+    contenido: `CREATE TABLE public.notas (\n  id uuid PRIMARY KEY,\n  user_id uuid NOT NULL\n);\n\nALTER TABLE public.notas ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY notas_write ON public.notas\n  FOR UPDATE USING (true);\n`,
+  },
 };
+
+/**
+ * Los archivos de un fixture, en su forma larga.
+ *
+ * Acepta `{ ruta, contenido }` —la forma corta, que es la de la mayoría— y
+ * `{ archivos: [{ ruta, contenido }] }` para las reglas que comparan dos
+ * archivos entre sí.
+ */
+export function archivosDe(fixture) {
+  if (Array.isArray(fixture?.archivos)) return fixture.archivos;
+  if (fixture?.ruta) return [{ ruta: fixture.ruta, contenido: fixture.contenido }];
+  return [];
+}
 
 /**
  * Qué reglas quedaron sin fixture, y cuáles son nuevas respecto del baseline.

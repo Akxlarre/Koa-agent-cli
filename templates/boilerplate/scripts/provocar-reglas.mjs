@@ -17,9 +17,9 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { execFileSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { extraerReglasRegistradas } from './lib/rule-wiring.js';
-import { FIXTURES, auditarProvocacion, disparo } from './lib/provocacion.js';
+import { FIXTURES, archivosDe, auditarProvocacion, disparo } from './lib/provocacion.js';
 
 const raiz = process.cwd();
 const architect = path.join(raiz, 'scripts', 'architect.js');
@@ -40,21 +40,27 @@ const baseline = fs.existsSync(rutaBaseline)
 
 console.log(`\n${c.cyan}🎯 Provocación de reglas — ¿cada una puede fallar?${c.reset}\n`);
 
-/** Corre el linter contra un sandbox que sólo contiene el fixture. */
+/**
+ * Corre el linter contra un sandbox que sólo contiene el fixture.
+ *
+ * Se leen las DOS salidas, siempre. La primera versión usaba `execFileSync`, que
+ * devuelve stdout y descarta stderr cuando el proceso sale en 0 — y el linter
+ * sale en 0 cuando lo único que encontró son ADVERTENCIAS. Con eso, una regla
+ * que reporta con `reportWarning` (ARCH-11 entre ellas) no podía darse por
+ * probada nunca: disparaba, y el provocador la veía muda. Que el mecanismo que
+ * busca reglas decorativas tuviera su propio punto ciego es demasiado apropiado
+ * para dejarlo pasar sin nombrarlo.
+ */
 function provocar(fixture) {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'provocar-'));
   try {
-    const destino = path.join(sandbox, fixture.ruta);
-    fs.mkdirSync(path.dirname(destino), { recursive: true });
-    fs.writeFileSync(destino, fixture.contenido);
-    try {
-      // El linter sale 1 cuando encuentra errores: eso es éxito acá.
-      return execFileSync(process.execPath, [architect], {
-        cwd: sandbox, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-      });
-    } catch (e) {
-      return `${e.stdout ?? ''}${e.stderr ?? ''}`;
+    for (const { ruta, contenido } of archivosDe(fixture)) {
+      const destino = path.join(sandbox, ruta);
+      fs.mkdirSync(path.dirname(destino), { recursive: true });
+      fs.writeFileSync(destino, contenido);
     }
+    const r = spawnSync(process.execPath, [architect], { cwd: sandbox, encoding: 'utf8' });
+    return `${r.stdout ?? ''}${r.stderr ?? ''}`;
   } finally {
     fs.rmSync(sandbox, { recursive: true, force: true });
   }

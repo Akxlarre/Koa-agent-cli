@@ -1,6 +1,6 @@
 # ADR-002 · La semántica de `Stop` y el ciclo de vida del estado
 
-**Estado:** implementado — 5 de 6 hallazgos cerrados; queda `HUE-004` ·
+**Estado:** implementado — los 6 hallazgos cerrados ·
 **Fecha:** 2026-08-29 · **Depende de:** `ADR-001` (`lib/session.js`)
 
 ---
@@ -200,7 +200,7 @@ relevantes y van al backlog de diseño, no a este ADR:
 | `INC-007` (S2) | ✅ `/hotfix-close` explícito + `SessionEnd` como red |
 | `INC-020` (**S1**) | ✅ Matcher explícito en `settings.json` y `cleanup({ source })`; ninguna limpieza destructiva en `resume`/`compact`/`fork` |
 | `CAR-004` (S2) | ✅ `session-start` deja de correr en `compact`; la mitad de la duplicación desaparece con el matcher, el resto con `budget.js` |
-| `HUE-004` (S2) | ⏳ Al revisar `spec-reflection`, distinguir «no marcaste nada» de «no hay nada abierto» — hoy calla en los dos casos |
+| `HUE-004` (S2) | ✅ Al revisar `spec-reflection`, distinguir «no marcaste nada» de «no hay nada abierto» — hoy calla en los dos casos |
 
 Y previene la cuarta instancia: con `lifetime` en el registro y `avisar()` en el núcleo, un
 hook nuevo tiene que **elegir** su ciclo de vida en vez de suponerlo.

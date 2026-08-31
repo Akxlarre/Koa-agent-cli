@@ -124,7 +124,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-001` | S2 | `C-02` | `sync-check` borra `session-writes.json` en cada `Stop` (que es por respuesta, no por sesión) | resuelto · la limpieza se mudó a `session-start` con origen `startup` |
 | `HUE-001` | S2 | `C-01` | El Discovery Gate solo comprueba que el flag exista; leer `context/` lo levanta sin ningún índice | abierto |
 | `HUE-003` | S2 | `C-01` | `compact-recovery` conoce 10 de 15 índices; GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan | abierto |
-| `HUE-004` | S2 | `C-03` | `spec-reflection` calla cuando no hay ninguna casilla marcada — el caso exacto que debería atrapar | abierto |
+| `HUE-004` | S2 | `C-03` | `spec-reflection` calla cuando no hay ninguna casilla marcada — el caso exacto que debería atrapar | resuelto · lo que separa las dos situaciones son las escrituras de la sesión, no las casillas |
 | `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | abierto |
 | `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | abierto |
 | `INC-003` | S2 | `C-05` | `pre-write-guard.js` no figura como consumidor del blueprint en ninguna documentación | abierto |

@@ -73,7 +73,7 @@ describe('SPEC REFLECTION', () => {
     assert.equal(runHook(root).exitCode, 0);
   });
 
-  test('calla si no hay ninguna casilla marcada (el agente no usa el flujo)', () => {
+  test('calla ante un spec recien generado: cero marcadas y cero escrituras', () => {
     const root = makeProject({
       spec: {
         name: 'task-spec-20260101-120000.md',
@@ -150,5 +150,58 @@ describe('SPEC REFLECTION', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-spec-empty-'));
     created.push(root);
     assert.equal(runHook(root).exitCode, 0);
+  });
+});
+
+describe('HUE-004 — CERRADO: "nada marcado" no es una sola situacion', () => {
+  // El hook callaba ante `done === 0` razonando «el agente no adopto el flujo».
+  // Eso tapaba el caso donde el aviso mas falta: trabajo escrito y criterio de
+  // done intacto. Lo que separa las dos situaciones no son las casillas, son las
+  // escrituras de la sesion.
+  const SPEC = { name: 'task-spec-20260101-120000.md', body: '## Done\n- [ ] a\n- [ ] b\n' };
+
+  test('con trabajo escrito y nada marcado, avisa', () => {
+    const root = makeProject({ spec: SPEC, writes: ['src/app/x.component.ts'] });
+    const r = runHook(root);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /ninguna casilla marcada/);
+    assert.match(r.stderr, /1 archivo\(s\) escrito\(s\)/);
+  });
+
+  test('y lista los puntos, que es lo que hay que mirar', () => {
+    const root = makeProject({ spec: SPEC, writes: ['src/app/x.component.ts'] });
+    const r = runHook(root);
+    assert.ok(r.stderr.includes('☐ a') && r.stderr.includes('☐ b'), r.stderr);
+  });
+
+  test('el encabezado distingue las dos situaciones', () => {
+    const sinMarcar = makeProject({ spec: SPEC, writes: ['src/app/x.ts'] });
+    const conAlgunaMarcada = makeProject({
+      spec: { name: SPEC.name, body: '## Done\n- [x] a\n- [ ] b\n' },
+      writes: ['src/app/x.ts'],
+    });
+    assert.match(runHook(sinMarcar).stderr, /ninguna casilla marcada/);
+    assert.match(runHook(conAlgunaMarcada).stderr, /1 punto\(s\) sin cerrar \(1 completado/);
+  });
+
+  test('sin escrituras sigue callando — un spec recien nacido no se regana', () => {
+    assert.equal(runHook(makeProject({ spec: SPEC })).exitCode, 0);
+    assert.equal(runHook(makeProject({ spec: SPEC, writes: [] })).exitCode, 0);
+  });
+
+  test('tampoco insiste: el anti-bucle vale igual para este aviso', () => {
+    const root = makeProject({ spec: SPEC, writes: ['src/app/x.ts'] });
+    assert.equal(runHook(root).exitCode, 2);
+    assert.equal(runHook(root).exitCode, 0);
+  });
+
+  test('marcar una casilla cambia el aviso, no lo silencia', () => {
+    const root = makeProject({ spec: SPEC, writes: ['src/app/x.ts'] });
+    assert.equal(runHook(root).exitCode, 2);
+    fs.writeFileSync(path.join(root, '.claude', 'temp', SPEC.name),
+      '## Done\n- [x] a\n- [ ] b\n');
+    const r = runHook(root);
+    assert.equal(r.exitCode, 2, 'la firma incluye cuantas van marcadas');
+    assert.ok(!r.stderr.includes('ninguna casilla marcada'));
   });
 });

@@ -101,13 +101,19 @@
         ]
       }
     ],
-    "Stop": [
+    "SessionEnd": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "node .claude/hooks/sdd/hotfix-autoclose.js"
-          },
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node .claude/hooks/spec-reflection.js"

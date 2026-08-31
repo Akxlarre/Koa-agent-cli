@@ -272,7 +272,7 @@ Se inyectan automáticamente **solo cuando el archivo editado coincide** con su 
                             y solo hasta <!-- DETAIL:BEGIN --> (Quick Reference, no ejemplos)
 
 ▼ Stop  (los 4 en cadena)
-  sdd/hotfix-autoclose.js · cierra el hotfix activo y limpia specs/.active
+  sdd/hotfix-autoclose.js · SessionEnd: red de seguridad; cierra el hotfix que quedo abierto
   spec-reflection.js ······ devuelve las casillas `- [ ]` del task-spec que siguen abiertas
   sync-check.js ··········· compara mtime de session-writes vs indices/ → ¿faltó sincronizar?
   context-guardian.js ····· "¿aprendiste algo hoy?" si learnings.md lleva >14 días quieto
@@ -353,7 +353,7 @@ CAPA DE EQUIPO (opcional)          CICLO SDD                        CIERRE
                                     /spec-verify → acceptance.md ┘
 
 Tracks livianos:  /fix-new + /fix-close   (bug con root cause + test de regresión)
-                  /hotfix                  (el "cómo" es obvio — AUTO-CIERRA al Stop)
+                  /hotfix                  (el "cómo" es obvio — cierra con /hotfix-close)
 ```
 
 Numeración **por autor** (`spec-0004-A-slug`, `fix-012-B-slug`), no global: un contador global

@@ -28,7 +28,7 @@
 | `templates/.claude/settings.json` | `.claude/settings.json` | Cableado de hooks. 7 eventos: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostCompact, Stop. 16 hooks cableados, incl. `harness-gate.js`. |
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
 | `templates/.claude/author.local.json.example` | `.claude/author.local.json.example` | Plantilla del código de autor (una letra) para la capa multi-dev del SDD. Se copia a `author.local.json`, que va gitignored. |
-| `templates/.claude/commands/` | `.claude/commands/` | 11 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/assign-*` (3). |
+| `templates/.claude/commands/` | `.claude/commands/` | 12 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/hotfix-close`, `/assign-*` (3). |
 | `templates/.claude/hooks/` | `.claude/hooks/` | 18 archivos: 16 cableados en settings.json (incl. `sdd/` y `harness-gate.js`), `context-enrichment-guard.js` opt-in (no cableado), y `validators/validate-file-contains.js` invocado por skills (ver tabla de hooks abajo). |
 | `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 15 reglas arquitectónicas path-scoped. |
@@ -96,7 +96,7 @@
 | `write-tracker.js` | PostToolUse (Edit/Write) | Registra archivos fuente modificados en session-writes.json | — |
 | `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
 | `compact-recovery.js` | PostCompact | Re-inyecta índices (selectivo + cortado en `DETAIL:BEGIN`) y **solo las casillas pendientes** del spec | discovery flag, task-spec |
-| `sdd/hotfix-autoclose.js` | Stop | Cierra automáticamente los tracks `hotfix-*` al terminar la sesión | `specs/.active` |
+| `sdd/hotfix-autoclose.js` | SessionEnd | Red de seguridad del cierre de `hotfix-*`; el camino normal es `/hotfix-close` | `specs/.active` |
 | `spec-reflection.js` | Stop | Verifica el "Criterio de done" del task-spec activo con evidencia del filesystem. Anti-bucle por estado del spec | task-spec, session-writes.json |
 | `sync-check.js` | Stop | Compara mtime de fuentes vs índices al cerrar sesión | session-writes.json |
 | `context-guardian.js` | Stop | Audita si `context/learnings.md` lleva >14d sin crecer. (La frescura del brief se auditó ya en SessionStart) | — |

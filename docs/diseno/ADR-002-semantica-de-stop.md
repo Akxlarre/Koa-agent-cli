@@ -1,6 +1,7 @@
 # ADR-002 · La semántica de `Stop` y el ciclo de vida del estado
 
-**Estado:** propuesto · **Fecha:** 2026-08-29 · **Depende de:** `ADR-001` (`lib/session.js`)
+**Estado:** implementado — 5 de 6 hallazgos cerrados; queda `HUE-004` ·
+**Fecha:** 2026-08-29 · **Depende de:** `ADR-001` (`lib/session.js`)
 
 ---
 
@@ -59,7 +60,7 @@ documentación: `lib/session.js` lo usa para decidir dónde vive y quién lo bor
 |---|---|---|
 | `session-writes.json` | `sesión` | `SessionStart` — **no en `Stop`** |
 | discovery flag | `sesión` | `SessionStart` |
-| `koa-breaker`, `koa-ctx-*`, `koa-prompt-ctx` | `sesión` | `SessionStart` |
+| `breaker.json`, `ctx-<categoria>.json`, `budget-<clave>.json` | `sesión` | `SessionStart` |
 | `spec-reflection-seen.json` | `turno` | lo gestiona su propio hook |
 | `LESSONS_LEARNED.md`, `indices-cache.json` | `permanente` | nadie |
 
@@ -196,7 +197,7 @@ relevantes y van al backlog de diseño, no a este ADR:
 |---|---|
 | `ACO-001` (S2) | ✅ La limpieza de ciclo `sesión` sale de `Stop` — a `SessionEnd`, y a `SessionStart` **solo con origen `startup`** |
 | `CAR-002` (S2) | ✅ `budget.avisar()` con default «una vez» — 5.790 → 579 chars en 10 respuestas |
-| `INC-007` (S2) | ⏳ `/hotfix-close` explícito + `SessionEnd` como red |
+| `INC-007` (S2) | ✅ `/hotfix-close` explícito + `SessionEnd` como red |
 | `INC-020` (**S1**) | ✅ Matcher explícito en `settings.json` y `cleanup({ source })`; ninguna limpieza destructiva en `resume`/`compact`/`fork` |
 | `CAR-004` (S2) | ✅ `session-start` deja de correr en `compact`; la mitad de la duplicación desaparece con el matcher, el resto con `budget.js` |
 | `HUE-004` (S2) | ⏳ Al revisar `spec-reflection`, distinguir «no marcaste nada» de «no hay nada abierto» — hoy calla en los dos casos |

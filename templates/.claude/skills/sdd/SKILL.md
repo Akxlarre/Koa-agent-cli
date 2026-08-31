@@ -21,7 +21,7 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash
 
 ## Cuándo activar este skill
 
-- El usuario invoca `/spec-new`, `/spec-activate`, `/spec-plan`, `/spec-tasks`, `/spec-verify`, `/fix-new`, `/fix-close`, `/hotfix`, `/assign-new`, `/assign-list` o `/assign-claim`.
+- El usuario invoca `/spec-new`, `/spec-activate`, `/spec-plan`, `/spec-tasks`, `/spec-verify`, `/fix-new`, `/fix-close`, `/hotfix`, `/hotfix-close`, `/assign-new`, `/assign-list` o `/assign-claim`.
 - El usuario pide "creemos la spec de…", "planifiquemos el feature X", "verifica los AC", "asígnale esto a X", "qué me toca a mí", "designemos tareas al equipo".
 - Vas a tocar `src/`, `app/`, `lib/` o `supabase/migrations/` y el proyecto tiene carpeta `specs/`
   (en ese caso el `spec-gate` te bloqueará si no hay spec activa — este skill te dice cómo desbloquearlo).
@@ -58,7 +58,7 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash
 │   │       └── fix.md          # Root Cause + ACs afectados + test de regresión
 │   └── hotfixes/
 │       └── hotfix-NNN-X-slug/
-│           └── hotfix.md       # Problema + Cambios (auto-cerrado al fin de sesión)
+│           └── hotfix.md       # Problema + Cambios (se cierra con /hotfix-close)
 └── .claude/
     └── settings.json           # engancha los 3 hooks SDD globales
 ```
@@ -93,7 +93,7 @@ track real a partir de ahí, con contexto pre-cargado.
 |------|--------|---------|
 | `spec-gate.js` | PreToolUse Edit\|Write\|MultiEdit | Bloquea escrituras en código de producto si no hay spec activa o si la spec no tiene plan |
 | `plan-injector.js` | PreToolUse Edit\|Write\|MultiEdit | Inyecta spec + plan activo como contexto adicional en cada edición |
-| `hotfix-autoclose.js` | Stop | Cierra automáticamente los tracks `hotfix-*` al terminar la sesión |
+| `hotfix-autoclose.js` | SessionEnd | Red de seguridad: cierra el `hotfix-*` que quedó abierto. El cierre normal es `/hotfix-close` |
 | AC verifier | Stop (prompt hook) | Definido inline en `.claude/settings.json`: verifica si los AC de la spec activa fueron cumplidos en la sesión |
 
 **Importante: los hooks son fail-open.** Si un proyecto no tiene `specs/`, el hook no bloquea

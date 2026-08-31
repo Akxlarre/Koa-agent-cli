@@ -23,16 +23,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const session = require('./lib/session.js');
+const blueprint = require('./lib/blueprint.js');
 
-// ─── Read stack from blueprint.json (fail-open) ──────────────────────────────
-let STACK = { angular: true, tailwind: true, primeng: true, gsap: false, supabase: true };
-try {
-  const bpPath = path.join(process.cwd(), 'blueprint.json');
-  if (fs.existsSync(bpPath)) {
-    const bp = JSON.parse(fs.readFileSync(bpPath, 'utf8'));
-    if (bp.stack && typeof bp.stack === 'object') STACK = { ...STACK, ...bp.stack };
-  }
-} catch { /* fail-open */ }
+// ─── Read stack from blueprint.json (fail-open, VALIDADO) ────────────────────
+// HUE-005: antes era `{ ...STACK, ...bp.stack }`, que acepta cualquier cosa. Un
+// `{ supabase: null }` apagaba SEC-RLS-01/02/03 en silencio. Ver lib/blueprint.js.
+const STACK = blueprint.readStack(process.cwd()).stack;
 
 // ─── CIRCUIT BREAKER ─────────────────────────────────────────────────────────
 // Un bloqueo con exit 2 es un "no" sin memoria: el agente puede reintentar la

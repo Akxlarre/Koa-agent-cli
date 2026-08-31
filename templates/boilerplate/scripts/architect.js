@@ -67,13 +67,25 @@ console.log(yellow, '🔍 Iniciando Auditoría Arquitectónica (AST Mode v2.0)..
 console.log('');
 
 // ─── Stack flags (lee blueprint.json para saltar reglas según configuración) ──
-let STACK = { angular: true, tailwind: true, primeng: true, gsap: true, supabase: true };
+//
+// HUE-005: antes era `{ ...STACK, ...bp.stack }`, que acepta cualquier cosa. Un
+// `{ supabase: null }` o `{ supabase: 0 }` apagaba SEC-RLS-01/02/03 en silencio,
+// y un `{ supabase: "false" }` las dejaba activas pese a la intención contraria.
+//
+// La lista de claves es la misma que declara .claude/hooks/lib/blueprint.js —
+// este archivo vive en otro árbol y no puede importarla, así que un test
+// verifica que las dos no diverjan.
+const STACK_KEYS = ['angular', 'tailwind', 'primeng', 'gsap', 'supabase'];
+const STACK = { angular: true, tailwind: true, primeng: true, gsap: true, supabase: true };
 try {
     const blueprintPath = path.join(process.cwd(), 'blueprint.json');
     if (fs.existsSync(blueprintPath)) {
         const bp = JSON.parse(fs.readFileSync(blueprintPath, 'utf-8'));
-        if (bp.stack && typeof bp.stack === 'object') {
-            STACK = { ...STACK, ...bp.stack };
+        const crudo = bp && bp.stack;
+        if (crudo && typeof crudo === 'object' && !Array.isArray(crudo)) {
+            for (const k of STACK_KEYS) {
+                if (typeof crudo[k] === 'boolean') STACK[k] = crudo[k];
+            }
         }
     }
 } catch { /* fail-open: usar defaults */ }

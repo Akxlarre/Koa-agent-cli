@@ -65,6 +65,33 @@
 - Solución: `npm run supabase:types` lo regenera. Las interfaces de `dto/` deben **extender** de ahí, no duplicar sus campos.
 - Por qué: cualquier edición manual se pierde en la próxima regeneración, y el tipo deja de reflejar el esquema real.
 
+<a id="arch-27"></a>
+### ARCH-27: Decoradores `@Input()` / `@Output()`
+- Prohibido `@Input()` y `@Output()` en componentes nuevos.
+- Solución: las APIs de signals — `input()`, `input.required()`, `output()`.
+- Por qué: un `@Input()` no es reactivo por sí solo y obliga a `ngOnChanges` o a un setter para derivar estado; `input()` es un signal y `computed()` se encadena solo.
+- Lo emite `pre-write-guard` (regex sobre el contenido nuevo).
+
+<a id="arch-28"></a>
+### ARCH-28: `MessageService` de PrimeNG inyectado directo
+- Prohibido `inject(MessageService)` en un `*.component.ts` de `features/`, `shared/` o `layout/`.
+- Solución: `ToastService` (`core/services/toast.service.ts`).
+- Por qué: los toasts efímeros son una decisión de producto (duración, severidad, copy) y con `MessageService` directo cada componente la toma por su cuenta. Ver `.claude/rules/notifications.md`.
+- Lo emite `pre-write-guard`.
+
+<a id="sql-01"></a>
+### SQL-01: Nombre de migración fuera de convención
+- Formato obligatorio: `YYYYMMDDHHMMSS_<dominio>_<tipo>_<descripcion>.sql`.
+- Por qué: el orden de aplicación de las migraciones es el orden alfabético de sus nombres. Un nombre sin timestamp se aplica en un punto impredecible de la secuencia.
+- Lo emite `pre-write-guard` al crear el archivo (`Write`).
+
+<a id="sec-env-01"></a>
+### SEC-ENV-01: Credencial real en un environment file
+- Prohibido escribir un JWT de Supabase (`eyJ…`) o una URL de proyecto real en `src/environments/**`.
+- Solución: variables de entorno + `scripts/set-env.js`, que las inyecta en build.
+- Por qué: `environment.ts` se commitea. Un placeholder (`your-anon-key-here`) no dispara la regla; un JWT de verdad sí.
+- Lo emite `pre-write-guard`.
+
 <a id="a11y-01"></a>
 ### A11Y-01: `<app-icon>` sin `aria-label`
 - Un icono de acción sin etiqueta es invisible para un lector de pantalla.

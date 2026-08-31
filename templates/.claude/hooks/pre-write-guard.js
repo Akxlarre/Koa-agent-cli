@@ -151,19 +151,19 @@ process.stdin.on('end', () => {
 
       // Directivas Angular deprecadas
       if (newContent.includes('*ngIf'))
-        violations.push('Usa @if {} en vez de *ngIf (Angular 17+ control flow)');
+        violations.push('[ARCH-06] Usa @if {} en vez de *ngIf (Angular 17+ control flow)');
       if (newContent.includes('*ngFor'))
-        violations.push('Usa @for {} en vez de *ngFor (Angular 17+ control flow)');
+        violations.push('[ARCH-06] Usa @for {} en vez de *ngFor (Angular 17+ control flow)');
       if (/\[ngClass\]/.test(newContent))
-        violations.push('Usa [class.nombre]="expr" en vez de [ngClass]');
+        violations.push('[ARCH-06] Usa [class.nombre]="expr" en vez de [ngClass]');
       if (/\[ngStyle\]/.test(newContent))
-        violations.push('Usa [style.prop]="expr" en vez de [ngStyle]');
+        violations.push('[ARCH-06] Usa [style.prop]="expr" en vez de [ngStyle]');
 
       // Decoradores deprecados
       if (/@Input\s*\(/.test(newContent))
-        violations.push('Usa input() signal en vez de @Input() decorator');
+        violations.push('[ARCH-27] Usa input() signal en vez de @Input() decorator');
       if (/@Output\s*\(/.test(newContent))
-        violations.push('Usa output() signal en vez de @Output() decorator');
+        violations.push('[ARCH-27] Usa output() signal en vez de @Output() decorator');
 
       // ARCH-13: supabase.types.ts es auto-generado — no editar manualmente
       if (/core\/models\/supabase\.types\.ts/.test(normalizedPath))
@@ -179,11 +179,11 @@ process.stdin.on('end', () => {
         (normalizedPath.includes('features/') || normalizedPath.includes('shared/')) &&
         newContent.includes('@supabase/supabase-js')
       )
-        violations.push('No importar @supabase/supabase-js en la capa UI. Usa un FacadeService.');
+        violations.push('[ARCH-01] No importar @supabase/supabase-js en la capa UI. Usa un FacadeService.');
 
       // @angular/animations prohibido siempre
       if (newContent.includes('@angular/animations'))
-        violations.push('No usar @angular/animations. Usa GsapAnimationsService (con GSAP) o CSS transitions/View Transitions API (sin GSAP).');
+        violations.push('[ARCH-05] No usar @angular/animations. Usa GsapAnimationsService (con GSAP) o CSS transitions/View Transitions API (sin GSAP).');
 
       // OnPush check — solo para Write (archivo completo) en .component.ts
       if (
@@ -193,7 +193,7 @@ process.stdin.on('end', () => {
         !newContent.includes('OnPush')
       )
         violations.push(
-          'Falta changeDetection: ChangeDetectionStrategy.OnPush en el componente.\n' +
+          '[ARCH-04] Falta changeDetection: ChangeDetectionStrategy.OnPush en el componente.\n' +
           '     Importa { ChangeDetectionStrategy } de @angular/core.'
         );
 
@@ -202,7 +202,7 @@ process.stdin.on('end', () => {
         /(?:text|bg|border|ring|from|to|via)-(?:red|blue|green|yellow|purple|pink|orange|teal|cyan|indigo|emerald|rose|amber|lime|sky|violet|fuchsia)-\d{2,3}/;
       if (hardcodedColorRe.test(newContent))
         violations.push(
-          'No usar colores Tailwind hardcodeados (ej: text-red-500, bg-blue-200).\n' +
+          '[ARCH-08] No usar colores Tailwind hardcodeados (ej: text-red-500, bg-blue-200).\n' +
           '     Usa tokens semanticos: text-primary, text-muted, bg-surface, bg-canvas, var(--ds-brand).'
         );
 
@@ -210,7 +210,7 @@ process.stdin.on('end', () => {
       if (normalizedPath.includes('shared/') && normalizedPath.endsWith('.component.ts')) {
         if (/inject\s*\(\s*\w*Facade/.test(newContent))
           violations.push(
-            'Componentes en shared/ son Dumb: no deben inyectar Facades.\n' +
+            '[ARCH-02] Componentes en shared/ son Dumb: no deben inyectar Facades.\n' +
             '     Solo usan input() y output(). Mueve la logica a un Smart component en features/.'
           );
       }
@@ -222,7 +222,7 @@ process.stdin.on('end', () => {
         /inject\s*\(\s*MessageService\s*\)/.test(newContent)
       )
         violations.push(
-          'No inyectar MessageService de PrimeNG directamente en componentes.\n' +
+          '[ARCH-28] No inyectar MessageService de PrimeNG directamente en componentes.\n' +
           '     Usa ToastService (core/services/toast.service.ts) para toasts efimeros.\n' +
           '     Ver: .claude/rules/notifications.md'
         );
@@ -298,7 +298,7 @@ process.stdin.on('end', () => {
       const isComponentStyle = normalizedPath.includes('src/app/');
       if (STACK.gsap && isComponentStyle && /@keyframes\s/.test(newContent))
         violations.push(
-          'No usar @keyframes en estilos de componente (proyecto usa GSAP).\n' +
+          '[ARCH-07] No usar @keyframes en estilos de componente (proyecto usa GSAP).\n' +
           '     Para animaciones de entrada: GsapAnimationsService.\n' +
           '     Para loops de estado: usar .indicator-live o .badge-pulse del design system.'
         );
@@ -306,7 +306,7 @@ process.stdin.on('end', () => {
       const hardcodedColorRe =
         /(?:text|bg|border|ring)-(?:red|blue|green|yellow|purple|pink|orange|teal|cyan|indigo|emerald|rose|amber|lime|sky|violet|fuchsia)-\d{2,3}/;
       if (hardcodedColorRe.test(newContent))
-        violations.push('No usar colores Tailwind hardcodeados en SCSS. Usa var(--ds-*) tokens.');
+        violations.push('[ARCH-08] No usar colores Tailwind hardcodeados en SCSS. Usa var(--ds-*) tokens.');
     }
 
     // --- SEC-T03: Secrets in environment files ---
@@ -317,7 +317,7 @@ process.stdin.on('end', () => {
       const hasRealSupabaseUrl = /https:\/\/[a-z]{20}\.supabase\.co/.test(newContent);
       if (hasHardcodedJwt || hasRealSupabaseUrl)
         violations.push(
-          '[SEC] Credencial Supabase detectada en environment file.\n' +
+          '[SEC-ENV-01] Credencial Supabase detectada en environment file.\n' +
           '     NUNCA hardcodear JWTs ni URLs de proyecto en archivos commiteados.\n' +
           '     Usa variables de entorno en CI/CD e inyectalas en el build.\n' +
           '     Ver: src/environments/environment.prod.ts (instrucciones de configuracion)'
@@ -330,7 +330,7 @@ process.stdin.on('end', () => {
 
       if (toolName === 'Write' && !/^\d{14}_\w+\.sql$/.test(fileName))
         violations.push(
-          'Nombre de migracion invalido. Formato: YYYYMMDDHHMMSS_dominio_tipo_descripcion.sql\n' +
+          '[SQL-01] Nombre de migracion invalido. Formato: YYYYMMDDHHMMSS_dominio_tipo_descripcion.sql\n' +
           '     Ejemplo: 20250301120000_auth_create_profiles.sql'
         );
 
@@ -338,7 +338,7 @@ process.stdin.on('end', () => {
 
       if (createsTable && !/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(newContent))
         violations.push(
-          'Toda tabla nueva DEBE tener RLS activado.\n' +
+          '[SEC-RLS-03] Toda tabla nueva DEBE tener RLS activado.\n' +
           '     Agrega: ALTER TABLE nombre ENABLE ROW LEVEL SECURITY;'
         );
 

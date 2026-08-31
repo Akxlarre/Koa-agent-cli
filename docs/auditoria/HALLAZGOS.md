@@ -57,13 +57,13 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 
 | ID | Sev | Unidad | Una línea | Estado |
 |---|---|---|---|---|
-| `INC-001` | S2 | `S-01` | **(reescrito)** El namespace ARCH está repartido en tres implementaciones sin registro único; `ARCH-14` está documentado y no lo emite nadie | abierto |
+| `INC-001` | S2 | `S-01` | **(reescrito)** El namespace ARCH está repartido en tres implementaciones sin registro único; `ARCH-14` está documentado y no lo emite nadie | resuelto en su mitad verificable · `lib/guard-rules.js` es el registro del guard; un test cruza los IDs emitidos contra el registro y contra sus anclas en el doc. `ARCH-14` sigue siendo fantasma (lo cubre `HUE-026`) |
 | `CAR-001` | **S1** | `H-06` | `plan-injector` inyecta ~6.155 tokens en CADA Edit, sin dedup ni techo — la única pieza del harness sin ningún control de costo | resuelto · `lib/budget.js` — 246.220 → 24.330 chars en 10 ediciones |
 | `DEC-002` | S2 | `H-05` | `GATE-A1` de `harness-gate` se satisface con la palabra «cuando»; 12 de 15 reglas reales ya lo cumplen sin intentarlo | abierto |
 | `INC-005` | S2 | `H-03` | `spec-gate` y `plan-injector` clasifican el mismo archivo con listas de exención distintas | resuelto · las dos preguntas son `paths.isProductCode`; hay un test que compara gate contra injector archivo por archivo |
 | `HUE-010` | S2 | `H-03` | Los 3 hooks de `sdd/` y `context-enrichment-guard` leen stdin sin el cap SEC-04 | resuelto · `spec-gate` y `context-enrichment-guard` migrados a `lib/payload.js`; ningún hook acumula stdin sin tope |
 | `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | resuelto · los tres hooks de `sdd/` tienen test: 42 + 35 + 16 = 93 |
-| `HUE-012` | S2 | `H-04` | Las ~20 reglas regex de `pre-write-guard` no las cubre `provocar-reglas.mjs` | abierto |
+| `HUE-012` | S2 | `H-04` | Las ~20 reglas regex de `pre-write-guard` no las cubre `provocar-reglas.mjs` | resuelto · las 19 reglas mudas ahora dicen su ID y hay un fixture por regla que las provoca de verdad (`guard-rules.test.js`) |
 | `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | abierto |
 | `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | abierto |
 | `HUE-009` | S3 | `H-00` | Ningún test verifica que los comandos cableados apunten a archivos existentes | resuelto · `settings.test.js`: ruta, sintaxis, evento y los dos matchers con semántica |
@@ -164,7 +164,7 @@ El namespace de códigos no vive en un solo lugar. Está repartido en tres super
 |---|---|---|
 | `scripts/architect.js` | ARCH-01…11, 15…19, 21…26 · A11Y-03 · SEC-RLS-01/02/03 | AST de TypeScript |
 | `scripts/lib/a11y-guardrails.js` | ARCH-20 | función pura importada por `architect.js` |
-| `.claude/hooks/pre-write-guard.js` | ARCH-12, ARCH-13 · A11Y-01, A11Y-02 · LLM-01, LLM-02 | regex, en tiempo de escritura |
+| `.claude/hooks/pre-write-guard.js` | ARCH-01, 02, 04, 05, 06, 07, 08, 12, 13, 27, 28 · A11Y-01/02 · LLM-01/02 · SQL-01 · SEC-ENV-01 · SEC-RLS-01/02/03 | regex, en tiempo de escritura. Registro: `.claude/hooks/lib/guard-rules.js` |
 
 No hay ningún hueco de numeración: 12, 13 y 20 existen. **La excepción es `ARCH-14`**, que
 `skills/verify/SKILL.md` documenta como si existiera —«Íconos sin registrar en

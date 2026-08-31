@@ -111,6 +111,16 @@
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/subagent-cleanup.js"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

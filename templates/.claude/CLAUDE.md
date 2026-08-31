@@ -8,13 +8,14 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 
 - **Session Start** — Al abrir la sesión se te inyectan los índices core (COMPONENTS, SERVICES, FACADES), el objetivo de `context/brief.md` y el trabajo pendiente del último task-spec. No arrancas a ciegas.
 - **Prompt Context** — Antes de cada prompt se te recuerda lo que está **fuera de alcance** esta sesión y qué queda pendiente del spec. Es lo primero que se olvida y nada en la conversación lo repite.
-- **Discovery Gate** — NO puedes escribir código en `src/app/` sin antes tener los índices en contexto. Session Start suele resolverlo por ti; si no, serás bloqueado hasta que leas `indices/`.
+- **Discovery Gate** — NO puedes escribir código en `src/app/` sin antes tener los **índices** en contexto. Session Start suele resolverlo por ti; si no, serás bloqueado hasta que leas `indices/`. Leer `context/` no lo levanta: el bloqueo pide índices. Delegar en `discovery-scout` **sí** cuenta — el flag registra quién descubrió y qué.
 - **Architect Guard** — Cada Edit/Write es validado en tiempo real. Se bloquean: `*ngIf`, `@Input()`, colores hardcodeados, imports de Supabase en UI, `@angular/animations`, `@keyframes`, y migraciones con problemas de RLS (`SEC-RLS-01/02`).
 - **File Protector** — No puedes modificar los archivos del sistema de hooks (`.claude/hooks/`, `settings.json`, `architect.js`).
 - **Bash Guard** — No puedes crear archivos `.ts/.html/.scss` via Bash. Usa Edit/Write.
 - **Compact Recovery** — Si el contexto se compacta, los índices se re-inyectan automáticamente (PostCompact).
 - **Failure Tracker** — Los errores de tools se registran en `.claude/temp/LESSONS_LEARNED.md` con dedup y rotación automática (max 20).
 - **Circuit Breaker** — Si el mismo Edit se bloquea 3 veces por la misma violación, el guard deja de explicar el arreglo y te ordena parar y escalar al humano. No intentes rodearlo.
+- **Subagent Cleanup** — Cuando un subagente termina, su estado de hilo (dedup de avisos, anti-bucle, breaker) se borra. Lo que descubrió o escribió no: eso es de la sesión.
 - **Approval Gate** — Las operaciones irreversibles de base de datos (`supabase db push`, `db reset`, `migration repair`, `link`, SQL destructivo) las ejecuta un humano, no tú. Escribe la migración y pide que la corran.
 - **Spec Reflection** — Al terminar de responder, se revisa el "Criterio de done" del task-spec activo y se te devuelven los puntos sin cerrar.
 - **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script.
@@ -55,7 +56,7 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 | `/angular-signals` | Implementar estado reactivo con Signals |
 | `/sync-indices` | Sincronizar índices al cerrar sesión |
 | `/harness-feedback` | Reportar fricción con el harness (hooks/rules/skills) al cerrar sesión — distinto de sync-indices |
-| `sdd` | Ciclo Spec-Driven Development. Comandos: `/spec-new`, `/spec-activate`, `/spec-plan`, `/spec-tasks`, `/spec-verify`, `/fix-new`, `/fix-close`, `/hotfix`, `/assign-new`, `/assign-list`, `/assign-claim` |
+| `sdd` | Ciclo Spec-Driven Development. Comandos: `/spec-new`, `/spec-activate`, `/spec-plan`, `/spec-tasks`, `/spec-verify`, `/fix-new`, `/fix-close`, `/hotfix`, `/hotfix-close`, `/assign-new`, `/assign-list`, `/assign-claim` (los `/assign-*` requieren `specs/AUTHORS.md`) |
 | `verify` | Verificar visualmente en el navegador (Playwright MCP) que un cambio funciona de verdad — no solo que compila |
 | `form-ux` | Diseñar o revisar la UX de un formulario |
 | `grill_me` | Estresar una propuesta con preguntas antes de convertirla en spec |

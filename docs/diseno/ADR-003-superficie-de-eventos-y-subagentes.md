@@ -1,6 +1,6 @@
 # ADR-003 · La superficie de eventos y los subagentes
 
-**Estado:** propuesto · **Fecha:** 2026-08-30 · **Depende de:** `ADR-001` (`lib/session.js`)
+**Estado:** implementado — §§1-3, salvo `PreCompact` (evaluación, no adopción) · **Fecha:** 2026-08-30 · **Depende de:** `ADR-001` (`lib/session.js`)
 · **Origen:** la verificación de `ADR-002`
 
 ---
@@ -232,3 +232,52 @@ aviso— ya está medido y es peor.
 y por eso la verificación va en la tanda 0 y no después. Si no llega, §1 cae de vuelta a
 distinguir hilos por otro medio, o se acepta el estado compartido **con motivo escrito** —
 que es distinto de aceptarlo sin saberlo.
+
+
+---
+
+## Lo hecho
+
+### §1 · Los dos ámbitos — cerrado en la tanda del núcleo
+
+`lib/session.js` expone `sessionScope` y `threadScope`, y la regla que los reparte quedó
+escrita donde se aplica: *si el artefacto describe **lo que se hizo**, es de la sesión; si
+describe **lo que ya se dijo**, es del hilo* (`HUE-032`).
+
+### §2 · El descubrimiento delegado — decidido, y con dos consecuencias
+
+**Sí cuenta** (`DUP-004`). Está fijado por test, que era el punto: estaba ocurriendo sin que
+nadie lo hubiera decidido. Si mañana se decide lo contrario, cambia un test y no el
+comportamiento por accidente.
+
+Y al mirar el flag con el origen ya registrado, quedó a la vista que el Gate no usaba nada de
+eso: comprobaba `flag.trim()`, o sea *«existe alguna línea»*. Como `discovery-tracker`
+escribe también ante una lectura de `context/`, **abrir `context/brief.md` levantaba un
+bloqueo cuyo texto dice, con esas palabras, «lee los índices del proyecto»** (`HUE-001`).
+Ahora se exige una línea que nombre `indices/` — que es lo que el mensaje ya pedía.
+
+Las dos decisiones son independientes y ahora se leen así:
+
+```
+READ     | context/brief.md              → NO levanta el Gate   (HUE-001)
+READ     | indices/COMPONENTS.md         → sí
+SUBAGENT:discovery-scout | indices/…     → sí                   (DUP-004)
+SUBAGENT:discovery-scout | context/…     → no
+```
+
+### §3 · `SubagentStop` — adoptado
+
+`subagent-cleanup.js`. Un ámbito que se abre tiene que cerrarse: los cinco subagentes
+arrancan y terminan varias veces en una sesión larga, y cada invocación dejaba su
+`thread-<agent_id>/` con dedup, anti-bucle y breaker. Nadie los borraba.
+
+Lo que el test fija es la mitad difícil —**que se lleve solo el hilo que termina**—: no el
+estado de sesión (lo que el subagente descubrió sigue siendo cierto cuando se fue), no el
+hilo de otro subagente que corre en paralelo, y nunca `thread-main`, que es la conversación
+que continúa.
+
+`SessionEnd` ya había entrado por `ADR-002` §3. **`PreCompact` sigue sin adoptarse**, y el
+motivo escrito ahí se cumplió: `CAR-004` era el diagnóstico correcto —el problema de la
+compactación era inyectar de más, no reconstruir de menos— y se arregló bajando de 26.006 a
+8.783 chars. Volver a evaluar `PreCompact` después de eso es una decisión distinta, con otro
+punto de partida.

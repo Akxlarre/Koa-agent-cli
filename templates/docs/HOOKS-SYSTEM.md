@@ -119,6 +119,7 @@ objetivo equivocado.
 |------|--------|---------|
 | `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escribir código de producto sin una spec activa con su plan. **Fail-open**: sin carpeta `specs/` no bloquea nada. |
 | `sdd/plan-injector.js` | PreToolUse (Edit/Write) | Inyecta la spec y el plan activos como contexto en cada edición. |
+| `subagent-cleanup.js` | SubagentStop | Borra el estado de hilo del subagente que termina (dedup, anti-bucle, breaker). El estado de sesión —discovery flag, `session-writes.json`— sobrevive. |
 | `sdd/hotfix-autoclose.js` | SessionEnd | Red de seguridad: cierra el track `hotfix-*` que quedó abierto. El cierre normal es `/hotfix-close`. |
 | `context-enrichment-guard.js` | — (**OPT-IN**) | Day 0 Context Guard: impide escribir código mientras `context/domain.md` e `indices/DATABASE.md` sigan vacíos. **No viene cableado**: un proyecto recién generado los trae como plantilla, así que activarlo por defecto bloquearía todo desde el minuto cero. |
 

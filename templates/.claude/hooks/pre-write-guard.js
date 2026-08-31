@@ -105,8 +105,21 @@ process.stdin.on('end', () => {
     if (isSourceCode) {
       // HUE-002: la clave sale del payload, no de una env var inexistente.
       // El flag vive en el proyecto, asi que dos proyectos ya no lo comparten.
+      //
+      // HUE-001: el Gate pide INDICES, y comprobaba solo que el flag existiera.
+      // `discovery-tracker` lo escribe tambien ante una lectura de `context/`,
+      // asi que abrir `context/brief.md` levantaba un bloqueo que dice, con esas
+      // palabras, «lee los indices del proyecto». Ahora se exige una linea que
+      // nombre `indices/` — que es lo que el mensaje ya pedia.
+      //
+      // Una lectura de un SUBAGENTE cuenta (ADR-003 §2): delegar el
+      // descubrimiento en `discovery-scout` es la ruta que el propio harness
+      // recomienda en session-start, y el resumen del scout puede ser mejor que
+      // el indice crudo. Estaba pasando sin que nadie lo hubiera decidido; queda
+      // decidido, escrito y con test (DUP-004).
       const flag = session.readText(input, 'discovery.flag');
-      if (!flag.trim()) {
+      const descubrioIndices = flag.split('\n').some((l) => l.includes('indices/'));
+      if (!descubrioIndices) {
         process.stderr.write(
           `\u{1F50D} DISCOVERY GATE: Debes leer los indices del proyecto ANTES de escribir codigo.\n` +
           `Lee al menos uno de estos archivos primero:\n` +

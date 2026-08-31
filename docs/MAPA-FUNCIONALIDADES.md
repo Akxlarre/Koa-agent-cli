@@ -181,7 +181,7 @@ Lo que recibe el proyecto generado. Seis capas que se refuerzan entre sí.
 ┌─ CAPA 2 · REGLAS path-scoped (15) ────────────────────────────────┐
 │  .claude/rules/*.md — se inyectan SOLO si el archivo editado matchea│
 └────────────────────────────────────────────────────────────────────┘
-┌─ CAPA 3 · GUARDRAILS (18 hooks, 7 eventos) ───────────────────────┐
+┌─ CAPA 3 · GUARDRAILS (18 hooks, 9 eventos) ───────────────────────┐
 │  El único mecanismo que puede DECIR QUE NO. exit 2 = bloqueado.    │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CAPA 4 · PROCEDIMIENTO (15 skills · 11 commands · 5 subagentes) ─┐

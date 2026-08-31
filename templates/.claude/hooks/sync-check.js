@@ -65,8 +65,16 @@ for (const filePath of writes) {
   } catch { /* skip */ }
 }
 
-// Limpiar tracker para la próxima sesión
-try { fs.unlinkSync(trackerPath); } catch { /* ignore */ }
+// ACO-001: acá se borraba session-writes.json «para la próxima sesión». Pero
+// `Stop` corre al final de cada RESPUESTA, no de la sesión —verificado contra la
+// documentación del runtime: «once per turn: UserPromptSubmit, Stop,
+// StopFailure»—, así que este hook dejaba sin datos a sus dos co-consumidores,
+// spec-diff-check y spec-reflection, desde el primer cierre.
+//
+// El artefacto es de ciclo `sesión` (lib/contracts.js) y ningún hook de `Stop`
+// borra estado de ciclo `sesión` (ADR-002 §1). La limpieza la hace session-start
+// con origen `startup`, que es el único momento en que la sesión empieza de
+// verdad.
 
 if (newerSourceFiles.length === 0) {
   process.exit(0);

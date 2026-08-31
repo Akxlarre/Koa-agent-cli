@@ -122,36 +122,47 @@ describe('CUÁNDO CALLA', () => {
   });
 });
 
-describe('ACO-001 — borra el tracker del que dependen otros dos hooks', () => {
-  // Stop corre por RESPUESTA, no por sesión (verificado contra la doc del
-  // runtime). El docblock del hook dice «limpiar para la próxima sesión».
-  // ADR-002 §1 muda esta limpieza fuera de Stop.
+describe('ACO-001 — CERRADO: sync-check ya no borra el tracker', () => {
+  // Stop corre por RESPUESTA, no por sesión. El hook borraba
+  // session-writes.json «para la próxima sesión» y dejaba sin datos a sus dos
+  // co-consumidores —spec-diff-check y spec-reflection— desde el primer cierre.
+  // La limpieza se mudó a session-start con origen `startup` (ADR-002 §1).
 
-  test('(bug) borra el tracker aunque NO haya nada que reportar', () => {
+  test('el tracker sobrevive a un cierre sin nada que reportar', () => {
     archivo('src/app/x.ts', 60_000);
     archivo('indices/COMPONENTS.md', 0);
     conTracker(['src/app/x.ts']);
 
     assert.equal(correr().exit, 0);
-    assert.equal(fs.existsSync(trackerPath()), false,
-      'spec-diff-check y spec-reflection se quedan sin datos');
+    assert.ok(fs.existsSync(trackerPath()),
+      'spec-diff-check lo necesita en el proximo git commit');
   });
 
-  test('(bug) lo borra también cuando SÍ avisa', () => {
+  test('y tambien a un cierre que SI avisa', () => {
     archivo('indices/COMPONENTS.md', 60_000);
     archivo('src/app/x.ts', 0);
     conTracker(['src/app/x.ts']);
 
     assert.equal(correr().exit, 2);
-    assert.equal(fs.existsSync(trackerPath()), false);
+    assert.ok(fs.existsSync(trackerPath()));
   });
 
-  test('(bug) el segundo cierre del mismo trabajo ya no ve nada', () => {
+  test('el segundo cierre del mismo trabajo sigue viendo el mismo estado', () => {
     archivo('indices/COMPONENTS.md', 60_000);
     archivo('src/app/x.ts', 0);
     conTracker(['src/app/x.ts']);
 
     assert.equal(correr().exit, 2, 'primer Stop: avisa');
-    assert.equal(correr().exit, 0, 'segundo Stop: el tracker ya no está');
+    assert.equal(correr().exit, 2, 'segundo Stop: sigue avisando, el trabajo sigue');
+    assert.deepEqual(JSON.parse(fs.readFileSync(trackerPath(), 'utf-8')), ['src/app/x.ts']);
+  });
+
+  test('el hook no llama a unlinkSync ni a rmSync', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '..', 'hooks', 'sync-check.js'), 'utf-8');
+    const codigo = src.replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    assert.ok(!/unlinkSync|rmSync/.test(codigo),
+      'ningun hook de Stop borra estado de ciclo sesion');
   });
 });

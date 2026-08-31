@@ -35,9 +35,32 @@ const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
 // —la misma clave que usan los otros tres hooks del discovery flag— y `source`,
 // que distingue un arranque real de un resume/compact/fork (INC-020).
 payload.read().then((PAYLOAD) => {
-const cwd = PAYLOAD.cwd;
-arrancar(PAYLOAD, cwd);
+  limpiarSiEsUnArranqueReal(PAYLOAD);
+  arrancar(PAYLOAD, PAYLOAD.cwd);
 });
+
+/**
+ * La limpieza de todo lo de ciclo `sesión` vive acá, y SOLO con origen
+ * `startup` (ADR-002 §1, INC-020).
+ *
+ * Dos cosas se borran:
+ *   - session-writes.json, que sync-check borraba en cada `Stop` creyendo que
+ *     era el fin de la sesión, dejando sin datos a spec-diff-check y a
+ *     spec-reflection desde el primer cierre (ACO-001).
+ *   - el estado de sesiones viejas, por antigüedad, para que .claude/temp/ no
+ *     crezca sin límite.
+ *
+ * En `resume`, `compact`, `fork` y `clear` no se borra nada: la sesión sigue
+ * viva y el trabajo en curso también.
+ */
+function limpiarSiEsUnArranqueReal(PAYLOAD) {
+  try {
+    if (PAYLOAD.source !== 'startup') return;
+    fs.rmSync(path.join(PAYLOAD.cwd, '.claude', 'temp', 'session-writes.json'),
+      { force: true });
+    session.cleanup(PAYLOAD, { source: 'startup' });
+  } catch { /* fail-open — arrancar nunca falla por no poder limpiar */ }
+}
 
 function arrancar(PAYLOAD, cwd) {
 

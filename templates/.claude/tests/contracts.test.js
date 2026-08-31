@@ -49,10 +49,14 @@ describe('EL REGISTRO EXISTE DE VERDAD — cada pieza declarada es un archivo', 
 describe('CADA PIEZA NOMBRA EL ARTEFACTO QUE DICE USAR', () => {
   // Si un hook deja de leer un contrato, esta prueba lo delata: el registro
   // quedaria declarando un consumidor que ya no consume.
+  // Los ids con <> nombran una FAMILIA de archivos (uno por categoria, uno por
+  // clave). La aguja es el prefijo comun, que es lo que el codigo escribe.
   const marca = {
     'discovery-flag': 'discovery',
     'task-spec': 'task-spec-',
     'specs/.active': '.active',
+    'ctx-<categoria>.json': 'ctx-',
+    'budget-<clave>.json': 'budget-',
   };
 
   for (const entry of C.all()) {
@@ -91,6 +95,87 @@ describe('LIFETIME Y SCOPE — los dos campos que los ADR agregaron', () => {
     for (const e of C.all()) {
       assert.ok(e.format && e.format.length > 10, `${e.id} sin formato declarado`);
     }
+  });
+});
+
+describe('NINGÚN ESTADO SIN DECLARAR (ACO-006, ACO-007)', () => {
+  // Los 12 ACO salieron de artefactos que una pieza escribía y otra leía sin que
+  // figuraran en ningún lado. Declararlos a mano no impide que aparezca el 13º;
+  // esto sí: se leen las claves que los hooks escriben de verdad y se exige que
+  // cada una tenga una fila. Una clave nueva sin declarar rompe este test.
+
+  const HOOKS = path.join(TEMPLATES, '.claude', 'hooks');
+
+  function archivosJs(dir) {
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === 'lib' ? [] : archivosJs(full);
+      return e.name.endsWith('.js') ? [full] : [];
+    });
+  }
+
+  /**
+   * `writeState(x, 'breaker.json'` y `appendState(x, 'discovery.flag'` → la clave.
+   *
+   * Resuelve UN nivel de indirección: `pre-write-guard` arma la clave en una
+   * variable (`const clave = \`ctx-${cat}.json\``) y pasa la variable. Sin esto,
+   * el único hook con estado por categoría se escapaba del chequeo y el test
+   * pasaba en verde sin mirarlo — que es exactamente el tipo de decoración que
+   * esta auditoría cataloga como `DEC`.
+   */
+  function clavesEscritas(src) {
+    const out = [];
+    const re = /(?:writeState|appendState)\s*\(\s*[A-Za-z_$][\w$]*\s*,\s*(?:(['"`])([^'"`]+)\1|([A-Za-z_$][\w$]*))/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      if (m[2]) { out.push(m[2]); continue; }
+      const asign = new RegExp(
+        `(?:const|let|var)\\s+${m[3]}\\s*=\\s*(['"\`])([^'"\`]+)\\1`).exec(src);
+      if (asign) out.push(asign[2]);
+      else throw new Error(
+        `no se pudo resolver la clave "${m[3]}": declarala como literal o extendé el detector`);
+    }
+    return out;
+  }
+
+  /** La familia a la que pertenece una clave: `ctx-features.json` → `ctx-`. */
+  const familias = C.all()
+    .map((e) => e.id)
+    .filter((id) => id.includes('<'))
+    .map((id) => id.slice(0, id.indexOf('<')));
+
+  const declarado = new Set(C.all().map((e) => e.id));
+  declarado.add('discovery.flag'); // se declara como `discovery-flag`
+
+  for (const archivo of archivosJs(HOOKS)) {
+    const claves = clavesEscritas(fs.readFileSync(archivo, 'utf-8'));
+    if (claves.length === 0) continue;
+    const rel = path.relative(TEMPLATES, archivo);
+
+    test(`${rel} solo escribe estado declarado`, () => {
+      for (const k of claves) {
+        const cubierta = declarado.has(k) || familias.some((f) => k.startsWith(f));
+        assert.ok(cubierta,
+          `${rel} escribe "${k}" y no hay fila en contracts.js — ese es el 13º ACO`);
+      }
+    });
+  }
+
+  test('el detector encuentra las claves que ya conocemos', () => {
+    // Si el regex dejara de matchear, el describe entero pasaría por vacío.
+    const claves = clavesEscritas(fs.readFileSync(path.join(HOOKS, 'pre-write-guard.js'), 'utf-8'));
+    assert.ok(claves.includes('breaker.json'), 'sin esto, un test verde no probaría nada');
+    assert.ok(claves.some((k) => k.startsWith('ctx-')),
+      'la clave por categoría va en una variable: si no se resuelve, no se está mirando');
+  });
+
+  test('y una clave nueva sin declarar lo rompe', () => {
+    // Provocación: el mecanismo tiene que fallar ante su propia violación.
+    const inventadas = clavesEscritas("session.writeState(input, 'inventada.json', {})");
+    assert.deepEqual(inventadas, ['inventada.json']);
+    const cubierta = declarado.has('inventada.json')
+      || familias.some((f) => 'inventada.json'.startsWith(f));
+    assert.equal(cubierta, false, 'si esto pasara, el describe entero sería decorativo');
   });
 });
 

@@ -115,6 +115,29 @@ function inject(payload, key, content, {
 }
 
 /**
+ * Avisar una sola vez.
+ *
+ * ADR-002 §2 pedia un `lib/notify.js` para esto. Al implementarlo resulto que
+ * la maquinaria es la misma que `inject`: «esto ya lo dije, no lo repito». Un
+ * modulo aparte seria la misma logica escrita dos veces — el error que la ficha
+ * H-03 nos hizo cometer con las rutas.
+ *
+ * Asi que es una funcion con NOMBRE PROPIO en el mismo modulo, no un modulo
+ * nuevo. La diferencia con `inject` es de intencion y de destino: `inject`
+ * enriquece el contexto por stdout; `avisar` le habla a la persona por stderr.
+ * Que compartan el mecanismo es correcto; que se llamen igual, no.
+ *
+ * El default es NO repetir. Un hook que quiera insistir tiene que pedirlo, que
+ * es la direccion correcta: hoy el default es insistir y hay que acordarse de
+ * evitarlo (CAR-002).
+ *
+ * @returns {string|null} el mensaje a emitir, o null si ya se dijo.
+ */
+function avisar(payload, key, mensaje, { repeatEvery = 0, scope = 'hilo' } = {}) {
+  return inject(payload, `aviso-${key}`, mensaje, { repeatEvery, scope, cutAt: null });
+}
+
+/**
  * Olvida lo dicho: la proxima vez se vuelve a emitir.
  *
  * La dedup significa «ya lo dije Y vos todavia lo tenes». Tras una compactacion
@@ -146,6 +169,7 @@ function huella(s) {
 
 module.exports = {
   inject,
+  avisar,
   olvidar,
   yaEmitido,
   isPlaceholder,

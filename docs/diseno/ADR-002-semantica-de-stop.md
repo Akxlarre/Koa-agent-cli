@@ -101,21 +101,41 @@ hook decide por su cuenta si «esto es una sesión nueva».
 diferencia entre no correr y correr para no hacer nada, y `session-start.js` corriendo en
 `compact` cuesta ~9.400 chars de inyección duplicada (`CAR-004`).
 
-### 2 · `lib/notify.js` — un aviso, una vez
+### 2 · Un aviso, una vez
 
 `spec-reflection` resolvió el anti-bucle para sí mismo. Se extrae al núcleo:
 
 ```js
-notify(payload, key, message, {
-  once = 'turno',   // 'turno' | 'sesión' | { everyTurns: N }
-}) → boolean        // false = ya se avisó, no repetir
+avisar(payload, key, mensaje, {
+  repeatEvery = 0,   // 0 = nunca repetir
+  scope = 'hilo',
+}) → string|null     // null = ya se avisó, no repetir
 ```
 
 **El default es no repetir.** Un hook que quiera insistir tiene que pedirlo explícitamente,
 que es la dirección correcta: hoy el default es insistir y hay que acordarse de evitarlo.
 
-Con esto `context-guardian` avisa una vez por sesión (`CAR-002`), y los cuatro hooks de
-`Stop` dejan de hablar todos a la vez.
+**Implementado — y no como decía este ADR.** La primera versión pedía un `lib/notify.js`
+aparte. Al escribirlo resultó que la maquinaria es la misma que `budget.inject()`: «esto ya
+lo dije, no lo repito». Un módulo aparte habría sido la misma lógica escrita dos veces — el
+error que la ficha `H-03` nos hizo cometer con las rutas. Quedó como `budget.avisar()`:
+**una función con nombre propio en el módulo que ya tenía el mecanismo**. La diferencia con
+`inject` es de intención y de destino —`inject` enriquece el contexto por stdout, `avisar`
+le habla a la persona por stderr—; que compartan el mecanismo es correcto, que se llamen
+igual, no.
+
+Con esto `context-guardian` avisa **una vez por hilo** (`CAR-002`), y los cuatro hooks de
+`Stop` dejan de hablar todos a la vez. Medido: 10 respuestas con `learnings.md` viejo pasan
+de 5.790 chars a 579.
+
+Dos detalles que solo aparecieron al implementarlo:
+
+- **La dedup es por contenido, no por clave.** El aviso de `context-guardian` incluye
+  *«no ha sido actualizado en N días»*: cuando N sube, el texto cambia y el aviso vuelve
+  solo. No hizo falta ninguna caducidad — la información nueva se abre paso sola.
+- **Ámbito de hilo, no de sesión** (`ADR-003` §1). Con ámbito de sesión, el primer subagente
+  que cerrara se llevaría el único aviso y el hilo principal —el que le habla a la persona—
+  no vería nada. Hay un test que lo fija.
 
 ### 3 · `hotfix-autoclose` deja de vivir en `Stop`
 
@@ -174,14 +194,14 @@ relevantes y van al backlog de diseño, no a este ADR:
 
 | Hallazgo | Cómo |
 |---|---|
-| `ACO-001` (S2) | La limpieza de ciclo `sesión` sale de `Stop` — a `SessionEnd`, y a `SessionStart` **solo con origen `startup`** |
-| `CAR-002` (S2) | `notify()` con default «una vez» |
-| `INC-007` (S2) | `/hotfix-close` explícito + `SessionEnd` como red |
-| `INC-020` (**S1**) | Matcher explícito en `settings.json` y `cleanup({ source })`; ninguna limpieza destructiva en `resume`/`compact`/`fork` |
-| `CAR-004` (S2) | `session-start` deja de correr en `compact`; la mitad de la duplicación desaparece con el matcher, el resto con `budget.js` |
-| `HUE-004` (S2) | Al revisar `spec-reflection`, distinguir «no marcaste nada» de «no hay nada abierto» — hoy calla en los dos casos |
+| `ACO-001` (S2) | ✅ La limpieza de ciclo `sesión` sale de `Stop` — a `SessionEnd`, y a `SessionStart` **solo con origen `startup`** |
+| `CAR-002` (S2) | ✅ `budget.avisar()` con default «una vez» — 5.790 → 579 chars en 10 respuestas |
+| `INC-007` (S2) | ⏳ `/hotfix-close` explícito + `SessionEnd` como red |
+| `INC-020` (**S1**) | ✅ Matcher explícito en `settings.json` y `cleanup({ source })`; ninguna limpieza destructiva en `resume`/`compact`/`fork` |
+| `CAR-004` (S2) | ✅ `session-start` deja de correr en `compact`; la mitad de la duplicación desaparece con el matcher, el resto con `budget.js` |
+| `HUE-004` (S2) | ⏳ Al revisar `spec-reflection`, distinguir «no marcaste nada» de «no hay nada abierto» — hoy calla en los dos casos |
 
-Y previene la cuarta instancia: con `lifetime` en el registro y `notify()` en el núcleo, un
+Y previene la cuarta instancia: con `lifetime` en el registro y `avisar()` en el núcleo, un
 hook nuevo tiene que **elegir** su ciclo de vida en vez de suponerlo.
 
 ---

@@ -64,6 +64,46 @@ const CONTRACTS = {
     scope: 'hilo',
   },
 
+  'breaker.json': {
+    path: '.claude/temp/session/<sid>/thread-<tid>/breaker.json',
+    format: 'objeto { "<archivo>::<violacion>": intentos }; al 3er intento corta y escala',
+    producers: ['.claude/hooks/pre-write-guard.js'],
+    consumers: ['.claude/hooks/pre-write-guard.js'],
+    lifetime: 'sesion',
+    scope: 'hilo',
+    nota: 'ACO-007: no estaba declarado. Vivia en TMPDIR bajo la clave global "default" '
+        + '(HUE-002), asi que un proyecto cortaba el breaker de otro. Es de HILO (HUE-032): '
+        + 'los tres intentos son de quien escribe, no de la sesion entera.',
+  },
+
+  'ctx-<categoria>.json': {
+    path: '.claude/temp/session/<sid>/thread-<tid>/ctx-<categoria>.json',
+    format: 'marca { at: ISO } por categoria de archivo; su presencia significa "ya inyectado"',
+    producers: ['.claude/hooks/pre-write-guard.js'],
+    consumers: ['.claude/hooks/pre-write-guard.js'],
+    lifetime: 'sesion',
+    scope: 'hilo',
+    nota: 'ACO-007: son 11 categorias (features, shared, layout, repositories, facades, '
+        + 'services, utils, directives, migrations, html, scss). Ambito de HILO: describe '
+        + 'LO QUE YA SE DIJO, y lo que oyo un subagente no lo oyo el hilo principal.',
+  },
+
+  'budget-<clave>.json': {
+    path: '.claude/temp/session/<sid>/thread-<tid>/budget-<clave>.json',
+    format: '{ n, hash } — hash del ultimo texto emitido; la dedup es por CONTENIDO',
+    producers: ['.claude/hooks/lib/budget.js'],
+    consumers: ['.claude/hooks/lib/budget.js'],
+    lifetime: 'sesion',
+    scope: 'hilo',
+    nota: 'Lo escribe budget.js por cuenta de quien lo llama: prompt-context —de donde '
+        + 'salio el patron, y donde vivia como koa-prompt-ctx-*.json (ACO-006)—, '
+        + 'plan-injector (CAR-001), compact-recovery (CAR-004) y context-guardian '
+        + '(CAR-002). Que la dedup sea por '
+        + 'contenido es lo que hace que un aviso vuelva solo cuando cambia lo que dice, '
+        + 'sin ninguna caducidad. compact-recovery lo borra con olvidar(): tras compactar, '
+        + '"ya lo dije" sigue siendo cierto pero "y vos lo tenes" ya no.',
+  },
+
   'task-spec': {
     path: '.claude/temp/task-spec-YYYYMMDD-HHMMSS.md',
     format: 'encabezados ## exactos + casillas "- [ ]" / "- [x]"; el nombre ordena por fecha',

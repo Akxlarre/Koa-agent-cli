@@ -13,7 +13,6 @@ const path = require('path');
 const HOOK = path.resolve(__dirname, '..', 'hooks', 'prompt-context.js');
 
 const created = [];
-const states = [];
 let counter = 0;
 
 function makeProject({ brief, spec } = {}) {
@@ -29,17 +28,20 @@ function makeProject({ brief, spec } = {}) {
 }
 
 function newSession() {
-  const id = `pc-test-${Date.now()}-${counter++}`;
-  states.push(path.join(os.tmpdir(), `koa-prompt-ctx-${id}.json`));
-  return id;
+  return `pc-test-${Date.now()}-${counter++}`;
 }
 
+/**
+ * El id de sesión va en el PAYLOAD, que es el único canal que existe.
+ * Antes iba por `CLAUDE_SESSION_ID`, una variable inventada: el hook la leía
+ * vacía, caía a `'default'` y todo el estado terminaba en un archivo único de
+ * TMPDIR compartido por la máquina entera (HUE-002).
+ */
 function runHook(root, sessionId, prompt = 'haz algo') {
   const r = spawnSync('node', [HOOK], {
     cwd: root,
-    input: JSON.stringify({ prompt }),
+    input: JSON.stringify({ prompt, session_id: sessionId, cwd: root }),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: sessionId },
   });
   let ctx = '';
   try { ctx = JSON.parse(r.stdout || '{}').hookSpecificOutput?.additionalContext || ''; } catch { /* ignore */ }
@@ -49,9 +51,6 @@ function runHook(root, sessionId, prompt = 'haz algo') {
 afterEach(() => {
   while (created.length) {
     try { fs.rmSync(created.pop(), { recursive: true, force: true }); } catch { /* ignore */ }
-  }
-  while (states.length) {
-    try { fs.unlinkSync(states.pop()); } catch { /* ignore */ }
   }
 });
 
@@ -129,6 +128,51 @@ describe('PROMPT CONTEXT — dedup entre prompts', () => {
     assert.equal(runHook(root, a).context, '');
     const b = newSession();
     assert.ok(runHook(root, b).context.includes('FUERA DE ALCANCE'), 'otra sesion arranca limpia');
+  });
+});
+
+describe('HUE-002 — CERRADO: el ultimo CLAUDE_SESSION_ID del harness', () => {
+  test('el hook ya no nombra la variable inexistente', () => {
+    const src = fs.readFileSync(HOOK, 'utf-8');
+    const codigo = src.replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    assert.ok(!/CLAUDE_SESSION_ID/.test(codigo),
+      'leerla no falla: devuelve vacio y el estado se vuelve global');
+  });
+
+  test('el estado vive dentro del proyecto, no en TMPDIR', () => {
+    const root = makeProject({ brief: BRIEF_WITH_SCOPE });
+    runHook(root, 's1');
+    const dir = path.join(root, '.claude', 'temp', 'session', 's1', 'thread-main');
+    assert.ok(fs.readdirSync(dir).some((f) => f.startsWith('budget-prompt-scope')),
+      `nada en ${dir}`);
+  });
+
+  test('dos proyectos abiertos a la vez no se callan el recordatorio', () => {
+    // Este era el dano medido: el estado era un unico archivo de TMPDIR bajo la
+    // clave 'default', asi que el primer proyecto que inyectaba dejaba mudo al otro.
+    const a = makeProject({ brief: BRIEF_WITH_SCOPE });
+    const b = makeProject({ brief: BRIEF_WITH_SCOPE });
+    assert.ok(runHook(a, 'misma-sesion').context.includes('FUERA DE ALCANCE'));
+    assert.ok(runHook(b, 'misma-sesion').context.includes('FUERA DE ALCANCE'),
+      'el otro proyecto tiene su propio brief y su propio estado');
+  });
+
+  test('sin session_id en el payload, el id sale del proyecto — nunca "default"', () => {
+    const root = makeProject({ brief: BRIEF_WITH_SCOPE });
+    const sinId = () => {
+      const r = spawnSync('node', [HOOK], {
+        cwd: root, input: JSON.stringify({ prompt: 'x', cwd: root }), encoding: 'utf8',
+      });
+      return r.stdout || '';
+    };
+    assert.ok(sinId().includes('FUERA DE ALCANCE'));
+    assert.equal(sinId(), '', 'el fallback tambien tiene que ser estable');
+
+    const dirs = fs.readdirSync(path.join(root, '.claude', 'temp', 'session'));
+    assert.deepEqual(dirs.filter((d) => d === 'default'), [],
+      'la clave global era justamente el bug');
+    assert.ok(dirs.every((d) => d.startsWith('proj-')), dirs.join(','));
   });
 });
 

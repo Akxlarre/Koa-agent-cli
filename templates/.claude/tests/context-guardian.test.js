@@ -10,8 +10,13 @@
  * El contraste esta en la casa: spec-reflection, otro hook de Stop, tiene
  * anti-bucle explicito y su docblock explica por que. Este no lo aplico.
  *
- * TESTS DE CARACTERIZACION. ADR-002 §2 le pone lib/notify.js con default
- * «una vez»; cuando eso pase, el describe CAR-002 falla a proposito.
+ * CERRADO. El aviso pasa por budget.avisar(), cuyo default es no repetir. La
+ * dedup es por CONTENIDO y en ambito de hilo: el dia que el contador de dias
+ * suba, el texto cambia y el aviso vuelve solo; y un subagente que lo consuma no
+ * deja mudo al hilo principal.
+ *
+ * ADR-002 §2 pedia un lib/notify.js aparte. Terminó siendo budget.avisar() —
+ * misma maquinaria que inject, nombre propio y destino distinto (stderr).
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -25,8 +30,10 @@ const HOOK = path.resolve(__dirname, '..', 'hooks', 'context-guardian.js');
 const DIA = 86400000;
 let proyecto;
 
-function correr() {
-  const r = spawnSync('node', [HOOK], { input: '{}', encoding: 'utf8', cwd: proyecto });
+function correr(extra = {}) {
+  const r = spawnSync('node', [HOOK], {
+    input: JSON.stringify(extra), encoding: 'utf8', cwd: proyecto,
+  });
   return { exit: r.status, stderr: r.stderr || '' };
 }
 
@@ -83,39 +90,61 @@ describe('CUANDO CALLA', () => {
   });
 });
 
-describe('CAR-002 — no tiene anti-bucle', () => {
-  test('(bug) avisa igual en tres cierres seguidos', () => {
+describe('CAR-002 — CERRADO: avisa una vez, no en cada respuesta', () => {
+  test('tres cierres seguidos: avisa el primero y calla los dos siguientes', () => {
     conLearnings(30);
     const salidas = [correr(), correr(), correr()];
-    assert.deepEqual(salidas.map((s) => s.exit), [2, 2, 2],
-      'Stop corre por respuesta: esto se repite en cada una');
+    assert.deepEqual(salidas.map((s) => s.exit), [2, 0, 0],
+      'Stop corre por respuesta; el aviso es uno por hilo');
   });
 
-  test('(bug) el mensaje es identico — nada registra que ya se dijo', () => {
+  test('el primero si trae el aviso entero', () => {
     conLearnings(30);
-    assert.equal(correr().stderr, correr().stderr);
+    const r = correr();
+    assert.match(r.stderr, /LEARNINGS/);
+    assert.match(r.stderr, /30 dias/);
+    assert.equal(correr().stderr, '', 'el segundo no dice nada, ni el marco');
   });
 
-  test('(bug) haber avisado no cambia la condicion', () => {
+  test('haber avisado no cambia la condicion — por eso hace falta el estado', () => {
     conLearnings(30);
     const antes = fs.statSync(path.join(proyecto, 'context', 'learnings.md')).mtimeMs;
     correr();
     const despues = fs.statSync(path.join(proyecto, 'context', 'learnings.md')).mtimeMs;
-    assert.equal(antes, despues, 'el mtime es la condicion, y el hook no lo toca');
+    assert.equal(antes, despues,
+      'el mtime sigue igual: sin registrar lo dicho, el aviso volveria para siempre');
   });
 
-  test('deja de avisar solo si alguien actualiza el archivo', () => {
+  test('si el mensaje CAMBIA vuelve a decirse — la dedup es por contenido', () => {
+    conLearnings(30);
+    assert.equal(correr().exit, 2);
+    assert.equal(correr().exit, 0);
+
+    conLearnings(60);
+    assert.equal(correr().exit, 2, 'otro numero de dias es otra informacion');
+  });
+
+  test('deja de avisar tambien si alguien actualiza el archivo', () => {
     conLearnings(30);
     assert.equal(correr().exit, 2);
     conLearnings(0);
     assert.equal(correr().exit, 0);
   });
 
-  test('no escribe ningun estado de anti-bucle', () => {
+  test('registra lo dicho en el ambito de HILO, no en el de sesion', () => {
     conLearnings(30);
-    correr();
-    const temp = path.join(proyecto, '.claude', 'temp');
-    assert.equal(fs.existsSync(temp), false,
-      'spec-reflection si guarda una marca; este hook no');
+    correr({ session_id: 's1' });
+    const marca = path.join(proyecto, '.claude', 'temp', 'session', 's1',
+      'thread-main', 'budget-aviso-learnings-viejo.json');
+    assert.ok(fs.existsSync(marca), 'la marca vive junto al hilo que la consumio');
+  });
+
+  test('un subagente no se lleva el unico aviso del hilo principal', () => {
+    conLearnings(30);
+    assert.equal(correr({ session_id: 's1', agent_id: 'scout' }).exit, 2,
+      'el subagente lo ve en su contexto');
+    assert.equal(correr({ session_id: 's1' }).exit, 2,
+      'y el hilo principal —el que le habla a la persona— tambien');
+    assert.equal(correr({ session_id: 's1' }).exit, 0);
   });
 });

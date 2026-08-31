@@ -7,12 +7,19 @@
  * round-trip: el hook lo escribe como tabla markdown y lo vuelve a parsear en la
  * proxima falla.
  *
- * HUE-016 queda demostrado: el separador de la tabla es `|`, el mensaje de error
- * se escribe crudo, y un error que contiene `|` desplaza las columnas en el
- * siguiente parseo. El dano es acumulativo — cada falla posterior reescribe el
- * archivo a partir de lo mal parseado.
+ * HUE-016 — CERRADO. El separador de la tabla es `|` y el mensaje de error se
+ * escribia crudo: un error con `|` desplazaba las columnas en el siguiente
+ * parseo. No era acumulativo —se corrompia una vez y llegaba a un punto fijo—
+ * pero lo que se rompia era la FIRMA, que es la clave del dedup, y eso si era
+ * permanente: cinco fallas identicas producian cinco filas.
  *
- * TESTS DE CARACTERIZACION: describen el comportamiento ACTUAL.
+ * DUP-002 — CERRADO. Este hook reescribia el archivo entero desde su modelo de
+ * tabla, y `lint-arch-wrapper` escribe secciones en prosa en el MISMO archivo.
+ * Verificado antes del arreglo: una seccion del wrapper desaparecia con la
+ * primera falla de cualquier otra tool.
+ *
+ * El formato vive ahora en lib/lessons.js, con la tabla entre marcadores
+ * AUTO-GENERATED.
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
@@ -113,13 +120,13 @@ describe('DEDUP Y ROTACION', () => {
   });
 });
 
-describe('HUE-016 — un "|" en el error corrompe la tabla', () => {
-  test('(bug) el error se escribe crudo, con el separador adentro', () => {
+describe('HUE-016 — CERRADO: un "|" en el error ya no corrompe la tabla', () => {
+  test('el pipe entra escapado', () => {
     fallar('Bash', 'grep foo | wc -l fallo');
-    assert.match(leer(), /grep foo \| wc -l/, 'el pipe entra sin escapar');
+    assert.match(leer(), /grep foo \\\| wc -l/, 'una celda tiene que ser una celda');
   });
 
-  test('(bug) en el siguiente parseo las columnas se desplazan', () => {
+  test('la fila sobrevive intacta al round-trip', () => {
     fallar('Bash', 'grep foo | wc -l fallo');
     const antes = filas()[0];
 
@@ -127,42 +134,42 @@ describe('HUE-016 — un "|" en el error corrompe la tabla', () => {
     fallar('Edit', 'otra cosa');
     const despues = filas().find((f) => f.includes('grep foo'));
 
-    assert.notEqual(antes, despues,
-      'la fila sobrevivio al round-trip cambiada: el pipe la partio');
+    assert.equal(antes, despues, 'el re-parseo la partia por el primer pipe');
   });
 
-  test('la corrupcion ocurre UNA vez y se estabiliza — no es progresiva', () => {
-    const fila = () => leer().split('\n').find((l) => l.includes('| `Bash` |'));
-
+  test('la FIRMA vuelve entera, que es lo que rompia el dedup', () => {
+    // Se escribia `Bash:a | b | c fallo` y volvia `Bash:a`. Desde ahi la firma
+    // calculada no coincidia nunca mas con la guardada.
     fallar('Bash', 'a | b | c fallo');
-    const ronda0 = fila();
-    fallar('Edit', 'ruido 1');
-    const ronda1 = fila();
-    fallar('Edit', 'ruido 2');
-    const ronda2 = fila();
-
-    assert.notEqual(ronda0, ronda1, 'el primer re-parseo la parte');
-    assert.equal(ronda1, ronda2, 'y de ahi queda igual: es un punto fijo');
-  });
-
-  test('(bug) lo que se pierde es la FIRMA, y con ella el dedup', () => {
-    // La firma se escribe entera —`Bash:a | b | c fallo`— y al re-parsear queda
-    // truncada en el primer pipe: `Bash:a`. Desde ahi la firma calculada nunca
-    // vuelve a coincidir con la guardada.
-    fallar('Bash', 'a | b | c fallo');
-    assert.match(leer(), /`Bash:a \| b \| c fallo`/, 'la firma entra con los pipes');
-
     fallar('Edit', 'ruido');
-    assert.match(leer(), /`Bash:a`/, 'y sale truncada');
+    assert.match(leer(), /`Bash:a \\\| b \\\| c fallo`/);
+    assert.ok(!/`Bash:a`/.test(leer()), 'no queda truncada en el primer pipe');
   });
 
-  test('(bug) la consecuencia: cinco veces el mismo error, cinco filas', () => {
+  test('cinco veces el mismo error con pipes: UNA fila con contador 5', () => {
     for (let i = 0; i < 5; i++) {
       fallar('Bash', 'grep a | wc -l fallo');
       fallar('Edit', 'ruido');          // fuerza el re-parseo
     }
-    const conPipe = filas().filter((f) => f.includes('grep a')).length;
-    assert.equal(conPipe, 5, 'el dedup dejo de funcionar para esa entrada');
+    const conPipe = filas().filter((f) => f.includes('grep a'));
+    assert.equal(conPipe.length, 1, 'antes eran cinco: el dedup dejaba de funcionar');
+    assert.match(conPipe[0], /\| 5 \|/);
+  });
+
+  test('un salto de linea en el error tampoco parte la fila', () => {
+    fallar('Bash', 'linea uno\nlinea dos');
+    assert.equal(filas().length, 1);
+  });
+
+  test('y una leccion buena ya no la desaloja la rotacion', () => {
+    // Con MAX_ENTRIES = 20, un error recurrente con pipe generaba un duplicado
+    // por vez y expulsaba por rotacion las entradas utiles.
+    fallar('Edit', 'la leccion que importa');
+    for (let i = 0; i < 22; i++) {
+      fallar('Bash', 'grep a | wc -l fallo');
+      fallar('Write', 'ruido');
+    }
+    assert.match(leer(), /la leccion que importa/);
   });
 
   test('el mismo error SIN pipe deduplica bien: una fila con contador 5', () => {
@@ -219,5 +226,80 @@ describe('FAIL-OPEN — nunca bloquea', () => {
       encoding: 'utf8', cwd: proyecto,
     });
     assert.equal(r.status, 0);
+  });
+});
+
+describe('DUP-002 — CERRADO: los dos productores no se pisan', () => {
+  // `lint-arch-wrapper` (ESM, en scripts/) agrega secciones en prosa al MISMO
+  // archivo que este hook (CommonJS, en hooks/) reescribia entero desde su
+  // modelo de tabla. No era que «los formatos son distintos»: uno borraba al otro.
+  const SECCION_DEL_WRAPPER = [
+    '## 2026-01-01T00:00:00.000Z — Recuperación tras fallo ARCH',
+    '',
+    '### Contexto',
+    'El linter falló y luego fue corregido:',
+    '',
+    '```',
+    '[ARCH-08] color hardcodeado en kpi-card',
+    '```',
+  ].join('\n');
+
+  function conSeccionDelWrapper() {
+    fs.mkdirSync(path.dirname(LESSONS()), { recursive: true });
+    fs.writeFileSync(LESSONS(), `# Lessons Learned (lint:arch)\n\n${SECCION_DEL_WRAPPER}\n`);
+  }
+
+  test('la seccion del wrapper sobrevive a una falla de otra tool', () => {
+    conSeccionDelWrapper();
+    fallar('Bash', 'command not found: ng');
+
+    assert.match(leer(), /Recuperación tras fallo ARCH/);
+    assert.match(leer(), /color hardcodeado en kpi-card/);
+  });
+
+  test('y sobrevive a veinte', () => {
+    conSeccionDelWrapper();
+    for (let i = 0; i < 20; i++) fallar('Bash', `error numero ${i}`);
+    assert.match(leer(), /color hardcodeado en kpi-card/);
+  });
+
+  test('la tabla queda entre marcadores AUTO-GENERATED', () => {
+    // El mismo patron que indices-sync y assignments-sync: se reescribe lo de
+    // adentro y se respeta lo de afuera.
+    fallar('Bash', 'x');
+    const md = leer();
+    assert.match(md, /<!-- AUTO-GENERATED:BEGIN -->/);
+    assert.match(md, /<!-- AUTO-GENERATED:END -->/);
+    const region = md.slice(md.indexOf('BEGIN -->'), md.indexOf('<!-- AUTO-GENERATED:END'));
+    assert.match(region, /\| Date \| Tool \|/, 'la tabla va adentro');
+  });
+
+  test('lo que escriba una persona a mano tambien se preserva', () => {
+    fallar('Bash', 'x');
+    fs.appendFileSync(LESSONS(), '\n## Nota a mano\n\nEsto lo escribio alguien.\n');
+    fallar('Edit', 'otra falla');
+
+    assert.match(leer(), /Esto lo escribio alguien/);
+  });
+
+  test('migra un archivo viejo sin marcadores sin perder sus entradas', () => {
+    // Los proyectos generados antes de este cambio tienen la tabla suelta.
+    fs.mkdirSync(path.dirname(LESSONS()), { recursive: true });
+    fs.writeFileSync(LESSONS(), [
+      '# Lessons Learned (Auto-generated)',
+      '',
+      '| Date | Tool | Error | Count | Signature | Context |',
+      '|------|------|-------|-------|-----------|---------|',
+      '| 2026-01-01 | `Bash` | error viejo | 3 | `Bash:error viejo` |  |',
+      '',
+      '## Seccion previa del wrapper',
+      'texto que estaba ahi',
+    ].join('\n'));
+
+    fallar('Edit', 'falla nueva');
+    const md = leer();
+    assert.match(md, /error viejo/, 'la entrada vieja se conserva');
+    assert.match(md, /\| 3 \|/, 'con su contador');
+    assert.match(md, /texto que estaba ahi/, 'y la seccion previa tambien');
   });
 });

@@ -73,8 +73,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | resuelto · `breaker.json` y `ctx-<categoria>.json` declarados; un test lee las claves que los hooks escriben de verdad |
 | `SEC-001` | **S1** | `H-11` | `post-edit.js` interpola la ruta del payload en una cadena de shell: una ruta con comillas ejecuta comandos arbitrarios | resuelto · `execFileSync` con argv — 6 cargas de ataque en el test |
 | `DEC-003` | **S1** | `H-11` | `post-edit.js` usa `import` bajo un `package.json` sin `type:module`: no carga en Node 20/21, el mínimo que el CLI exige | descartado · Node ejecuta el archivo igual (detección por sintaxis); verificado |
-| `HUE-016` | S2 | `H-12` | **(remedido)** Un error con `\|` corrompe la fila UNA vez y se estabiliza; lo que se rompe para siempre es el dedup de esa entrada | abierto |
-| `DUP-002` | S2 | `H-12` | `failure-tracker` y `lint-arch-wrapper` escriben ambos en `LESSONS_LEARNED.md` con formatos distintos | abierto |
+| `HUE-016` | S2 | `H-12` | **(remedido)** Un error con `\|` corrompe la fila UNA vez y se estabiliza; lo que se rompe para siempre es el dedup de esa entrada | resuelto · `lib/lessons.js` escapa el `|` y lo desescapa al leer; 5 fallas con pipe → 1 fila con contador 5 |
+| `DUP-002` | S2 | `H-12` | `failure-tracker` y `lint-arch-wrapper` escriben ambos en `LESSONS_LEARNED.md` con formatos distintos | resuelto · la tabla vive entre marcadores `AUTO-GENERATED` y lo de afuera se preserva; verificado que una sección del wrapper sobrevive a 20 fallas |
 | `CAR-002` | S2 | `H-17` | `context-guardian` avisa en cada respuesta indefinidamente: no tiene anti-bucle | resuelto · `budget.avisar()`, cuyo default es no repetir |
 | `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | abierto |
 | `INC-007` | S2 | `H-14` | `hotfix-autoclose` dice cerrar «al terminar la sesión»; `Stop` corre al final de cada respuesta | resuelto · `/hotfix-close` explícito + el hook como red en `SessionEnd` |

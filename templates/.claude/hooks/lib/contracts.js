@@ -132,13 +132,15 @@ const CONTRACTS = {
 
   'LESSONS_LEARNED.md': {
     path: '.claude/temp/LESSONS_LEARNED.md',
-    format: 'tabla markdown; el separador "|" DEBE ir escapado en el texto libre',
+    format: 'tabla markdown entre marcadores AUTO-GENERATED; fuera de ellos, prosa libre. '
+        + 'El separador "|" va escapado — lo hace lib/lessons.js, que es quien conoce el formato',
     producers: ['.claude/hooks/failure-tracker.js', 'scripts/lint-arch-wrapper.js'],
-    consumers: ['.claude/hooks/pre-write-guard.js'],
+    consumers: ['.claude/hooks/pre-write-guard.js', '.claude/hooks/lib/lessons.js'],
     lifetime: 'permanente',
     scope: 'proyecto',
-    nota: 'DUP-002: dos productores con formatos distintos. HUE-016: un "|" sin escapar '
-        + 'corrompe el archivo en el siguiente parseo, y el dano es acumulativo.',
+    nota: 'DUP-002 y HUE-016, cerrados. Eran: dos productores donde uno reescribia el '
+        + 'archivo entero y borraba las secciones del otro; y un "|" sin escapar que '
+        + 'partia la fila y devolvia la firma truncada, rompiendo el dedup para siempre.',
   },
 
   'indices-cache.json': {

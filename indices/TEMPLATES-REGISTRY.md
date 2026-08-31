@@ -97,6 +97,7 @@
 | `failure-tracker.js` | PostToolUseFailure | Registra errores en LESSONS_LEARNED.md con dedup y rotación (max 20) | — |
 | `compact-recovery.js` | PostCompact | Re-inyecta índices (selectivo + cortado en `DETAIL:BEGIN`) y **solo las casillas pendientes** del spec | discovery flag, task-spec |
 | `subagent-cleanup.js` | SubagentStop | Cierra el ámbito de hilo del subagente que termina; el estado de sesión sobrevive | `thread-<agent_id>/` |
+| `lib/lessons.js` | — | El formato de `LESSONS_LEARNED.md`: tabla entre marcadores `AUTO-GENERATED`, `\|` escapado. Sus dos productores viven en árboles distintos y no pueden importarse entre sí | `.claude/temp/LESSONS_LEARNED.md` |
 | `lib/guard-rules.js` | — | Registro de las 20 reglas que emite `pre-write-guard`: qué detecta cada una, su doc y el fixture que la provoca | `docs/TECH-STACK-RULES.md` |
 | `sdd/hotfix-autoclose.js` | SessionEnd | Red de seguridad del cierre de `hotfix-*`; el camino normal es `/hotfix-close` | `specs/.active` |
 | `spec-reflection.js` | Stop | Verifica el "Criterio de done" del task-spec activo con evidencia del filesystem. Anti-bucle por estado del spec | task-spec, session-writes.json |

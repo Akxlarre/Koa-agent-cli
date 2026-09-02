@@ -342,3 +342,48 @@ describe('API', () => {
     assert.ok(ids.includes('session-writes.json'));
   });
 });
+
+describe('HUE-008 — la partición 13 auto-generados / 2 manuales', () => {
+  // La partición estaba escrita en tres lugares —`TEMPLATES-REGISTRY.md`, el
+  // docblock de `indices-sync.js`, la prosa de las skills— y en ninguno se podía
+  // verificar. Un índice nuevo sin marcadores es un archivo que `indices:sync`
+  // ignora en silencio: no falla, simplemente no se actualiza nunca.
+  //
+  // El criterio no es una lista de nombres, que se desactualiza (HUE-003): es
+  // «¿tiene los marcadores AUTO-GENERATED?». Se deriva del disco, y los dos
+  // manuales se nombran porque SON la excepción y merecen justificarse.
+  const MANUALES = ['ANTI-PATTERNS', 'LAYOUTS'];
+
+  const dir = path.join(TEMPLATES, 'indices');
+  const conMarcadores = [];
+  const sinMarcadores = [];
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.md'))) {
+    const cuerpo = fs.readFileSync(path.join(dir, f), 'utf-8');
+    (cuerpo.includes('<!-- AUTO-GENERATED:BEGIN -->') ? conMarcadores : sinMarcadores)
+      .push(f.replace(/\.md$/, ''));
+  }
+
+  test('son 13 auto-generados', () => {
+    assert.equal(conMarcadores.length, 13, conMarcadores.join(' '));
+  });
+
+  test('y exactamente estos 2 son manuales', () => {
+    // ANTI-PATTERNS lo escribe una persona cuando descubre un anti-patrón —el
+    // AST no puede deducirlo— y LAYOUTS describe intención de composición, no
+    // archivos. Agregar un tercero es una decisión, no un descuido.
+    assert.deepEqual(sinMarcadores.sort(), [...MANUALES].sort());
+  });
+
+  test('los 13 + los 2 son los 15 del registro', () => {
+    assert.deepEqual(
+      [...conMarcadores, ...sinMarcadores].sort(), [...C.INDICES].sort());
+  });
+
+  test('todo auto-generado cierra su región', () => {
+    // Un BEGIN sin END deja al generador sin dónde terminar de escribir.
+    for (const n of conMarcadores) {
+      const cuerpo = fs.readFileSync(path.join(dir, `${n}.md`), 'utf-8');
+      assert.match(cuerpo, /<!-- AUTO-GENERATED:END -->/, `${n}.md abre y no cierra`);
+    }
+  });
+});

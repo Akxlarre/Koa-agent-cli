@@ -79,7 +79,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | resuelto · una sesión de puro esquema dejaba ciegos a los **tres** consumidores a la vez; `DATABASE.md` es un índice y una migración es lo que lo desactualiza |
 | `INC-007` | S2 | `H-14` | `hotfix-autoclose` dice cerrar «al terminar la sesión»; `Stop` corre al final de cada respuesta | resuelto · `/hotfix-close` explícito + el hook como red en `SessionEnd` |
 | `HUE-017` | S3 | `H-13` | `compact-recovery` no tiene tope de tamaño: los 4 archivos de `context/` se inyectan enteros | abierto |
-| `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | abierto |
+| `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | resuelto · medido **6 de 6** componentes inventados pasando como registrados (`x` incluido); `lib/indices.js` pregunta si hay una **fila** que los declare → 1 de 6, y esa una es real |
 | `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
 | `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | abierto |
 | `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → 18/28 → **28/28**. El baseline quedó vacío: no hay ninguna regla que no se haya puesto delante de su propia violación |
@@ -127,12 +127,12 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-004` | S2 | `C-03` | `spec-reflection` calla cuando no hay ninguna casilla marcada — el caso exacto que debería atrapar | resuelto · lo que separa las dos situaciones son las escrituras de la sesión, no las casillas |
 | `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | resuelto · `task-spec.test.js`: las tres convenciones que atan al productor con sus cinco consumidores, con los consumidores corriendo de verdad |
 | `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | resuelto · cuatro situaciones, cuatro mensajes; la estructura gana sobre la edad, y sin `--require-file` la edad sigue sin opinar |
-| `INC-003` | S2 | `C-05` | `pre-write-guard.js` no figura como consumidor del blueprint en ninguna documentación | abierto |
+| `INC-003` | S2 | `C-05` | `pre-write-guard.js` no figura como consumidor del blueprint en ninguna documentación | resuelto · figura en `contracts.js` y en `docs/CONTRATOS.md`, que **viaja al proyecto generado** — con un test que falla si deja de consumirlo |
 | `DUP-001` | S3 | `C-04` | Dos fail modes para el mismo contrato: `indices-sync` avisa y sigue, `assignments-sync` lanza | resuelto · «nada que hacer» ≠ «algo roto» en los dos scripts, y el fallo de `sync` dejó de ser un stack trace |
 | `ACO-002` | S3 | `C-03` | `spec-reflection-seen.json` no está declarado como artefacto | resuelto · declarado en `contracts.js` (lifetime `turno`, scope `hilo`) y publicado en `docs/CONTRATOS.md` |
 | `ACO-003` | S3 | `C-04` | `indices-cache.json` decide qué se re-parsea y no está declarado como dependencia | resuelto · declarado — y al verificarlo apareció que su **ruta estaba mal**: el registro decía `scripts/` y se escribe en `.claude/temp/`. Ahora hay un test que contrasta cada `path` contra su productor |
 | `HUE-007` | S3 | `C-04` | Nada impide editar dentro de los marcadores y perder el trabajo en el siguiente sync | resuelto · `GATE-D1`: la superficie se detecta por los marcadores **en disco**, no por una lista de rutas; el mensaje nombra el generador que corresponde |
-| `HUE-008` | S3 | `C-04` | Ningún test fija la partición 13 auto-generados / 2 manuales | abierto |
+| `HUE-008` | S3 | `C-04` | Ningún test fija la partición 13 auto-generados / 2 manuales | resuelto · derivada del disco (¿tiene marcadores?), no de una lista de nombres; los 2 manuales se nombran porque **son** la excepción |
 | `INC-020` | **S1** | `diseño` | `SessionStart` no corre una vez por sesión: corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin matcher | resuelto · matcher `startup\|resume\|clear\|fork` + `cleanup()` por antigüedad |
 | `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | resuelto · 26.006 → 8.783 chars por compactación |
 | `HUE-032` | **S1** | `diseño` | Los 18 hooks corren dentro de los 5 subagentes y ninguno lee `agent_id`: todo el estado de sesión es un pozo compartido entre el hilo principal y sus subagentes | resuelto · `threadScope()`; el estado de «lo ya dicho» es por hilo |
@@ -2590,3 +2590,91 @@ gitignored y se limpia. Perderlo solo cuesta un re-parseo.
 Provocado: devolviendo la ruta vieja, 3 tests en rojo.
 
 **Estado:** resueltos · declarados, y el `path` de cada artefacto ahora se verifica
+
+---
+
+## HUE-014 · El guardrail que bloquea commits casi nunca podía fallar
+
+- **Tipo / severidad:** `HUE` · S3 *(la severidad quedó corta)*
+- **Unidad:** `H-08` (`spec-diff-check`)
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`spec-diff-check` bloquea el commit cuando un componente o una facade nuevos no figuran en
+su índice. Preguntaba así:
+
+```js
+if (!componentsIndex.includes(selectorName) && !componentsIndex.includes(componentName))
+```
+
+`String.includes` sobre el **archivo entero**. Medido contra el `COMPONENTS.md` que reparte
+el blueprint, con componentes inventados que no existen en ningún lado:
+
+```
+card       → "registrado"   matchea dentro de `app-kpi-card`
+block      → "registrado"   dentro de `skeleton-block`
+skeleton   → "registrado"
+kpi        → "registrado"
+tabla      → "registrado"   ← ni es un componente: está en la prosa del encabezado
+x          → "registrado"   ← una sola letra
+```
+
+**Seis de seis.** Para cualquier nombre corto o común, el guardrail no bloquea porque no
+puede fallar: es la definición de `DEC` de esta auditoría, en un hook que sí existía, sí
+corría y sí estaba testeado.
+
+**Arreglo**
+
+`lib/indices.js` pregunta lo que había que preguntar: *«¿hay una FILA que declare este
+artefacto?»*. Los índices son tablas markdown y su primera celda es el identificador, así
+que es exactamente comprobable. Mismo resultado sobre el mismo índice: **1 de 6**, y esa
+una es correcta — `app-icon` existe de verdad.
+
+**Los dos errores no cuestan lo mismo, y el módulo está calibrado para eso.** Dejar pasar
+un componente sin registrar desactualiza un índice; frenar un commit por uno que **sí**
+está registrado rompe el trabajo de alguien. Por eso se aceptan las tres formas en que un
+índice escribe un identificador —`` `app-kpi-card` ``, `` `<app-kpi-card>` ``, pelado—: el
+propio `COMPONENTS.md` del blueprint usa dos de las tres **en la misma tabla**.
+
+Dos cosas más las encontró su propio test:
+
+- El filtro de identificador: `COMPONENTS.md` trae también una tabla de rutas cuya primera
+  celda es «`` `/app/dashboard` — `DashboardComponent` ``» y filas con un guión de
+  placeholder. Nada de eso declara un artefacto, y dejarlo entrar solo agranda la
+  superficie del falso «ya está registrado».
+- Un bug de orden en `normalizar`: quitaba el prefijo `app-` **antes** de bajar a
+  minúsculas, así que un `APP-Kpi-Card` conservaba su `APP-` y dejaba de coincidir.
+
+Provocado: volviendo al `includes`, 8 tests en rojo.
+
+**Estado:** resuelto · se pregunta por la fila, no por el texto
+
+---
+
+## HUE-008 e INC-003 · Dos que el registro ya había cerrado, y uno que faltaba fijar
+
+- **Tipo / severidad:** `HUE` S3 y `INC` S2 · **Unidades:** `C-04` y `C-05` · **Contexto:** B
+
+**`INC-003`** — `pre-write-guard` lee `blueprint.json` (su `stack` decide qué guardrails
+corren) y no figuraba como consumidor en ninguna documentación. Lo cerró `contracts.js` al
+declararlo, y desde `ACO-013` esa declaración **viaja al proyecto generado** dentro de
+`docs/CONTRATOS.md` — que es donde hacía falta, porque el agente que trabaja ahí es
+justamente el que no tenía cómo enterarse. Con un test que falla si el hook deja de
+consumirlo.
+
+**`HUE-008`** — la partición *13 auto-generados / 2 manuales* estaba escrita en tres
+lugares y en ninguno se podía verificar. Un índice nuevo sin marcadores es un archivo que
+`indices:sync` ignora en silencio: no falla, simplemente no se actualiza nunca.
+
+El criterio del test no es una lista de nombres —eso se desactualiza, y es exactamente
+`HUE-003`—: es *«¿tiene los marcadores `AUTO-GENERATED`?»*, derivado del disco. Los dos
+manuales sí se nombran, porque **son** la excepción y merecen justificarse: `ANTI-PATTERNS`
+lo escribe una persona cuando descubre un anti-patrón —el AST no puede deducirlo— y
+`LAYOUTS` describe intención de composición, no archivos. Agregar un tercero pasa a ser una
+decisión en vez de un descuido.
+
+Un cuarto test de yapa: todo índice que **abre** una región tiene que cerrarla. Un `BEGIN`
+sin `END` deja al generador sin dónde terminar de escribir.
+
+**Estado:** resueltos

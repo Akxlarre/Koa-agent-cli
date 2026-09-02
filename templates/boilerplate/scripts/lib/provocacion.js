@@ -205,6 +205,161 @@ export class FixtureComponent {}
     contenido: `CREATE TABLE public.notas (\n  id uuid PRIMARY KEY,\n  user_id uuid NOT NULL\n);\n\nALTER TABLE public.notas ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY notas_write ON public.notas\n  FOR UPDATE USING (true);\n`,
   },
 
+  'ARCH-02': {
+    // Un componente vista inyectando un *Service directo. `GsapAnimationsService`
+    // está en la allowlist y `*FacadeService` queda fuera por sufijo: el fixture
+    // usa un nombre que no es ninguno de los dos.
+    ruta: 'src/app/features/fixture.component.ts',
+    contenido: `import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { PedidosService } from '@core/services/pedidos.service';
+
+@Component({
+  selector: 'app-fixture',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<p>x</p>',
+})
+export class FixtureComponent {
+  private readonly pedidos = inject(PedidosService);
+}
+`,
+  },
+
+  'ARCH-06': {
+    // *ngIf en un template. La sintaxis vieja compila igual: nada la delata.
+    ruta: 'src/app/features/fixture.component.html',
+    contenido: `<div *ngIf="visible">contenido</div>\n`,
+  },
+
+  'ARCH-07': {
+    // @keyframes en el .scss de un componente.
+    //
+    // La ruta importa y no es intercambiable: el linter recorre
+    // `src/app/{features,shared,core,layout}`, y `src/styles/` —la capa de
+    // motion del design system— queda FUERA a propósito. Ahí viven
+    // `_animations.scss`, las view transitions (que no se pueden hacer con
+    // GSAP) y los overrides de PrimeNG: siete `@keyframes` curados que esta
+    // regla no debe tocar. Lo que prohíbe es la animación ad-hoc en un
+    // componente, que es lo que GsapAnimationsService existe para reemplazar.
+    //
+    // Un fixture en `src/styles/` no dispara. No lo muevas ahí «para que sea
+    // más representativo»: estarías provocando un hueco que es una decisión.
+    //
+    // `stack.gsap` viene en true por defecto; el blueprint.json va igual para
+    // que el fixture no dependa de ese default.
+    archivos: [
+      { ruta: 'blueprint.json', contenido: `{ "stack": { "gsap": true } }\n` },
+      {
+        ruta: 'src/app/features/fixture.component.scss',
+        contenido: `@keyframes aparecer {\n  from { opacity: 0; }\n  to { opacity: 1; }\n}\n`,
+      },
+    ],
+  },
+
+  'ARCH-08': {
+    // Color de la paleta cruda de Tailwind en vez de un token semántico.
+    ruta: 'src/app/features/fixture.component.html',
+    contenido: `<p class="text-red-500">error</p>\n`,
+  },
+
+  'ARCH-10': {
+    // Seis inject() en una Facade: el límite es cinco.
+    ruta: 'src/app/core/facades/fixture.facade.ts',
+    contenido: `import { Injectable, inject } from '@angular/core';
+import { A } from './a';
+import { B } from './b';
+import { C } from './c';
+import { D } from './d';
+import { E } from './e';
+import { F } from './f';
+
+@Injectable({ providedIn: 'root' })
+export class FixtureFacade {
+  private readonly a = inject(A);
+  private readonly b = inject(B);
+  private readonly c = inject(C);
+  private readonly d = inject(D);
+  private readonly e = inject(E);
+  private readonly f = inject(F);
+}
+`,
+  },
+
+  'A11Y-03': {
+    // Botón cuyo único contenido es un icono, sin aria-label: para un lector de
+    // pantalla es un botón sin nombre.
+    ruta: 'src/app/features/fixture.component.html',
+    contenido: `<button (click)="borrar()"><app-icon name="trash" /></button>\n`,
+  },
+
+  'ICON-01': {
+    // Icono usado en un template y ausente del pick() de app.config: lucide no
+    // rompe el build, lanza en runtime cuando alguien abre esa pantalla.
+    //
+    // El icono NO va dentro de un botón, a propósito: ahí dispararía también
+    // A11Y-03 y el fixture dejaría de identificar qué regla habló.
+    archivos: [
+      {
+        ruta: 'src/app/features/fixture.component.html',
+        contenido: `<span class="inline-flex"><app-icon name="rocket" /></span>\n`,
+      },
+      {
+        ruta: 'src/app/app.config.ts',
+        contenido: `import { ApplicationConfig } from '@angular/core';
+import { Home } from 'lucide-angular';
+
+export const appConfig: ApplicationConfig = {
+  providers: [LucideAngularModule.pick({ Home })],
+};
+`,
+      },
+    ],
+  },
+
+  'ARCH-21': {
+    // Clase del sistema bento definida en el SCSS y ausente del allowlist: el
+    // grid crece por acumulación si nadie la aprueba a mano.
+    archivos: [
+      {
+        ruta: 'src/styles/layout/_bento-grid.scss',
+        contenido: `.bento-grid { display: grid; }\n.bento-inventada { grid-column: span 2; }\n`,
+      },
+      {
+        ruta: 'scripts/lib/bento-classes.allowlist.json',
+        contenido: `{ "classes": ["bento-grid"] }\n`,
+      },
+    ],
+  },
+
+  'NAV-01': {
+    // El menú apunta a una ruta que no existe: el usuario hace clic y cae en el
+    // not-found. Ningún build lo delata porque son dos archivos que no se citan.
+    archivos: [
+      {
+        ruta: 'src/app/app.routes.ts',
+        contenido: `import { Routes } from '@angular/router';
+
+export const routes: Routes = [
+  { path: 'inicio', loadComponent: () => import('./features/inicio') },
+];
+`,
+      },
+      {
+        ruta: 'src/app/core/services/menu-config.service.ts',
+        contenido: `import { Injectable } from '@angular/core';
+
+@Injectable({ providedIn: 'root' })
+export class MenuConfigService {
+  readonly items = [
+    { label: 'Inicio', routerLink: '/inicio' },
+    { label: 'Reportes', routerLink: '/reportes' },
+  ];
+}
+`,
+      },
+    ],
+  },
+
   'ARCH-09': {
     // Un componente de shared/ con 201 miembros triviales: el cuerpo pasa de 200
     // líneas sin que ninguna otra regla tenga nada que decir.

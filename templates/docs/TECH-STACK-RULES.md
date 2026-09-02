@@ -33,9 +33,11 @@
 - Solución: `@if/@for` y bindings directos `[class.x]`, `[style.prop]`.
 
 <a id="arch-07"></a>
-### ARCH-07: No `@keyframes` en estilos de app
+### ARCH-07: No `@keyframes` en estilos de componente
 - Prohibido `@keyframes` en estilos dentro de `src/app/**`.
-- Solución: usar GSAP.
+- **`src/styles/` está fuera de alcance, y es a propósito.** Ahí vive la capa de motion curada del design system: `_animations.scss`, `motion/_view-transitions.scss` (las view transitions no se pueden hacer con GSAP) y los overrides de PrimeNG. El blueprint reparte siete `@keyframes` en esa capa y ninguno es una violación.
+- Lo que la regla prohíbe es la animación **ad-hoc en un componente**, que es lo que `GsapAnimationsService` existe para reemplazar.
+- Solución: usar GSAP, o una de las clases de motion del DS (`.animate-fade-in-up`, `.indicator-live`, `.badge-pulse`).
 
 <a id="arch-08"></a>
 ### ARCH-08: No hardcoded Tailwind colors

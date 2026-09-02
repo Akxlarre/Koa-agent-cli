@@ -82,11 +82,11 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | abierto |
 | `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
 | `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | abierto |
-| `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → **18/28**; las 3 de RLS y las 2 que motivaron el script, cubiertas. Las 10 restantes siguen en el baseline |
+| `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → 18/28 → **28/28**. El baseline quedó vacío: no hay ninguna regla que no se haya puesto delante de su propia violación |
 | `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | resuelto · las tres RLS tienen fixture; la corrida sale en 0 |
 | `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | abierto |
 | `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | resuelto · la regla medía el `@Component` (template inline), no la clase: `tabs` era falso positivo; `section-hero` 258 → 198. `lint:arch` limpio |
-| `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | abierto |
+| `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | resuelto · las 9 que faltaban tienen fixture; 7 dispararon a la primera, 1 era un fixture mal escrito y 1 destapó `INC-023` |
 | `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | resuelto · interruptor `specs/AUTHORS.md`: apagada → mensaje y `exit 0` |
 | `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | abierto |
 | `ACO-009` | S3 | `S-05` | La provocación depende de que la salida de `architect.js` nombre el código de la regla; ese formato no está declarado | abierto |
@@ -142,6 +142,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DEC-009` | S2 | `diseño` | El provocador de reglas leía solo stdout: una regla que reporta con `reportWarning` no podía darse por probada nunca — el linter sale en 0 y su aviso va a stderr | resuelto · se leen las dos salidas; ARCH-11 pasó de muda a verde sin tocar la regla |
 | `INC-021` | S3 | `diseño` | `writeBlueprintJson(targetDir, projectName, isFull, stack)` acepta `projectName` y no lo usa: el `name` del blueprint es una constante. Una firma que promete algo que la función ignora | abierto |
 | `INC-022` | **S2** | `diseño` | La plantilla canónica de `ASSIGNMENTS.md` no traía **ningún** marcador `AUTO-GENERATED`, y `assignments-sync` se niega a escribir sin ellos: el único camino de escritura de la capa fallaba incluso en un proyecto que hubiera hecho todo bien | resuelto · marcadores en la plantilla + el error dice cómo arreglar un tablero viejo |
+| `INC-023` | S2 | `S-01` | `ARCH-07` se llamaba «No @keyframes in app styles» y su mensaje decía «archivo de estilos», pero solo mira `src/app/**`. El blueprint reparte **siete** `@keyframes` en `src/styles/` que la lectura literal convertiría en violaciones | resuelto · el alcance era correcto y las palabras no: las tres puntas dicen «estilos de componente», como el hook siempre dijo |
 | `HUE-033` | **S2** | `ejecución` | El trinquete de `CAR-003` estuvo **en rojo desde el commit siguiente al que lo fijó**, y no me enteré: la suite de `scripts/lib/` no entraba en la verificación de cada tanda. El mecanismo funcionó; el que no corría era yo | resuelto · el presupuesto vuelve a estar bajo el tope sin subirlo, y las cuatro suites entran en la verificación |
 
 ---
@@ -1531,7 +1532,26 @@ muertas: la lógica estaba bien, el cableado no.
 Al escribir los fixtures de `DEC-004`, priorizar las reglas que ya tienen test de función
 pura: ahí el fixture solo comprueba el cableado y es el más barato de escribir.
 
-**Estado:** abierto
+**Resolución** — se escribieron los nueve que faltaban (`ARCH-02`, `ARCH-06`, `ARCH-07`,
+`ARCH-08`, `ARCH-10`, `ARCH-21`, `A11Y-03`, `ICON-01`, `NAV-01`) y el baseline quedó
+**vacío**: `28/28`, ninguna regla registrada sin haberse puesto delante de su propia
+violación.
+
+Siete dispararon en el primer intento — el nivel 2 estaba bien y nadie lo había mirado. Las
+otras dos son la razón por la que el hallazgo valía la pena:
+
+- **`NAV-01`** no disparó porque mi fixture escribía `route:` y el extractor busca
+  `routerLink:`. Fixture mal escrito, regla sana. El fixture ahora usa la forma real del
+  `menu-config.service.ts` que reparte el blueprint.
+- **`ARCH-07`** no disparó con el fixture en `src/styles/`, y ahí había algo de verdad:
+  → `INC-023`.
+
+Dos fixtures llevan una advertencia escrita, porque la ruta **es** el fixture: el de
+`ARCH-07` explica por qué no debe moverse a `src/styles/`, y el de `ICON-01` por qué el
+icono va fuera de un `<button>` (dentro dispararía también `A11Y-03` y ya no se sabría cuál
+de las dos habló).
+
+**Estado:** resuelto · 28/28, baseline vacío
 
 ---
 
@@ -2067,3 +2087,67 @@ Y la verificación de cada tanda pasó a ser **cuatro** suites, no dos:
 proyecto generado, que es donde el linter puede resolver `typescript`.
 
 **Estado:** resuelto · el presupuesto está bajo el tope sin haberlo subido
+
+---
+
+## INC-023 · `ARCH-07` prometía todos los estilos y solo mira los de componente
+
+- **Tipo / severidad:** `INC` · S2
+- **Unidad:** `S-01` (`architect.js`) — encontrado escribiendo el fixture de `HUE-019`
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+El fixture de `ARCH-07` no disparó. La primera hipótesis —regla muerta— era falsa: dispara
+perfectamente con un `.scss` dentro de `src/app/**`. Lo que pasa es que el scanner recorre
+solo cuatro directorios:
+
+```js
+const targetDirs = [ 'src/app/features', 'src/app/shared', 'src/app/core', 'src/app/layout' ];
+```
+
+`src/styles/` no está. Y ahí es exactamente donde uno escribiría un `@keyframes`:
+
+```
+src/styles/_animations.scss                 2 @keyframes
+src/styles/motion/_view-transitions.scss    2
+src/styles/tokens/_variables.scss           2
+src/styles/vendors/_primeng-overrides.scss  1
+```
+
+**Siete**, en el código que el CLI reparte, bajo una regla cuyo nombre era *«No @keyframes
+in app styles»* y cuyo mensaje decía *«@keyframes detectado en archivo de estilos»*.
+
+**Por qué importa**
+
+O el boilerplate viola su propia regla siete veces, o la regla no dice lo que hace. Es lo
+segundo, y las dos lecturas tenían consecuencias opuestas: ampliar el alcance habría
+marcado como violaciones las view transitions —que **no se pueden** hacer con GSAP— y los
+overrides de un vendor.
+
+El desempate estaba escrito en el propio harness. El hook `pre-write-guard` implementa la
+misma regla así:
+
+```js
+const isComponentStyle = normalizedPath.includes('src/app/');
+if (STACK.gsap && isComponentStyle && /@keyframes\s/.test(newContent))
+  violations.push('[ARCH-07] No usar @keyframes en estilos de componente …');
+```
+
+Acota igual y **lo dice**. Las dos implementaciones hacían lo mismo; solo una lo contaba
+bien. Es la misma forma de `INC-008`: el mecanismo es más angosto que su nombre, y quien lo
+lee confía en la promesa.
+
+**Arreglo**
+
+El alcance no se tocó — era la decisión correcta. Se corrigieron las tres puntas que
+mentían: el `name` de la regla, el texto del `reportError`, el docblock de cabecera de
+`architect.js`, `TECH-STACK-RULES.md#arch-07` y la línea del Architect Guard en
+`.claude/CLAUDE.md`. Todas dicen ahora **estilos de componente**, y la doc explica por qué
+`src/styles/` es una excepción en vez de dejarla como un hueco sin nombre.
+
+El fixture quedó en `src/app/features/` con una advertencia escrita al lado: moverlo a
+`src/styles/` «para que sea más representativo» estaría provocando un hueco que es una
+decisión.
+
+**Estado:** resuelto · el alcance era correcto; las palabras no

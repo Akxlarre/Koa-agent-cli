@@ -16,7 +16,8 @@
  *   6. Prohibido *ngIf, *ngFor, [ngClass], [ngStyle] en templates.
  *
  * Reglas activas (Regex sobre estilos .scss):
- *   7. Prohibido @keyframes en archivos SCSS dentro de src/app/.
+ *   7. Prohibido @keyframes en SCSS de componente (src/app/). src/styles/ —la capa
+ *      de motion curada del DS— queda fuera a propósito.
  *
  * Regla activa (Regex sobre .ts y .html):
  *   8. Prohibido colores Tailwind hardcodeados (text-red-500, bg-blue-200, etc.).
@@ -197,9 +198,9 @@ const RULES = {
         fix: 'Usa Control Flow nativo (Angular 17+): @if/@for y bindings directos.',
     },
     'ARCH-07': {
-        name: 'No @keyframes in app styles',
+        name: 'No @keyframes in component styles',
         doc: 'docs/TECH-STACK-RULES.md#arch-07',
-        fix: 'Usa GsapAnimationsService para animaciones. GSAP es obligatorio en este proyecto.',
+        fix: 'Usa GsapAnimationsService para animaciones de UI. La capa de motion curada del DS vive en src/styles/ y esta regla no la mira.',
     },
     'ARCH-08': {
         name: 'No hardcoded Tailwind colors',
@@ -671,10 +672,20 @@ function analyzeStyles(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
 
     // ── Regla 7: @keyframes prohibido (skip si stack.gsap === false) ─────────
+    //
+    // El alcance es `src/app/**`, porque es donde el scanner entra: `src/styles/`
+    // queda fuera A PROPÓSITO. Ahí vive la capa de motion curada del design
+    // system —`_animations.scss`, las view transitions (que GSAP no puede hacer)
+    // y los overrides de PrimeNG—: siete `@keyframes` que el blueprint reparte
+    // y que esta regla no debe tocar.
+    //
+    // El nombre decía «app styles» y el mensaje «archivo de estilos», que se leen
+    // como «todos». El hook `pre-write-guard` siempre dijo «estilos de componente»
+    // y siempre acotó a `src/app/`: era esta punta la que prometía de más.
     if (STACK.gsap && /@keyframes\s/.test(content)) {
         reportError(
             'ARCH-07', filePath,
-            '@keyframes detectado en archivo de estilos',
+            '@keyframes detectado en un estilo de componente',
         );
     }
 }

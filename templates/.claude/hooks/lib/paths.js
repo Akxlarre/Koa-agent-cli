@@ -117,12 +117,27 @@ function needsDiscovery(filePath, cwd) {
  * ¿Su creación obliga a actualizar un índice?
  * Lo preguntan `write-tracker` (para registrar) y `sync-check` (para avisar).
  *
- * Más estrecho todavía: solo la superficie que los índices describen. Las
- * migraciones quedan fuera a propósito — las cubre DATABASE.md por otra vía.
+ * Más estrecho que las otras dos: solo la superficie que los índices describen.
+ *
+ * HUE-015: las migraciones estaban fuera, con este motivo escrito acá —«las
+ * cubre DATABASE.md por otra vía»—. El motivo confundía dos cosas: QUIÉN genera
+ * `DATABASE.md` (el auto-indexer, leyendo `supabase/migrations/`) con si la
+ * escritura OBLIGA a actualizarlo, que es lo único que esta función pregunta.
+ *
+ * Medido: una sesión que escribe solo una migración no produce
+ * `session-writes.json`, y entonces los tres consumidores quedan ciegos a la
+ * vez — `sync-check` no avisa, `spec-diff-check` no bloquea, `spec-reflection`
+ * cree que no pasó nada. Una sesión entera de esquema, invisible. Con un
+ * componente en la misma sesión, `sync-check` sale en 2.
+ *
+ * `DATABASE.md` ES un índice, y una migración es exactamente lo que lo
+ * desactualiza. Sin esto, el aviso de sincronizar depende de haber tocado
+ * además algo de `src/app/`.
  */
 function belongsToIndex(filePath, cwd) {
   const r = rel(filePath, cwd);
   if (!r || r.endsWith('.spec.ts')) return false;
+  if (r.startsWith('supabase/migrations/')) return path.extname(r).toLowerCase() === '.sql';
   if (!r.startsWith(RAIZ_INDEXABLE)) return false;
   return EXTENSIONES_INDEXABLES.has(path.extname(r).toLowerCase());
 }

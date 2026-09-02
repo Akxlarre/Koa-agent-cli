@@ -76,7 +76,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-016` | S2 | `H-12` | **(remedido)** Un error con `\|` corrompe la fila UNA vez y se estabiliza; lo que se rompe para siempre es el dedup de esa entrada | resuelto · `lib/lessons.js` escapa el `|` y lo desescapa al leer; 5 fallas con pipe → 1 fila con contador 5 |
 | `DUP-002` | S2 | `H-12` | `failure-tracker` y `lint-arch-wrapper` escriben ambos en `LESSONS_LEARNED.md` con formatos distintos | resuelto · la tabla vive entre marcadores `AUTO-GENERATED` y lo de afuera se preserva; verificado que una sección del wrapper sobrevive a 20 fallas |
 | `CAR-002` | S2 | `H-17` | `context-guardian` avisa en cada respuesta indefinidamente: no tiene anti-bucle | resuelto · `budget.avisar()`, cuyo default es no repetir |
-| `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | abierto |
+| `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | resuelto · una sesión de puro esquema dejaba ciegos a los **tres** consumidores a la vez; `DATABASE.md` es un índice y una migración es lo que lo desactualiza |
 | `INC-007` | S2 | `H-14` | `hotfix-autoclose` dice cerrar «al terminar la sesión»; `Stop` corre al final de cada respuesta | resuelto · `/hotfix-close` explícito + el hook como red en `SessionEnd` |
 | `HUE-017` | S3 | `H-13` | `compact-recovery` no tiene tope de tamaño: los 4 archivos de `context/` se inyectan enteros | abierto |
 | `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | abierto |
@@ -2394,3 +2394,66 @@ problema por su cuenta.
 Provocado: con la skill anterior, 4 tests en rojo.
 
 **Estado:** resuelto · la autoridad es el script, el que escribe es el subagente, la skill delega
+
+---
+
+## HUE-015 · Una sesión de puro esquema era invisible para el harness
+
+- **Tipo / severidad:** `HUE` · S2
+- **Unidad:** `H-10` (`write-tracker`)
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+El hallazgo original lo describía como una asimetría: el Discovery Gate trata
+`supabase/migrations/**` como código fuente y `write-tracker` no lo rastrea. Medido, la
+consecuencia es bastante más grande.
+
+`write-tracker` es el **productor** de `session-writes.json`, el contrato con más
+consumidores del harness. Si no registra nada, el archivo no existe, y entonces los tres
+consumidores quedan ciegos **a la vez**:
+
+```
+sesión que escribe SOLO una migración
+  session-writes.json   (no existe)
+  sync-check            exit 0 — no avisa
+  spec-diff-check       no bloquea el commit
+  spec-reflection       cree que no se escribió nada
+
+la misma sesión con un componente además
+  sync-check            exit 2 ✔
+```
+
+Una sesión entera de trabajo de esquema no deja rastro, y `DATABASE.md` —el índice que esa
+sesión desactualiza— se queda viejo en silencio.
+
+**La causa: un motivo escrito que confundía dos cosas**
+
+`belongsToIndex` excluía las migraciones con este comentario: *«las migraciones quedan
+fuera a propósito — las cubre `DATABASE.md` por otra vía»*. Es cierto que el auto-indexer
+genera `DATABASE.md` leyendo `supabase/migrations/`. Pero eso responde **quién lo genera**,
+no **si la escritura obliga a actualizarlo**, que es lo único que esa función pregunta. Y
+nada recuerda correr el auto-indexer, porque el recordatorio se dispara justo desde el
+archivo que quedaba vacío.
+
+**Arreglo**
+
+`belongsToIndex` acepta `supabase/migrations/**.sql`. El borde queda fijado con test:
+`config.toml`, un `README.md` dentro de `migrations/`, las edge functions y una migración
+anidada bajo `docs/` siguen afuera — un guardrail que se dispara de más se termina
+ignorando.
+
+El aviso de `sync-check` también se corrigió: sugería cuatro índices de componentes y
+ninguno era el que había que tocar. Ahora dice `DATABASE.md` cuando hubo migraciones, los
+de código cuando hubo código, y nombra el camino de arreglo (`npm run indices:sync` vía
+`index-syncer`, que es la autoridad decidida en `DUP-003`).
+
+**Un test que estaba fijando el bug como si fuera correcto.** El caso vivía en
+`write-tracker.test.js` bajo `QUÉ NO RASTREA`, como *«ignora una migración»*. Eso es lo que
+hace un test de caracterización cuando nadie vuelve a mirarlo: deja de documentar un hueco
+y pasa a defenderlo. Se movió a su propio describe, con el escenario completo.
+
+Provocado: quitando la línea de `paths.js`, 3 tests en rojo; con el mensaje anterior de
+`sync-check`, 2 más.
+
+**Estado:** resuelto · las migraciones se rastrean, y el aviso nombra el índice correcto

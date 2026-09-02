@@ -26,11 +26,27 @@ describe('SON TRES PREGUNTAS DISTINTAS — no colapsar', () => {
     assert.equal(r.needsDiscovery, false, 'ni obliga a descubrir antes');
   });
 
-  test('una migración exige descubrimiento pero no va a un índice de componentes', () => {
+  test('una migración responde que sí a las tres — DATABASE.md es un índice (HUE-015)', () => {
+    // Estuvo en `false` con un motivo escrito: «las cubre DATABASE.md por otra
+    // vía». El motivo confundía QUIÉN genera DATABASE.md con si la escritura
+    // OBLIGA a actualizarlo, que es lo único que esta función pregunta.
     const r = c('supabase/migrations/001_init.sql');
     assert.equal(r.isProductCode, true);
     assert.equal(r.needsDiscovery, true);
-    assert.equal(r.belongsToIndex, false);
+    assert.equal(r.belongsToIndex, true);
+  });
+
+  test('pero solo el .sql: lo demás bajo supabase/ no obliga a nada (HUE-015)', () => {
+    // Un guardrail que se dispara de más se termina ignorando, así que el borde
+    // va fijado: config, prosa y edge functions quedan afuera.
+    for (const f of ['supabase/config.toml', 'supabase/migrations/README.md',
+      'supabase/functions/enviar-mail/index.ts']) {
+      assert.equal(c(f).belongsToIndex, false, f);
+    }
+  });
+
+  test('y una migración anidada en docs/ tampoco — se compara por prefijo', () => {
+    assert.equal(c('docs/ejemplos/supabase/migrations/y.sql').belongsToIndex, false);
   });
 
   test('un componente responde que sí a las tres', () => {
@@ -52,6 +68,12 @@ describe('SON TRES PREGUNTAS DISTINTAS — no colapsar', () => {
     const casos = [
       'src/app/x.component.ts', 'src/app/x.component.spec.ts',
       'supabase/migrations/1.sql', 'src/main.ts', 'docs/guia.md',
+      'supabase/config.toml',
+      // El caso que separa `needsDiscovery` de `belongsToIndex` desde HUE-015:
+      // un .json bajo src/app/ obliga a haber leído los índices —es la app— y
+      // no va a ninguno, porque ningún índice describe datos sueltos. Sin él,
+      // las dos columnas coinciden y este test dejaría de probar nada.
+      'src/app/features/datos.json',
     ].map(c);
     const cols = ['isProductCode', 'needsDiscovery', 'belongsToIndex']
       .map((k) => casos.map((r) => r[k]).join(''));

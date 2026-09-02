@@ -166,3 +166,55 @@ describe('ACO-001 — CERRADO: sync-check ya no borra el tracker', () => {
       'ningun hook de Stop borra estado de ciclo sesion');
   });
 });
+
+describe('HUE-015 — una sesión de puro esquema también avisa', () => {
+  // Hasta que las migraciones entraron en `belongsToIndex`, este aviso no podía
+  // dispararse por una sesión de esquema: el productor del contrato
+  // (write-tracker) no las registraba, así que `session-writes.json` quedaba
+  // vacío y este hook salía en 0 sin mirar nada. Y `DATABASE.md` —el índice que
+  // esa sesión desactualiza— se quedaba viejo en silencio.
+
+  test('avisa por una migración más nueva que los índices', () => {
+    archivo('indices/DATABASE.md', 60_000);
+    archivo('supabase/migrations/001_pedidos.sql', 0);
+    conTracker(['supabase/migrations/001_pedidos.sql']);
+
+    const r = correr();
+    assert.equal(r.exit, 2, 'una sesión de esquema no puede pasar en silencio');
+    assert.match(r.stderr, /001_pedidos\.sql/);
+  });
+
+  test('y le sugiere DATABASE.md, no COMPONENTS.md', () => {
+    // Un aviso que nombra los índices equivocados es casi peor que no avisar:
+    // manda a mirar cuatro archivos que no cambiaron.
+    archivo('indices/DATABASE.md', 60_000);
+    archivo('supabase/migrations/001_pedidos.sql', 0);
+    conTracker(['supabase/migrations/001_pedidos.sql']);
+
+    const { stderr } = correr();
+    assert.match(stderr, /DATABASE\.md/);
+    assert.ok(!stderr.includes('COMPONENTS.md'), stderr);
+    assert.match(stderr, /indices:sync/, 'el camino de arreglo va escrito');
+  });
+
+  test('con código Y migraciones, sugiere las dos cosas', () => {
+    archivo('indices/DATABASE.md', 60_000);
+    archivo('src/app/features/x.component.ts', 0);
+    archivo('supabase/migrations/001_pedidos.sql', 0);
+    conTracker(['src/app/features/x.component.ts', 'supabase/migrations/001_pedidos.sql']);
+
+    const { stderr } = correr();
+    assert.match(stderr, /COMPONENTS\.md/);
+    assert.match(stderr, /DATABASE\.md/);
+  });
+
+  test('y con solo código, no menciona DATABASE.md', () => {
+    archivo('indices/COMPONENTS.md', 60_000);
+    archivo('src/app/features/x.component.ts', 0);
+    conTracker(['src/app/features/x.component.ts']);
+
+    const { stderr } = correr();
+    assert.ok(!stderr.includes('DATABASE.md'), stderr);
+    assert.ok(!stderr.includes('indices:sync'), stderr);
+  });
+});

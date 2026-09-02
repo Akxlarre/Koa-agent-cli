@@ -77,7 +77,9 @@ describe('QUÉ NO RASTREA', () => {
     ['una extensión que no describe ningún índice', 'src/app/x.css'],
     ['un índice', 'indices/COMPONENTS.md'],
     ['un hook', '.claude/hooks/foo.js'],
-    ['una migración', 'supabase/migrations/1.sql'],
+    ['la config de supabase', 'supabase/config.toml'],
+    ['prosa dentro de migrations/', 'supabase/migrations/README.md'],
+    ['una edge function', 'supabase/functions/enviar-mail/index.ts'],
   ];
 
   for (const [nombre, ruta] of ignorados) {
@@ -86,6 +88,34 @@ describe('QUÉ NO RASTREA', () => {
       assert.equal(tracker(), null, `${ruta} no debería registrarse`);
     });
   }
+});
+
+describe('LAS MIGRACIONES SÍ SE RASTREAN (HUE-015)', () => {
+  // Este caso vivía en el describe de arriba, como «ignora una migración».
+  // Estaba fijado como comportamiento correcto y no lo era: `DATABASE.md` ES un
+  // índice, y una migración es exactamente lo que lo desactualiza.
+  //
+  // Medido antes de moverlo: una sesión que escribe SOLO una migración no
+  // produce `session-writes.json`, así que los tres consumidores quedan ciegos
+  // a la vez — sync-check no avisa, spec-diff-check no bloquea, spec-reflection
+  // cree que no pasó nada. Una sesión entera de esquema, invisible.
+
+  test('una migración .sql se registra', () => {
+    correr('supabase/migrations/20260101_pedidos.sql');
+    assert.deepEqual(tracker(), ['supabase/migrations/20260101_pedidos.sql']);
+  });
+
+  test('y una sesión de puro esquema deja de ser invisible', () => {
+    // El escenario completo del hallazgo: nada de src/app/ en toda la sesión.
+    correr('supabase/migrations/001_pedidos.sql');
+    correr('supabase/migrations/002_rls.sql');
+    assert.equal(tracker().length, 2, 'el productor del contrato no vio nada');
+  });
+
+  test('pero una migración anidada en docs/ no — se compara por prefijo', () => {
+    correr('docs/ejemplos/supabase/migrations/y.sql');
+    assert.equal(tracker(), null);
+  });
 });
 
 describe('PREFIJO, NO SUBSTRING — cerrado en la tanda 3', () => {

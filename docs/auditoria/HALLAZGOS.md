@@ -116,7 +116,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-018` | S2 | `L-03` | Dos de tres servidores MCP usan `@latest`, incluido `@angular/cli@latest`, que `lib/config.js` prohíbe con tres párrafos | resuelto · `@angular/cli@{{ANGULAR_MAJOR}}`, sustituido por el scaffolder |
 | `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | resuelto · la frase se corrigió **y** la cifra dejó de escribirse a mano: un test la deriva de `RULES` y falla contra cualquier doc del payload que afirme otra |
 | `HUE-029` | S3 | `L-04` | Los adapters no llevan ningún mecanismo y nada le dice al usuario que ahí las reglas son solo prosa | abierto |
-| `ACO-013` | S2 | Lente 1 | 21 artefactos compartidos, 3 declarados. Y `templates-contract.md` vive en este repo, no en el payload: el proyecto generado no recibe ninguna declaración de sus propios contratos | abierto |
+| `ACO-013` | S2 | Lente 1 | 21 artefactos compartidos, 3 declarados. Y `templates-contract.md` vive en este repo, no en el payload: el proyecto generado no recibe ninguna declaración de sus propios contratos | resuelto · los **21** declarados en `contracts.js`, y `docs/CONTRATOS.md` —generado desde ahí, con test de sincronía— viaja al proyecto |
 | `HUE-031` | S3 | Lente 2 | `pre-write-guard` capa 1 y `harness-gate` protegen superficies complementarias del harness sin criterio común; ninguno cubre `.claude/skills/` ni `.claude/agents/` | abierto |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | resuelto · lee stdin vía `lib/payload.js` |
 | `HUE-002` | **S1** | `C-01` | **(ampliado)** `CLAUDE_SESSION_ID` **no existe**: `sessionId` es siempre `'default'`. Demostrado que una lectura en un proyecto levanta el Discovery Gate de otro | resuelto · `lib/session.js`; los seis hooks migrados, `prompt-context` el último |
@@ -2181,3 +2181,58 @@ El fixture quedó en `src/app/features/` con una advertencia escrita al lado: mo
 decisión.
 
 **Estado:** resuelto · el alcance era correcto; las palabras no
+
+---
+
+## ACO-013 · La declaración de contratos vivía del lado equivocado
+
+- **Tipo / severidad:** `ACO` · S2
+- **Unidad:** Lente 1 del pase general — ninguna ficha individual podía verlo
+- **Contexto:** B (harness)
+
+**Qué encontré** *(resumen; el desarrollo está en `PASE-GENERAL.md`)*
+
+Dos cosas, y la segunda es la que cuesta más:
+
+1. **21 artefactos compartidos, 3 declarados.** `specs/.active` solo —diez comandos lo
+   escriben, tres hooks lo leen, y define si el motor SDD bloquea— supera a los tres
+   declarados juntos.
+2. **`templates-contract.md` está en `.claude/rules/` de este repositorio.** Es una regla
+   para quien mantiene el CLI. El proyecto generado no recibe **ninguna** declaración de
+   sus propios contratos: un agente trabajando ahí no tenía forma de saber que
+   `sync-check` borraba el archivo del que depende `spec-diff-check`.
+
+**Resolución**
+
+La primera mitad la cerró `lib/contracts.js` (ADR-001 §5), que ya viajaba en el payload.
+Al ir a cerrar la segunda aparecieron **seis artefactos que el registro todavía no tenía**
+—los que el pase general contó y nadie había pasado a datos—:
+
+```
+AUTO-GENERATED:BEGIN            3 productores; el patrón más reusado del blueprint
+author.local.json               gitignored a propósito: dos clones con el mismo
+                                código de autor colisionarían los track IDs
+arch-last-failure.json          el único contrato cuyo consumidor es un subagente
+class-discipline.baseline.json  ausentes de fábrica: Koa se entrega con
+contrast.baseline.json          tolerancia cero, el ratchet es opt-in
+bento-classes.allowlist.json    este SÍ viaja: no es deuda tolerada, es
+                                vocabulario aprobado (ARCH-21)
+```
+
+Con esos seis, **21** — el número exacto del pase general.
+
+La segunda mitad es `docs/CONTRATOS.md`, que ahora viaja al proyecto: la tabla de los 21
+con productor, consumidor, `lifetime` y `scope`, más el porqué de cada uno. Y **se genera**
+(`npm run contracts:doc`, `.claude/scripts/contracts-doc.js`), entre marcadores
+`AUTO-GENERATED`, con `--check` en un test. Escrita a mano volvería a desactualizarse, que
+es literalmente el hallazgo que cierra.
+
+`templates-contract.md` dejó de ser la fuente y pasó a decirlo: el registro manda, y esa
+tabla queda como resumen para orientarse al editar `templates/`. De paso se corrigió que
+seguía describiendo el discovery flag en `$TMPDIR` bajo la clave `'default'`, tres tandas
+después de que `HUE-002` lo moviera.
+
+Provocado: agregando un artefacto al registro sin regenerar el doc, caen 4 tests —dos por
+el consumidor que no lo nombra, dos por el doc desfasado.
+
+**Estado:** resuelto · 21 declarados y la declaración viaja al proyecto generado

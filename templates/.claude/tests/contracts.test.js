@@ -14,6 +14,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const C = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'contracts.js'));
 
@@ -226,6 +227,46 @@ describe('HUE-003 / HUE-030 — el hueco, cerrado', () => {
     const literales = C.INDICES.filter((n) => src.includes(`'${n}'`));
     assert.deepEqual(literales.sort(), ['COMPONENTS', 'FACADES', 'SERVICES'],
       'solo los CORE se nombran: son los que se inyectan aunque nadie los haya leído');
+  });
+});
+
+describe('ACO-013 — el proyecto generado recibe la declaración de sus contratos', () => {
+  // La primera mitad del hallazgo la cerró este registro: 21 artefactos, no 3.
+  // La otra mitad era DÓNDE vive la declaración. `templates-contract.md` está en
+  // el repo del CLI: es una regla para quien mantiene el generador. Un agente
+  // trabajando en un proyecto generado no tenía forma de saber que `sync-check`
+  // borraba el archivo del que depende `spec-diff-check`.
+  //
+  // `docs/CONTRATOS.md` es la misma verdad en la forma en que se consulta, y se
+  // GENERA desde acá. Escrita a mano volvería a desactualizarse, que es
+  // literalmente el hallazgo.
+  const DOC = enRepo('docs/CONTRATOS.md');
+  const GENERADOR = enRepo('.claude/scripts/contracts-doc.js');
+
+  test('el doc existe y viaja en el payload', () => {
+    assert.ok(fs.existsSync(DOC), 'sin esto, el proyecto generado no declara nada');
+  });
+
+  test('está al día con el registro', () => {
+    // El generador sabe compararse a sí mismo: --check no escribe.
+    const r = spawnSync('node', [GENERADOR, '--check'], {
+      cwd: path.dirname(path.dirname(DOC)), encoding: 'utf8',
+    });
+    assert.equal(r.status, 0, `${r.stdout || ''}${r.stderr || ''}`);
+  });
+
+  test('nombra los 21 artefactos, no una selección', () => {
+    const txt = fs.readFileSync(DOC, 'utf-8');
+    const faltan = Object.keys(C.CONTRACTS).filter((id) => !txt.includes(`\`${id}\``));
+    assert.deepEqual(faltan, []);
+  });
+
+  test('la tabla vive entre marcadores AUTO-GENERATED', () => {
+    // Mismo patrón que indices-sync y assignments-sync: adentro se reescribe,
+    // afuera se conserva. Es lo que hace que regenerar no borre notas a mano.
+    const txt = fs.readFileSync(DOC, 'utf-8');
+    assert.match(txt, /<!-- AUTO-GENERATED:BEGIN -->/);
+    assert.match(txt, /<!-- AUTO-GENERATED:END -->/);
   });
 });
 

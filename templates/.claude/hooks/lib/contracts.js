@@ -209,7 +209,90 @@ const CONTRACTS = {
     consumers: ['scripts/provocar-reglas.mjs'],
     lifetime: 'permanente',
     scope: 'proyecto',
-    nota: 'ACO-009: la provocacion depende de que architect.js nombre el codigo de la regla.',
+    nota: 'ACO-009: la provocacion depende de que architect.js nombre el codigo de la regla. '
+        + 'Hoy esta VACIO: las 28 reglas tienen fixture (DEC-004, HUE-019).',
+  },
+
+  'AUTO-GENERATED:BEGIN': {
+    path: 'indices/*.md, specs/ASSIGNMENTS.md, .claude/temp/LESSONS_LEARNED.md',
+    format: 'par de marcadores HTML; adentro se reescribe entero, afuera no se toca nunca',
+    producers: [
+      'scripts/indices-sync.js',
+      'scripts/assignments-sync.js',
+      '.claude/hooks/lib/lessons.js',
+    ],
+    consumers: [
+      'scripts/indices-sync.js',
+      'scripts/assignments-sync.js',
+      '.claude/hooks/lib/lessons.js',
+      '.claude/agents/index-syncer.md',
+    ],
+    lifetime: 'permanente',
+    scope: 'proyecto',
+    nota: 'ACO-013: es el patron mas reusado del blueprint —tres productores— y no estaba '
+        + 'declarado en ningun lado. HUE-007: nada impide editar ADENTRO y perder el trabajo '
+        + 'en el proximo sync. INC-022: assignments-sync se niega a escribir sin marcadores, '
+        + 'y la plantilla canonica no los traia.',
+  },
+
+  'author.local.json': {
+    path: '.claude/author.local.json',
+    format: '{ "code": "X" } — una letra; gitignored, es identidad local, no del repo',
+    producers: ['<el humano, copiando author.local.json.example>'],
+    consumers: [
+      '.claude/commands/assign-new.md',
+      '.claude/commands/assign-list.md',
+      '.claude/commands/assign-claim.md',
+    ],
+    lifetime: 'permanente',
+    scope: 'proyecto',
+    nota: 'ACO-013. Va gitignored A PROPOSITO: si viajara en el repo, dos personas '
+        + 'clonarian el mismo codigo de autor y los track IDs colisionarian.',
+  },
+
+  'arch-last-failure.json': {
+    path: '.claude/temp/arch-last-failure.json',
+    format: 'la ultima corrida fallida de lint:arch, para que el subagente no la repita',
+    producers: ['scripts/lint-arch-wrapper.js'],
+    consumers: ['.claude/agents/arch-auditor.md'],
+    lifetime: 'sesion',
+    scope: 'proyecto',
+    nota: 'ACO-013: el canal entre un script y un subagente. El unico contrato del harness '
+        + 'cuyo consumidor es un .md que describe a un agente, no codigo que lo lea.',
+  },
+
+  'class-discipline.baseline.json': {
+    path: 'scripts/class-discipline.baseline.json',
+    format: 'conteos por regla del DS; ratchet — un conteo solo puede bajar',
+    producers: ['scripts/architect.js'],
+    consumers: ['scripts/architect.js', 'scripts/lib/class-discipline.js'],
+    lifetime: 'permanente',
+    scope: 'proyecto',
+    nota: 'ACO-013. Koa se entrega SIN este archivo: tolerancia cero. Se genera con '
+        + '`npm run lint:arch -- --update-ds-baseline` solo si el proyecto adopta deuda '
+        + 'a proposito, y entonces el ratchet la congela en vez de dejarla crecer.',
+  },
+
+  'contrast.baseline.json': {
+    path: 'scripts/contrast.baseline.json',
+    format: 'pares token/fondo que hoy no llegan a AA; ratchet propio de ARCH-25',
+    producers: ['scripts/architect.js'],
+    consumers: ['scripts/architect.js'],
+    lifetime: 'permanente',
+    scope: 'proyecto',
+    nota: 'ACO-013. Tambien ausente de fabrica, y por el mismo motivo.',
+  },
+
+  'bento-classes.allowlist.json': {
+    path: 'scripts/lib/bento-classes.allowlist.json',
+    format: '{ classes: string[] } — toda clase .bento-* del SCSS tiene que estar aca',
+    producers: ['<el humano, al aprobar una clase nueva>'],
+    consumers: ['scripts/architect.js', 'scripts/check-bento-classes.js'],
+    lifetime: 'permanente',
+    scope: 'proyecto',
+    nota: 'ACO-013 y ARCH-21: el freno contra el sprawl del bento. A diferencia de los dos '
+        + 'baselines, este SI viaja en el payload — no es deuda tolerada, es el vocabulario '
+        + 'aprobado.',
   },
 };
 

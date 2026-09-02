@@ -137,4 +137,5 @@ Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las i
 - Stack completo: `docs/TECH-STACK-RULES.md`
 - Brand & UI: `docs/BRAND_GUIDELINES.md`
 - Sistema de Hooks: `docs/HOOKS-SYSTEM.md`
+- Contratos del harness (qué escribe cada pieza y quién lo lee): `docs/CONTRATOS.md` — generado desde `.claude/hooks/lib/contracts.js` con `npm run contracts:doc`
 - Visión del producto: `docs/PRODUCT-VISION.md`

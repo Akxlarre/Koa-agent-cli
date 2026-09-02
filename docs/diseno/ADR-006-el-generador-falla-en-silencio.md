@@ -188,6 +188,13 @@ encima. Con `--skip-install`: lo que se verifica es la **forma** de los archivos
 configuración, que es lo que los parches suponen, no que compile. Baja de minutos a
 segundos y sigue cubriendo el caso que importa —que Angular cambie esa forma—.
 
+> **Ampliado al cerrar `HUE-021`.** El test corre además `architect.js` dentro del
+> proyecto generado. Eso parecía exigir el `npm install` que este test evita, y no:
+> exige **un paquete**. Se instala el `typescript` que el propio `package.json` declara
+> —no uno fijado en el test, para que el día que Angular mueva su rango a una versión
+> que rompa el linter esto lo diga— y con eso corren el linter, sus 141 tests de
+> guardrails y las 28 provocaciones, sobre la salida real del generador.
+
 En su primera corrida falló, y el que estaba mal era **el test**: esperaba que
 `blueprint.json` llevara el nombre del proyecto. No: `name` identifica al *blueprint*
 (`koa-agent-blueprint`), es constante a propósito y así está documentado. Corregido el

@@ -94,7 +94,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-020` | **S1** | `G-02` | `parseJsonc` se come lo que siga a `//` dentro de un string: un `tsconfig.json` con `$schema` deja el proyecto sin path aliases y sin compilar | resuelto · `stripJsonComments` recorre respetando strings; el parche de `tsconfig` pasó a requerido |
 | `HUE-022` | **S1** | `G-10` | Los 9 parches son condicionales: si `ng new` cambia de forma no fallan, no hacen nada. Ningún test de integración corre `ng new` | resuelto · `patch()` con `requerido` (los tres archivos sin los que no hay proyecto paran el CLI) + `npm run test:integracion`, que corre `ng new` de verdad |
 | `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | abierto |
-| `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | abierto · el test de integración genera un proyecto real, pero no genera una feature ni le corre `architect.js` encima: eso necesita `npm install` (el linter usa la API de TypeScript) |
+| `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | resuelto · no hacía falta `npm install`, solo **un paquete**: se instala el `typescript` que el propio proyecto declara y el linter corre sobre la salida real de `ng new` |
 | `HUE-023` | S3 | `A-01` | La calidad del resumen de los subagentes no es verificable por ningún mecanismo del repo | abierto |
 | `HUE-024` | S3 | `A-01` | Nadie verifica que los comandos que los procedimientos de los subagentes mencionan existan en `package.json` | abierto |
 | `HUE-026` | S3 | `T-01` | `doc-links.test.js` verifica «regla emitida → documentada» pero no la inversa; por eso no atrapó `ARCH-14` | resuelto · `doc-links.test.js` verifica las dos direcciones; encontró un segundo fantasma, `A11Y-04`, que la auditoría no tenía |
@@ -2236,3 +2236,60 @@ Provocado: agregando un artefacto al registro sin regenerar el doc, caen 4 tests
 el consumidor que no lo nombra, dos por el doc desfasado.
 
 **Estado:** resuelto · 21 declarados y la declaración viaja al proyecto generado
+
+---
+
+## HUE-021 · Ningún test corría el linter sobre lo que el CLI genera
+
+- **Tipo / severidad:** `HUE` · S3
+- **Unidad:** `G-08` (cobertura del generador)
+- **Contexto:** A/B — el punto exacto donde se tocan
+
+**Qué encontré**
+
+`architect.js` tiene 28 reglas y es el guardrail principal del blueprint. Se lo probaba
+contra sandboxes armados a mano, nunca contra la salida real del generador. Nadie había
+comprobado jamás que el linter que **recibe el usuario** funcione en el proyecto que
+**recibe el usuario**.
+
+**Por qué se quedó abierto tanto tiempo**
+
+Cuando escribí el test de integración de `HUE-022` lo marqué resuelto de más y tuve que
+corregirlo: el test usa `ng new --skip-install`, y el linter parsea con la API de
+TypeScript. La conclusión que anoté entonces —«eso necesita el `npm install` que este test
+evita a propósito»— era **falsa, y cara**: dio por bloqueado durante tres tandas algo que
+no lo estaba.
+
+No hace falta `npm install`. Hace falta **un paquete**.
+
+**Resolución**
+
+Se instala `typescript` en la versión que el propio `package.json` del proyecto declara —no
+una fijada en el test— y con eso el linter corre. Instalar la declarada es deliberado: el
+día que Angular mueva su rango a un TypeScript que rompa `architect.js`, el test lo dice;
+fijarla a mano convertiría ese aviso en silencio. (No es hipotético: TypeScript 7 rompe
+`architect.js` — `ts.ScriptTarget` viene `undefined`.)
+
+Cinco tests nuevos sobre el proyecto real:
+
+```
+el boilerplate pasa su propio linter          0 errores, 0 advertencias
+una feature que viola tres reglas NO pasa     ARCH-01 + ARCH-04 + ARCH-08, exit ≠ 0
+scripts/lib/*.test.mjs corre ahí adentro      141 tests
+provocar-reglas.mjs corre ahí adentro         28/28
+```
+
+Las dos primeras son una sola afirmación partida en dos, y por eso van juntas: que el
+linter salga en 0 sobre el boilerplate podría significar «está limpio» o «no mira nada».
+Con la feature rota al lado, solo puede significar lo primero.
+
+Los dos últimos cierran un hueco de método, no solo de cobertura: esas suites **se saltean
+en el repo del CLI** porque ahí `typescript` no resuelve. Ahora corren donde importa.
+
+Medido: **15/15 en 61 segundos**, `ng new` real incluido.
+
+Provocado devolviendo el bug de `ARCH-09` (`INC-008`): el test cae con
+`0 errores, 2 advertencias`. Es la regresión que el usuario veía el primer día, y ahora hay
+algo que la ve antes que él.
+
+**Estado:** resuelto · el linter corre sobre la salida real de `ng new`

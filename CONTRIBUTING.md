@@ -75,6 +75,20 @@ The fast suite covers module contracts against a project shaped the way we *beli
 the scaffolder on it — that's the one that notices when Angular changes that shape.
 Run it before publishing.
 
+It also runs `architect.js` **inside** the generated project: the boilerplate has to
+pass its own linter with 0 errors and 0 warnings, a deliberately broken feature has to
+fail it, and both `scripts/lib/*.test.mjs` and `provocar-reglas.mjs` have to run there.
+Those last two are skipped in this repo — they need `typescript` to resolve, and the
+CLI doesn't depend on it. The integration suite installs the exact `typescript` version
+the generated `package.json` declares, so if Angular moves to a version that breaks the
+linter, this is what tells you.
+
+The payload has its own suites, and they are not run by `npm test`:
+
+```bash
+cd templates/.claude/tests && node --test *.test.js   # the harness hooks
+```
+
 Patches to `tsconfig.json`, `angular.json` and `package.json` are **required**: if the
 file isn't there, the CLI stops instead of quietly producing a project that doesn't
 compile. Adding a patch for a file that may legitimately be absent? Use

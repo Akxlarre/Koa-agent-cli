@@ -34,11 +34,13 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
+import { cargarTypescript } from './lib/typescript-guard.mjs';
 import { parseMigrations, renderDatabaseMd } from './lib/sql-schema.js';
 
-const require = createRequire(import.meta.url);
-const ts = require('typescript');
+// HUE-018: el require pelado moria con un stack trace de Node cuando el
+// paquete no estaba, y con un TypeError en medio del AST con TypeScript 7.
+// El guard distingue los dos casos y dice que hacer en cada uno.
+const ts = cargarTypescript({ quienLlama: '`npm run indices:sync`' });
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const green  = (s) => `\x1b[32m${s}\x1b[0m`;

@@ -174,6 +174,6 @@ Antes de crear un componente presentacional, consulta en este orden:
 - **Tailwind v4:** Usar de forma predeterminada para el 90% del styling (utilidades como `p-4`, `flex`, `bg-surface`, `text-text-muted`). NUNCA usar colores Tailwind arbitrarios. TODO debe mapear a nuestros tokens de diseño.
 - **Vanilla SCSS:** Usar EXCLUSIVAMENTE para layouts complejos estructurales (ej: los mixins abstractos del `_bento-grid.scss`) o donde las utilidades de Tailwind se vuelvan ilegibles.
 - **Motion:**
-  - Navegación de rutas → **CSS View Transitions API** nativa (`_view-transitions.scss`).
+  - Navegación de rutas → **CSS View Transitions API** nativa (`src/styles/motion/_view-transitions.scss`).
   - Animación de componentes montados → **GSAP** (`GsapAnimationsService`). NO uses `@keyframes` para micro-interacciones complejas.
   - Cambio de Tema (Light/Dark) → **CSS Transitions** puros (manejados globalmente en el `body`).

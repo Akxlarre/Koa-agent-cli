@@ -39,9 +39,15 @@ allowed-tools: Read, Write, Bash, Glob
 
 5.6. Si el "Root Cause" de este fix reveló un gotcha de **dominio/esquema/RLS/regla de
    negocio no obvia** (no visual — eso es `indices/ANTI-PATTERNS.md`) que alguien sin
-   contexto de este fix volvería a pisar, agrega una entrada `DG-NNN` a
-   `indices/DOMAIN-GOTCHAS.md` (ver convención al final de ese archivo). Si el fix fue
-   puramente visual/UI o no dejó ningún hallazgo reutilizable, sáltalo.
+   contexto de este fix volvería a pisar, agrégalo a `context/learnings.md`, que es
+   donde vive el conocimiento de negocio y entorno que el código no expresa. Si el fix
+   fue puramente visual/UI o no dejó ningún hallazgo reutilizable, sáltalo.
+
+   Escríbelo como **principio + criterio de aplicabilidad en el mismo párrafo**, no como
+   la crónica del fix: el `harness-gate` bloquea una lección que cita un track ID sin
+   decir cuándo aplica (`GATE-A1`). "En fix-042 el saldo salía negativo" no sirve;
+   "cuando una cuenta tiene movimientos en dos monedas, el saldo se calcula sobre la
+   moneda base — la conversión va después (visto en fix-042)" sí.
 
 6. Imprimir confirmación:
    ```

@@ -210,7 +210,7 @@ Shift (CLS).
 
 ### Sin GSAP (default — `blueprint.gsap: false`)
 - Entradas de vistas: clases CSS `.animate-fade-in-up`, `.animate-fade-in`, `.animate-stagger` de `src/styles/_animations.scss`
-- Navegación entre rutas: `withViewTransitions()` en `app.config.ts` + estilos en `src/styles/_view-transitions.scss`
+- Navegación entre rutas: `withViewTransitions()` en `app.config.ts` + estilos en `src/styles/motion/_view-transitions.scss`
 - `@keyframes` permitido en cualquier archivo SCSS
 
 ### Con GSAP (`blueprint.gsap: true`, flag `--with-gsap`)

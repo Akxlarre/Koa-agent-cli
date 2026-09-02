@@ -291,6 +291,70 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
       'una regla citada y no existente manda al agente a buscar algo que no esta');
   });
 
+  test('toda ruta de src/ que la doc cita existe en el boilerplate (INC-014)', () => {
+    // `visual-patterns.md` mandaba a `src/styles/_view-transitions.scss` y el
+    // archivo vive en `src/styles/motion/`. Una ruta vieja manda al agente a
+    // buscar algo que no está — el mismo daño que una regla citada e
+    // inexistente, y este archivo ya vigila ese caso para las reglas.
+    //
+    // `doc-links` verificaba referencias `archivo.md#ancla`, no rutas a código.
+    //
+    // Las excepciones van con su MOTIVO, no como una lista de silencios: una
+    // ruta que no existe y no está acá abajo hace fallar esto.
+    const EXCEPCIONES = {
+      'src/app/core/models/supabase.types.ts':
+        'lo genera `npm run supabase:types` desde el esquema real; no viaja en el payload',
+      'src/app/features/registro/registro.component.ts':
+        'es el ejemplo ilustrativo de spec-plan.md («no escribas src/..., escribe esto»)',
+    };
+
+    const boilerplate = path.join(PAYLOAD, 'boilerplate');
+    if (!fs.existsSync(boilerplate)) return; // en un proyecto generado, src/ está en la raíz
+
+    const rotas = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/`(src\/[\w./-]+\.(?:ts|html|scss|css|json))`/g)) {
+        const ruta = m[1];
+        if (fs.existsSync(path.join(boilerplate, ruta)) || EXCEPCIONES[ruta]) continue;
+        rotas.push(`${rel} → ${ruta}`);
+      }
+    }
+    assert.deepEqual([...new Set(rotas)].sort(), [],
+      'una ruta que la doc cita y no existe manda a buscar algo que no está');
+  });
+
+  test('todo `indices/X.md` que la doc cita es uno de los 15 (INC-016)', () => {
+    // `/fix-close` mandaba a registrar los gotchas de dominio en
+    // `indices/DOMAIN-GOTCHAS.md`, que no existe. El agente que siguiera esa
+    // instruccion crearia un decimosexto indice que nada sincroniza: ni el
+    // auto-indexer, ni `compact-recovery`, ni `AGENTS.md`.
+    //
+    // Un indice nuevo es una decision con consecuencias en cinco piezas. Que
+    // aparezca por una instruccion suelta en un comando es la forma mas cara de
+    // tomarla — sin tomarla.
+    const dir = path.join(PAYLOAD, 'indices');
+    if (!fs.existsSync(dir)) return;
+    const reales = new Set(fs.readdirSync(dir).filter((f) => f.endsWith('.md')));
+
+    // Placeholders: la doc explica el patron, no cita un archivo concreto.
+    const PLANTILLAS = new Set(['NOMBRE.md', 'NUEVO.md']);
+
+    const inventados = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      for (const m of fs.readFileSync(file, 'utf-8').matchAll(/indices\/([A-Z][\w-]*\.md)/g)) {
+        if (reales.has(m[1]) || PLANTILLAS.has(m[1])) continue;
+        inventados.push(`${rel} → indices/${m[1]}`);
+      }
+    }
+    assert.deepEqual([...new Set(inventados)].sort(), [],
+      'la doc manda a un indice que no existe: crearlo es una decision, no un descuido');
+  });
+
   test('y ningun doc miente sobre CUANTAS reglas valida el linter (INC-019)', () => {
     // `CLAUDE-USER-GUIDE.md` decia 8 y eran 28. No es un typo: describe un
     // linter con menos de un tercio de las reglas que tiene, y el usuario que

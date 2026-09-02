@@ -65,10 +65,10 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | resuelto · los tres hooks de `sdd/` tienen test: 42 + 35 + 16 = 93 |
 | `HUE-012` | S2 | `H-04` | Las ~20 reglas regex de `pre-write-guard` no las cubre `provocar-reglas.mjs` | resuelto · las 19 reglas mudas ahora dicen su ID y hay un fixture por regla que las provoca de verdad (`guard-rules.test.js`) |
 | `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | resuelto · las dependencias de orden declaradas y testeadas; una de las tres se disolvió con `ACO-001` en vez de documentarse |
-| `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | abierto |
+| `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | resuelto · 19 archivos, 17 cableados (el 18º comando es `post-edit.js`, que vive en `.claude/scripts/`) |
 | `HUE-009` | S3 | `H-00` | Ningún test verifica que los comandos cableados apunten a archivos existentes | resuelto · `settings.test.js`: ruta, sintaxis, evento y los dos matchers con semántica |
 | `HUE-013` | S3 | `H-05` | `GATE-B1` bloquearía una regla que documenta un hook; latente, no activo hoy | abierto |
-| `ACO-005` | S3 | `H-01` | `<!-- DETAIL:BEGIN -->` y `**last_updated:**` son contratos de 2-3 piezas sin declarar | abierto |
+| `ACO-005` | S3 | `H-01` | `<!-- DETAIL:BEGIN -->` y `**last_updated:**` son contratos de 2-3 piezas sin declarar | resuelto · los dos declarados en `contracts.js` y publicados en `docs/CONTRATOS.md` |
 | `ACO-006` | S3 | `H-02` | `koa-prompt-ctx-{sessionId}.json` no declarado | resuelto · el estado pasó a `budget-<clave>.json`, declarado en `contracts.js` |
 | `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | resuelto · `breaker.json` y `ctx-<categoria>.json` declarados; un test lee las claves que los hooks escriben de verdad |
 | `SEC-001` | **S1** | `H-11` | `post-edit.js` interpola la ruta del payload en una cadena de shell: una ruta con comillas ejecuta comandos arbitrarios | resuelto · `execFileSync` con argv — 6 cargas de ataque en el test |
@@ -78,13 +78,13 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `CAR-002` | S2 | `H-17` | `context-guardian` avisa en cada respuesta indefinidamente: no tiene anti-bucle | resuelto · `budget.avisar()`, cuyo default es no repetir |
 | `HUE-015` | S2 | `H-10` | `write-tracker` no rastrea `supabase/migrations/**`, que el Discovery Gate sí trata como código fuente | resuelto · una sesión de puro esquema dejaba ciegos a los **tres** consumidores a la vez; `DATABASE.md` es un índice y una migración es lo que lo desactualiza |
 | `INC-007` | S2 | `H-14` | `hotfix-autoclose` dice cerrar «al terminar la sesión»; `Stop` corre al final de cada respuesta | resuelto · `/hotfix-close` explícito + el hook como red en `SessionEnd` |
-| `HUE-017` | S3 | `H-13` | `compact-recovery` no tiene tope de tamaño: los 4 archivos de `context/` se inyectan enteros | abierto |
+| `HUE-017` | S3 | `H-13` | `compact-recovery` no tiene tope de tamaño: los 4 archivos de `context/` se inyectan enteros | resuelto · `MAX_INDEX_CHARS` + `budget.recortar` + corte en `DETAIL:BEGIN`; el test exige que el aviso diga que recortó |
 | `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | resuelto · medido **6 de 6** componentes inventados pasando como registrados (`x` incluido); `lib/indices.js` pregunta si hay una **fila** que los declare → 1 de 6, y esa una es real |
 | `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
-| `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | abierto |
+| `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | resuelto · declarado, y el round-trip vive en `lib/lessons.js` — un solo dueño del formato (`HUE-016`, `DUP-002`) |
 | `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → 18/28 → **28/28**. El baseline quedó vacío: no hay ninguna regla que no se haya puesto delante de su propia violación |
 | `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | resuelto · las tres RLS tienen fixture; la corrida sale en 0 |
-| `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | abierto |
+| `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | resuelto · `lib/typescript-guard.mjs` distingue los **dos** modos de fallo —falta el paquete, o la API cambió— y sale en 1, no en 2 |
 | `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | resuelto · la regla medía el `@Component` (template inline), no la clase: `tabs` era falso positivo; `section-hero` 258 → 198. `lint:arch` limpio |
 | `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | resuelto · las 9 que faltaban tienen fixture; 7 dispararon a la primera, 1 era un fixture mal escrito y 1 destapó `INC-023` |
 | `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | resuelto · interruptor `specs/AUTHORS.md`: apagada → mensaje y `exit 0` |
@@ -101,7 +101,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-011` | S3 | `G-01` | `bin/index.js` tiene 169 líneas contra el techo de ~150 que declara `cli-architecture.md` | resuelto · los prompts salieron a `lib/prompts.js`; 169 → 122 líneas, con test contra el techo de la regla |
 | `INC-012` | S3 | `G-02` | Los nombres reservados de Windows solo se validan **en** Windows | resuelto · se validan siempre, no solo en win32 |
 | `INC-013` | S3 | `G-07` | La mitigación de `deriveSingular` («el prompt permite corregirlo») no existe en modo no-interactivo | resuelto · `--singular <Nombre>` + se imprime lo derivado en modo no-interactivo |
-| `ACO-011` | S3 | `A-01` | `.claude/temp/review-diff.patch` es el canal entre `/review` y `code-judge` y no está declarado | abierto |
+| `ACO-011` | S3 | `A-01` | `.claude/temp/review-diff.patch` es el canal entre `/review` y `code-judge` y no está declarado | resuelto · declarado (lifetime `turno`, scope `sesion`) y publicado en `docs/CONTRATOS.md` |
 | `ACO-012` | S3 | `T-01` | Ningún test fija el formato del payload que reciben los hooks; cada uno lo construye a mano | abierto |
 | `CAR-003` | S2 | `R-01` | **(remedido)** Editar un componente de `features/` inyecta **13 reglas** completas (~19.100 tokens); `visual-system.md` sola es el 28% y matchea seis globs | resuelto · peor caso 76.391 → 71.975; `shared/` −38%, `.scss` −58%, SQL −40%; con tope testeado por ruta |
 | `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | resuelto · los dos npm scripts en `lib/scaffolder.js`, con test que ata comando y script |
@@ -109,8 +109,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | resuelto · la skill no nombraba **ni al script ni al subagente** y editaba dentro de los marcadores; ahora delega, y sin `Edit` en su frontmatter |
 | `HUE-027` | S3 | `R-01` | Nada distingue las 10 reglas mecanizadas de las 5 que son contrato social | abierto |
 | `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | abierto |
-| `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | abierto |
-| `INC-016` | S3 | `D-07` | `fix-close.md` manda registrar en `indices/DOMAIN-GOTCHAS.md`, que no existe | abierto |
+| `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | resuelto · era `visual-patterns.md`; corregida, y `doc-links` verifica ahora toda ruta `src/` que la doc cita |
+| `INC-016` | S3 | `D-07` | `fix-close.md` manda registrar en `indices/DOMAIN-GOTCHAS.md`, que no existe | resuelto · redirigido a `context/learnings.md`, que es donde ya vive ese conocimiento; un índice nuevo toca cinco piezas y no se decide desde un comando |
 | `DEC-006` | S2 | `L-02` | El umbral de 80 chars no salta las plantillas de `context/`: se inyectan enteras, ~3.240 tokens por compactación en un proyecto sin contexto llenado | resuelto · el detector es `budget.sinLlenar`, que mide contenido real |
 | `HUE-030` | S2 | `L-05` | `AGENTS.md` y `compact-recovery.js` omiten exactamente los mismos cinco índices; agregar uno obliga a actualizar consumidores independientes y nada lo verifica | resuelto · el hook dejó de tener lista (la lee del disco) y el que sigue teniéndola tiene test |
 | `INC-018` | S2 | `L-03` | Dos de tres servidores MCP usan `@latest`, incluido `@angular/cli@latest`, que `lib/config.js` prohíbe con tres párrafos | resuelto · `@angular/cli@{{ANGULAR_MAJOR}}`, sustituido por el scaffolder |
@@ -2676,5 +2676,121 @@ decisión en vez de un descuido.
 
 Un cuarto test de yapa: todo índice que **abre** una región tiene que cerrarla. Un `BEGIN`
 sin `END` deja al generador sin dónde terminar de escribir.
+
+**Estado:** resueltos
+
+---
+
+## HUE-018 · Un guardrail que moría con un stack trace
+
+- **Tipo / severidad:** `HUE` · S2
+- **Unidad:** `S-01` (`architect.js`)
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`architect.js` e `indices-sync.js` pedían el compilador así:
+
+```js
+const ts = require('typescript');
+```
+
+Sin guarda. Y falla de **dos** formas distintas que se ven igual de mal:
+
+| | Qué ve el usuario |
+|---|---|
+| **No está instalado** | `Error: Cannot find module 'typescript'` y veinte líneas de stack de `node:internal/modules/cjs/loader`. Un crash de Node, no «te falta un paquete» |
+| **TypeScript 7** | Carga bien y revienta más tarde con un `TypeError: Cannot read properties of undefined` en medio del recorrido del AST, apuntando a una línea del linter que no tiene nada que ver con la causa |
+
+Los dos aparecieron **auditando este repo**, no en teoría: el primero cada vez que corría el
+linter fuera de un proyecto generado, el segundo la vez que instalé `typescript` sin fijar
+la versión.
+
+**Por qué importa**
+
+Un guardrail que muere con un stack trace no es más estricto que uno que no existe: es más
+**caro**, porque manda a depurar el lugar equivocado. El primer mensaje culpa a Node; el
+segundo culpa a una línea del linter que está bien.
+
+**Arreglo**
+
+`lib/typescript-guard.mjs` carga el compilador y verifica que exponga lo que estos scripts
+usan (`createSourceFile`, `forEachChild`, `ScriptTarget`, `SyntaxKind`). Cada modo de fallo
+dice qué pasó y qué hacer:
+
+```
+✖ `npm run lint:arch` necesita el paquete `typescript` y no está instalado.
+  TypeScript viene con Angular: `npm install` en la raíz del proyecto lo resuelve.
+
+✖ El `typescript` instalado (7.0.0) no expone ScriptTarget, SyntaxKind.
+  TypeScript 7 reorganizó la API del compilador y estos scripts todavía usan la de la 5.
+```
+
+**Sale en 1, no en 2**, y eso es una decisión: esto no es una violación de una regla, es que
+el chequeo no se pudo correr. Confundirlas haría que un `lint:arch` sin TypeScript se leyera
+como «el código está mal», y mandaría a arreglar código que está bien.
+
+Los dos escenarios se montan **de verdad** en el test —un proyecto sin `node_modules` y otro
+con un `typescript` falso que carga y no expone la API—, porque probar el mensaje sin
+provocar el fallo sería exactamente el error que este repo audita. El sandbox va en
+`os.tmpdir()` a propósito: bajo un árbol con `node_modules` en algún ancestro, Node
+resolvería `typescript` desde ahí y el primer escenario no se podría montar. Costó una
+corrida descubrirlo.
+
+Provocado: con el `require` pelado de vuelta, 3 tests en rojo.
+
+**Estado:** resuelto · los dos modos de fallo dicen qué pasó y qué hacer
+
+---
+
+## INC-014 e INC-016 · Dos referencias que mandaban a un archivo que no existe
+
+- **Tipo / severidad:** `INC` · S3 · **Unidades:** `R-10` y `D-07` · **Contexto:** B
+
+**`INC-014`** — una regla mandaba a `src/styles/_view-transitions.scss` y el archivo vive en
+`src/styles/motion/`. (El hallazgo decía `visual-system.md`; es `visual-patterns.md`.)
+
+**`INC-016`** — `/fix-close` mandaba a registrar los gotchas de dominio en
+`indices/DOMAIN-GOTCHAS.md`, que **no existe**. Un agente que siguiera esa instrucción
+crearía un decimosexto índice que nada sincroniza: ni el auto-indexer, ni `compact-recovery`,
+ni `AGENTS.md`. Un índice nuevo es una decisión con consecuencias en cinco piezas, y que
+aparezca por una instrucción suelta en un comando es la forma más cara de tomarla — sin
+tomarla.
+
+Se redirigió a `context/learnings.md`, que es donde ya vive el conocimiento de negocio y
+entorno que el código no expresa, con la forma que el `harness-gate` exige: principio +
+criterio de aplicabilidad **en el mismo párrafo** (`GATE-A1`), y un ejemplo de lo que no
+sirve al lado del que sí.
+
+**Los dos comparten el mismo hueco de mecanismo.** `doc-links.test.js` verificaba
+referencias `archivo.md#ancla` y que toda regla emitida estuviera documentada — pero no las
+rutas a código ni a índices. Ahora sí:
+
+- toda ruta `` `src/...` `` que la doc cita existe en el boilerplate. Las excepciones van
+  **con su motivo**, no como una lista de silencios: `supabase.types.ts` lo genera
+  `npm run supabase:types`, y `registro.component.ts` es el ejemplo ilustrativo de
+  `spec-plan.md`. Medido: 4 de 9 citas no existían, 3 legítimas y 1 real.
+- todo `indices/X.md` que la doc cita es uno de los 15.
+
+Provocado: con la ruta vieja, 1 test en rojo nombrando el archivo y la ruta.
+
+**Estado:** resueltos · y lo que los dejó pasar ya no puede
+
+---
+
+## INC-004, ACO-005, ACO-008, ACO-011, HUE-017 · Cerrados por trabajo anterior
+
+- **Tipo / severidad:** varios · S3 · **Contexto:** B
+
+Cinco filas que las tandas anteriores habían cerrado sin actualizar su estado. Se verifican
+una por una antes de marcarlas, que es la diferencia entre cerrar y dar por cerrado:
+
+| Hallazgo | Dónde quedó cerrado |
+|---|---|
+| `INC-004` | El registro dice hoy «19 archivos, 17 cableados» — el 18º comando de `settings.json` es `post-edit.js`, que vive en `.claude/scripts/`, no en `hooks/` |
+| `ACO-005` | `DETAIL:BEGIN` y `last_updated:` están declarados en `contracts.js` y publicados en `docs/CONTRATOS.md` |
+| `ACO-008` | `LESSONS_LEARNED.md` declarado, y su round-trip con un solo dueño en `lib/lessons.js` (`HUE-016`, `DUP-002`) |
+| `ACO-011` | `review-diff.patch` declarado, con `lifetime: turno` y `scope: sesion` |
+| `HUE-017` | `compact-recovery` tiene `MAX_INDEX_CHARS`, `budget.recortar` y corte en `DETAIL:BEGIN`; su test exige que el aviso diga que recortó |
 
 **Estado:** resueltos

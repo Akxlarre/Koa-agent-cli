@@ -68,7 +68,7 @@ before(() => {
     // El scaffold, tal cual lo hace bin/index.js para un Full Scaffold.
     copyTemplates(TEMPLATES, proyecto, NOMBRE, STACK);
     injectBoilerplate(TEMPLATES, proyecto, STACK);
-    writeBlueprintJson(proyecto, NOMBRE, true, STACK);
+    writeBlueprintJson(proyecto, true, STACK);
 }, { timeout: 10 * 60 * 1000 });
 
 after(() => {
@@ -127,8 +127,9 @@ describe('EL CONTRATO DEL SCAFFOLDER SOBRE UN ng new REAL', () => {
         // `name` identifica al BLUEPRINT, no al proyecto: es constante a
         // propósito y así está documentado en MAPA-FUNCIONALIDADES.md. Escribí
         // este test esperando el nombre del proyecto y el que estaba mal era el
-        // test — de ahí salió INC-021, que es otra cosa: el parámetro
-        // `projectName` que la función acepta y no usa.
+        // test — de ahí salió INC-021, ya cerrado: la función aceptaba un
+        // `projectName` que no usaba, y esa firma es lo que me hizo escribir
+        // este test mal. Hoy no lo acepta.
         assert.equal(bp.name, 'koa-agent-blueprint');
         assert.equal(bp.scaffoldMode, 'full-scaffold');
         assert.equal(bp.stack.supabase, true);

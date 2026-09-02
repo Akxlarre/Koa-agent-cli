@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # ARCH-01, ARCH-02, ARCH-12
 paths:
   - "src/app/**/*.ts"
   - "src/app/**/*.html"
@@ -36,7 +37,7 @@ supabase/
 UI (features/ shared/)  →  Facade (core/facades/)  →  Repository (core/repositories/)  →  SupabaseService
 ```
 
-- La UI **NUNCA** inyecta `SupabaseService` ni Repositories directamente.
+- La UI **NUNCA** inyecta `SupabaseService` ni Repositories directamente (`ARCH-01`, `ARCH-02`).
 - Los **Facades** son la única puerta de entrada para la UI. Gestionan estado vía Signals.
 - Los **Repositories** son la única capa que llama `.client.from()`. Un método por query. Retornan tipos, no objetos Supabase raw.
 - `SupabaseService` expone `.db` **solo para los Repositories** (queries de tabla) y `onAuthStateChange()` para `AuthFacade` (auth events). No existe `.client` público.
@@ -44,7 +45,7 @@ UI (features/ shared/)  →  Facade (core/facades/)  →  Repository (core/repos
 ## Patrón Facade y Núcleo Funcional (Functional Core)
 
 - **SIEMPRE** extender `BaseFacade<T>` de `@core/facades/base.facade` para Facades de dominio.
-- **NUNCA** llamar `.client.from()` en un Facade — usar un Repository.
+- **NUNCA** llamar `.client.from()` en un Facade — usar un Repository (`ARCH-12`).
 - **NÚCLEO FUNCIONAL (Functional Core):** Extrae la lógica compleja y transformaciones de datos a **funciones puras** en `core/utils/`. Sin `inject()`, sin `signal()`. Testeable instantáneamente sin Angular.
 
 ## Funciones Puras (`core/utils/`)

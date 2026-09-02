@@ -96,7 +96,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | abierto |
 | `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | resuelto · no hacía falta `npm install`, solo **un paquete**: se instala el `typescript` que el propio proyecto declara y el linter corre sobre la salida real de `ng new` |
 | `HUE-023` | S3 | `A-01` | La calidad del resumen de los subagentes no es verificable por ningún mecanismo del repo | abierto |
-| `HUE-024` | S3 | `A-01` | Nadie verifica que los comandos que los procedimientos de los subagentes mencionan existan en `package.json` | abierto |
+| `HUE-024` | S3 | `A-01` | Nadie verifica que los comandos que los procedimientos de los subagentes mencionan existan en `package.json` | resuelto · las **64** menciones de `npm run X` del payload se contrastan contra los scripts que declara el scaffolder |
 | `HUE-026` | S3 | `T-01` | `doc-links.test.js` verifica «regla emitida → documentada» pero no la inversa; por eso no atrapó `ARCH-14` | resuelto · `doc-links.test.js` verifica las dos direcciones; encontró un segundo fantasma, `A11Y-04`, que la auditoría no tenía |
 | `INC-011` | S3 | `G-01` | `bin/index.js` tiene 169 líneas contra el techo de ~150 que declara `cli-architecture.md` | resuelto · los prompts salieron a `lib/prompts.js`; 169 → 122 líneas, con test contra el techo de la regla |
 | `INC-012` | S3 | `G-02` | Los nombres reservados de Windows solo se validan **en** Windows | resuelto · se validan siempre, no solo en win32 |
@@ -107,7 +107,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | resuelto · los dos npm scripts en `lib/scaffolder.js`, con test que ata comando y script |
 | `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | resuelto · una convención con dos formas y el interruptor decide; `parseTrackName` compartido, con test de las dos ramas |
 | `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | resuelto · la skill no nombraba **ni al script ni al subagente** y editaba dentro de los marcadores; ahora delega, y sin `Edit` en su frontmatter |
-| `HUE-027` | S3 | `R-01` | Nada distingue las 10 reglas mecanizadas de las 5 que son contrato social | abierto |
+| `HUE-027` | S3 | `R-01` | Nada distingue las 10 reglas mecanizadas de las 5 que son contrato social | resuelto · la partición real era **8/8**, y dos de las «sociales» sí estaban mecanizadas sin decirlo. `enforcement:` en el frontmatter, derivado de quién emite cada código |
 | `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | abierto |
 | `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | resuelto · era `visual-patterns.md`; corregida, y `doc-links` verifica ahora toda ruta `src/` que la doc cita |
 | `INC-016` | S3 | `D-07` | `fix-close.md` manda registrar en `indices/DOMAIN-GOTCHAS.md`, que no existe | resuelto · redirigido a `context/learnings.md`, que es donde ya vive ese conocimiento; un índice nuevo toca cinco piezas y no se decide desde un comando |
@@ -115,7 +115,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-030` | S2 | `L-05` | `AGENTS.md` y `compact-recovery.js` omiten exactamente los mismos cinco índices; agregar uno obliga a actualizar consumidores independientes y nada lo verifica | resuelto · el hook dejó de tener lista (la lee del disco) y el que sigue teniéndola tiene test |
 | `INC-018` | S2 | `L-03` | Dos de tres servidores MCP usan `@latest`, incluido `@angular/cli@latest`, que `lib/config.js` prohíbe con tres párrafos | resuelto · `@angular/cli@{{ANGULAR_MAJOR}}`, sustituido por el scaffolder |
 | `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | resuelto · la frase se corrigió **y** la cifra dejó de escribirse a mano: un test la deriva de `RULES` y falla contra cualquier doc del payload que afirme otra |
-| `HUE-029` | S3 | `L-04` | Los adapters no llevan ningún mecanismo y nada le dice al usuario que ahí las reglas son solo prosa | abierto |
+| `HUE-029` | S3 | `L-04` | Los adapters no llevan ningún mecanismo y nada le dice al usuario que ahí las reglas son solo prosa | resuelto · el de Windsurf decía «rules **enforced on every edit**», que en ese editor es falso. Los cuatro avisan ahora, y un test lo exige |
 | `ACO-013` | S2 | Lente 1 | 21 artefactos compartidos, 3 declarados. Y `templates-contract.md` vive en este repo, no en el payload: el proyecto generado no recibe ninguna declaración de sus propios contratos | resuelto · los **21** declarados en `contracts.js`, y `docs/CONTRATOS.md` —generado desde ahí, con test de sincronía— viaja al proyecto |
 | `HUE-031` | S3 | Lente 2 | `pre-write-guard` capa 1 y `harness-gate` protegen superficies complementarias del harness sin criterio común; ninguno cubre `.claude/skills/` ni `.claude/agents/` | resuelto · `GATE-C1`: el frontmatter que reparte permisos (`tools:`, `hooks:`) no lo edita el agente. La garantía de que `code-judge` no tiene `Bash` la sostenía una línea que él mismo podía cambiar |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | resuelto · lee stdin vía `lib/payload.js` |
@@ -140,7 +140,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DEC-008` | S2 | `diseño` | El detector de plantillas de `context-enrichment-guard` no dispara en un proyecto recién generado: `injectVars` borra el único marcador que buscaba | resuelto · `budget.sinLlenar` mide las tres formas de estar vacío; el motivo del opt-in pasó a ser cierto |
 | `DUP-004` | S2 | `diseño` | `discovery-scout` levanta el Discovery Gate del hilo principal, que nunca vio un índice — y `session-start` recomienda esa ruta | resuelto · decidido y testeado: el descubrimiento delegado SÍ cuenta, y el flag registra quién descubrió (ADR-003 §2) |
 | `DEC-009` | S2 | `diseño` | El provocador de reglas leía solo stdout: una regla que reporta con `reportWarning` no podía darse por probada nunca — el linter sale en 0 y su aviso va a stderr | resuelto · se leen las dos salidas; ARCH-11 pasó de muda a verde sin tocar la regla |
-| `INC-021` | S3 | `diseño` | `writeBlueprintJson(targetDir, projectName, isFull, stack)` acepta `projectName` y no lo usa: el `name` del blueprint es una constante. Una firma que promete algo que la función ignora | abierto |
+| `INC-021` | S3 | `diseño` | `writeBlueprintJson(targetDir, projectName, isFull, stack)` acepta `projectName` y no lo usa: el `name` del blueprint es una constante. Una firma que promete algo que la función ignora | resuelto · el parámetro ya no está, en la función y en los 8 llamadores |
 | `INC-022` | **S2** | `diseño` | La plantilla canónica de `ASSIGNMENTS.md` no traía **ningún** marcador `AUTO-GENERATED`, y `assignments-sync` se niega a escribir sin ellos: el único camino de escritura de la capa fallaba incluso en un proyecto que hubiera hecho todo bien | resuelto · marcadores en la plantilla + el error dice cómo arreglar un tablero viejo |
 | `INC-023` | S2 | `S-01` | `ARCH-07` se llamaba «No @keyframes in app styles» y su mensaje decía «archivo de estilos», pero solo mira `src/app/**`. El blueprint reparte **siete** `@keyframes` en `src/styles/` que la lectura literal convertiría en violaciones | resuelto · el alcance era correcto y las palabras no: las tres puntas dicen «estilos de componente», como el hook siempre dijo |
 | `HUE-033` | **S2** | `ejecución` | El trinquete de `CAR-003` estuvo **en rojo desde el commit siguiente al que lo fijó**, y no me enteré: la suite de `scripts/lib/` no entraba en la verificación de cada tanda. El mecanismo funcionó; el que no corría era yo | resuelto · el presupuesto vuelve a estar bajo el tope sin subirlo, y las cuatro suites entran en la verificación |
@@ -2873,3 +2873,85 @@ menos 15 archivos.
 Provocado: devolviendo `harness-gate` a parsear a mano, 2 tests en rojo.
 
 **Estado:** resuelto · 5 → 4, y el baseline solo se achica
+
+---
+
+## HUE-027 y HUE-029 · Qué te frena de verdad, y dónde nada te frena
+
+- **Tipo / severidad:** `HUE` · S3 · **Unidades:** `R-01` y `L-04` · **Contexto:** B
+
+**HUE-027, y la medición corrigió el hallazgo.** Decía «10 mecanizadas / 5 sociales». Al
+derivarlo de quién emite cada código —`guard-rules.js` y el `RULES` de `architect.js`—
+salió otra cosa:
+
+```
+16 reglas
+ 6  citaban un código que algún mecanismo emite
+10  no citaban ninguno
+```
+
+Y **dos de esas diez sí estaban mecanizadas, solo que sin decirlo**: `architecture.md`
+describe en prosa lo que `ARCH-01`, `ARCH-02` y `ARCH-12` bloquean, y `testing-tdd.md` dice
+«el linter verifica» sin nombrar `ARCH-03`.
+
+Son dos daños opuestos, y el segundo no estaba en el hallazgo: creer que algo te frena
+cuando no te frena nada, **y no encontrar la regla que explica el bloqueo que sí ocurrió**.
+Un agente detenido con `[ARCH-12]` no tenía cómo llegar al texto que se lo explica.
+
+Se nombraron los códigos donde la regla ya los describía —eso arregla el segundo daño— y
+las 16 declaran ahora `enforcement:` en su frontmatter. La partición real: **8 y 8**.
+
+La etiqueta no puede mentir porque no es la fuente: el test deriva la verdad de los
+emisores y falla en las dos direcciones —una regla que se declara `mecanizada` sin un
+código que la respalde, y una que se declara `social` citando uno que sí la respalda—.
+
+**HUE-029.** Cursor, Windsurf y Copilot no ejecutan hooks de Claude Code: ahí no corre el
+Discovery Gate, ni el Architect Guard, ni las 28 reglas del linter. Y los adapters heredaban
+el lenguaje de un harness que no tienen — el de Windsurf decía, literal, *«the most critical
+rules **enforced on every edit**»*.
+
+Es `HUE-027` un grado peor: no es una regla que no frena, es un archivo entero que no frena
+presentándose como si frenara. Los cuatro adapters llevan ahora el aviso —qué no corre ahí,
+y cómo verificar de verdad (`npm run lint:arch`, o abrir el proyecto con Claude Code)— y un
+test exige que lo lleven y que ninguno vuelva a prometer que algo se hace cumplir en cada
+edición.
+
+**El presupuesto de reglas se cobró esto, y esta vez lo escuché.** El `enforcement:` son
+~35 chars por regla, y una ruta que matchea 14 las paga 14 veces: el trinquete de `CAR-003`
+saltó con +1.031 en el peor caso. Se pagó primero lo que se podía —la explicación de las
+sociales estaba repetida 8 veces, ~450 chars, y vive una sola vez en `.claude/CLAUDE.md`— y
+los dos topes que quedaban cortos se subieron **a propósito y con el motivo escrito al
+lado**, que es lo que `HUE-033` reprocha no haber hecho.
+
+Provocado: una regla mecanizada declarándose social, 2 tests en rojo; una sin `enforcement`,
+1; un adapter sin el aviso, 1.
+
+**Estado:** resueltos
+
+---
+
+## HUE-024 e INC-021 · Un comando que no existe, y un parámetro que no se usa
+
+- **Tipo / severidad:** `HUE` S3 y `INC` S3 · **Contexto:** A y B
+
+**`HUE-024`** — los subagentes tienen procedimientos que mandan correr comandos
+(`arch-auditor` corre `lint:arch`, `index-syncer` corre `indices:sync`) y nadie verificaba
+que existieran. Ya había pasado: `INC-015`, donde `sdd/SKILL.md` y `/assign-claim` mandaban
+correr `assignments:sync` y el script no existía en ningún proyecto generado, así que el
+único camino de escritura de esa capa no se podía recorrer.
+
+Medido: **64 menciones de `npm run X` en el payload, ninguna rota**. El hallazgo no era una
+rotura, era la ausencia de mecanismo — así que lo que se agrega empieza en verde y sirve
+para que siga estándolo. Un comando inexistente no falla como un error de sintaxis: falla en
+la cara del usuario, a mitad de un procedimiento, con un mensaje de npm.
+
+**`INC-021`** — `writeBlueprintJson(targetDir, projectName, isFull, stack)` aceptaba
+`projectName` y no lo usaba: el `name` del blueprint es la constante `koa-agent-blueprint`,
+porque identifica al *blueprint*, no al proyecto.
+
+No es cosmético, y hay evidencia en esta misma auditoría: esa firma **me hizo escribir un
+test equivocado**. El de integración nació esperando el nombre del proyecto en `bp.name`, y
+el que estaba mal era el test. Una firma que promete algo que la función ignora induce
+exactamente ese error. El parámetro ya no está, ni en la función ni en los 8 llamadores.
+
+**Estado:** resueltos

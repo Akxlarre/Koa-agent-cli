@@ -1,4 +1,5 @@
 ---
+enforcement: social
 paths:
   - "src/app/**/*.html"
   - "src/app/**/*.scss"

@@ -1,4 +1,5 @@
 ---
+enforcement: social
 paths:
   - "src/app/shared/**/*.ts"
   - "src/app/features/**/*.ts"

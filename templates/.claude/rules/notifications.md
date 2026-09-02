@@ -1,4 +1,5 @@
 ---
+enforcement: social
 paths:
   - "src/app/core/facades/*notification*"
   - "src/app/core/services/toast*"

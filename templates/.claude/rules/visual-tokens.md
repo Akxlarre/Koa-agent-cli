@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # ARCH-11, ARCH-15, ARCH-16, ARCH-17, ARCH-18, ARCH-19, ARCH-22, ARCH-23, ARCH-24, ARCH-25, ARCH-26
 paths:
   - "src/app/**/*.html"
   - "src/app/**/*.scss"

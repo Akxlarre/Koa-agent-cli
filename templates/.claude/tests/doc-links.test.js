@@ -355,6 +355,42 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
       'la doc manda a un indice que no existe: crearlo es una decision, no un descuido');
   });
 
+  test('todo `npm run X` que la doc manda correr existe (HUE-024)', () => {
+    // Los subagentes tienen PROCEDIMIENTOS que mandan correr comandos —
+    // `arch-auditor` corre `lint:arch`, `index-syncer` corre `indices:sync`— y
+    // nadie verificaba que existieran. Ya pasó una vez: `INC-015`, donde
+    // `sdd/SKILL.md` y `/assign-claim` mandaban correr `assignments:sync` y el
+    // script no existía en ningún proyecto generado, así que el único camino de
+    // escritura de esa capa no se podía recorrer.
+    //
+    // Un comando inexistente no falla como un error de sintaxis: falla en la
+    // cara del usuario, a mitad de un procedimiento, con un mensaje de npm.
+    //
+    // Hoy están las 64 menciones y ninguna rota. Este test es lo que hace que
+    // siga siendo así.
+    const scaffolder = path.resolve(PAYLOAD, '..', 'lib', 'scaffolder.js');
+    if (!fs.existsSync(scaffolder)) return; // en un proyecto generado no está el CLI
+
+    const declarados = new Set(
+      [...fs.readFileSync(scaffolder, 'utf-8').matchAll(/'([\w:-]+)':\s*'/g)].map((m) => m[1]),
+    );
+    assert.ok(declarados.size >= 15, `solo ${declarados.size} scripts detectados en el scaffolder`);
+
+    const rotos = [];
+    let total = 0;
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      for (const m of fs.readFileSync(file, 'utf-8').matchAll(/npm run ([\w:-]+)/g)) {
+        total += 1;
+        if (!declarados.has(m[1])) rotos.push(`${rel} → npm run ${m[1]}`);
+      }
+    }
+    assert.ok(total >= 20, `solo ${total} menciones de npm run — revisá el regex`);
+    assert.deepEqual([...new Set(rotos)].sort(), [],
+      'la doc manda a correr un script que el scaffolder no declara');
+  });
+
   test('y ningun doc miente sobre CUANTAS reglas valida el linter (INC-019)', () => {
     // `CLAUDE-USER-GUIDE.md` decia 8 y eran 28. No es un typo: describe un
     // linter con menos de un tercio de las reglas que tiene, y el usuario que

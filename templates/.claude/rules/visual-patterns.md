@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # ARCH-23
 paths:
   - "src/app/features/**"
   - "src/app/layout/**"

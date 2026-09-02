@@ -109,7 +109,7 @@ async function main() {
             try { fs.rmSync(tempParentDir, { recursive: true, force: true }); } catch { /* ignore */ }
         }
 
-        writeBlueprintJson(targetDir, projectName, isFull, stack);
+        writeBlueprintJson(targetDir, isFull, stack);
         printSuccess(projectName, isFull, targetDir);
     } catch (err) {
         spinnerBlueprint.fail(chalk.red('Error al inyectar Blueprint'));

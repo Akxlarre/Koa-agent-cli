@@ -123,6 +123,17 @@ hecho.
 Las reglas viven en `.claude/rules/` con frontmatter `paths:`. Claude Code las inyecta
 **solo cuando el archivo editado coincide con el path** — no se cargan todas al inicio.
 
+**No todas te frenan igual, y cada una lo dice en su frontmatter** (`enforcement:`):
+
+| | Qué significa |
+|---|---|
+| `mecanizada` | Un hook o el linter la bloquea. El frontmatter nombra los códigos (`ARCH-01`, `A11Y-03`…), así que cuando algo te bloquee con uno de ellos podés llegar a la regla que lo explica |
+| `social` | **Nada la bloquea.** Es un acuerdo del proyecto: si la rompés, no hay guardrail que te avise — se nota en la revisión, o no se nota |
+
+Son **8 y 8**. Saberlo importa en las dos direcciones: creer que algo te frena cuando no
+te frena nada es tan caro como no encontrar la explicación de lo que sí te frenó. Un test
+deriva la verdad de quién emite cada código, así que la etiqueta no puede mentir.
+
 | Archivos editados | Reglas activas |
 |---|---|
 | `src/app/**/*.ts` + `.html` | `architecture`, `facades`, `swr-pattern`, `testing-tdd`, `state-management` |

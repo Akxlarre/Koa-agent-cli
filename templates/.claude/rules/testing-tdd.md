@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # ARCH-03
 paths:
   - "src/app/core/**/*.ts"
   - "src/app/features/**/*.ts"
@@ -119,4 +120,4 @@ test('should create item', async ({ page }) => {
 
 ## Shadow CI y Cobertura
 
-El Linter Arquitectónico (`npm run lint:arch`) verifica que lógicas y módulos clave tengan sus `.spec.ts` complementarios. Si detecta una falta, interrumpirá tu flujo de éxito.
+El Linter Arquitectónico (`npm run lint:arch`) verifica que lógicas y módulos clave tengan sus `.spec.ts` complementarios (`ARCH-03`). Si detecta una falta, interrumpirá tu flujo de éxito.

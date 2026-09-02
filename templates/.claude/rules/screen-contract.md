@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # ARCH-17, ARCH-19, ARCH-23, ARCH-24, ARCH-25, NAV-01
 paths:
   - "src/app/features/**/*.ts"
   - "src/app/features/**/*.html"

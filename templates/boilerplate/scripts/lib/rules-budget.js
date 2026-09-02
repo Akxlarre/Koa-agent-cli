@@ -81,16 +81,34 @@ export function costoDe(ruta, reglas) {
  * tope que no se achica es la misma lista de excusas que un baseline que no se
  * achica.
  */
+/**
+ * Los dos topes que subieron, y a cambio de qué (HUE-027).
+ *
+ * Cada regla declara ahora en su frontmatter si la bloquea un mecanismo
+ * (`enforcement: mecanizada  # ARCH-01, ARCH-02…`) o si es un acuerdo del
+ * proyecto (`enforcement: social`). Son ~35 chars por regla, y una ruta que
+ * matchea 14 reglas los paga 14 veces: +583 en el peor caso.
+ *
+ * Se subió a propósito, no por inercia. Lo que compra es que el agente sepa si
+ * romper esa regla lo frena o no — la pregunta que ninguna de las 16 respondía,
+ * y de la que dependen dos errores opuestos: confiar en un guardrail que no
+ * existe, y no encontrar la regla que explica el bloqueo que sí ocurrió.
+ *
+ * Se pagó primero lo que se podía: la explicación de las sociales («nada la
+ * bloquea: es un acuerdo, no un guardrail») estaba repetida 8 veces, ~450
+ * chars, y vive una sola vez en `.claude/CLAUDE.md`. Los códigos de las
+ * mecanizadas se quedan: eso es información, no explicación.
+ */
 export const TOPES = {
   // ruta                                        tope     medido al fijarlo
-  'src/app/features/reportes/reportes.ts':      72_000, // 71.975 — el peor caso
-  'src/app/features/reportes/reportes.html':    41_000, // 40.196
-  'src/app/core/facades/reportes.facade.ts':    40_000, // 39.316
-  'src/app/layout/sidebar/sidebar.ts':          33_000, // 32.058
-  'src/app/shared/ui/kpi-card/kpi-card.ts':     25_000, // 24.639
-  'src/app/core/models/reporte.model.ts':       19_000, // 18.212
-  'src/styles/tokens/_variables.scss':          10_000, //  8.986
-  'supabase/migrations/001_init.sql':            5_000, //  4.522
+  'src/app/features/reportes/reportes.ts':      73_000, // 72.583 — el peor caso
+  'src/app/features/reportes/reportes.html':    41_000, // 40.677
+  'src/app/core/facades/reportes.facade.ts':    40_000, // 39.531
+  'src/app/layout/sidebar/sidebar.ts':          33_000, // 32.477
+  'src/app/shared/ui/kpi-card/kpi-card.ts':     25_500, // 25.013
+  'src/app/core/models/reporte.model.ts':       19_000, // 18.387
+  'src/styles/tokens/_variables.scss':          10_000, //  9.131
+  'supabase/migrations/001_init.sql':            5_000, //  4.593
 };
 
 export const RUTAS_REPRESENTATIVAS = Object.keys(TOPES);

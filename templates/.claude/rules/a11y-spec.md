@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # A11Y-01, A11Y-02, A11Y-03, LLM-01, LLM-02
 paths:
   - "src/app/**/*.html"
   - "src/app/features/**/*.ts"

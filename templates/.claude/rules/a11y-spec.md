@@ -26,11 +26,8 @@ El Architect Guard valida estos contratos automáticamente en cada escritura.
 - **PROHIBIDO**: `<button (click)="borrar()"><app-icon name="trash" /></button>`  
 - **OBLIGATORIO**: `<button (click)="borrar()" aria-label="Eliminar registro"><app-icon name="trash" /></button>`
 
-### `data-llm-action` en botones de mutación — lo emiten LLM-01 y LLM-02
-- Refuerzo: toda acción que modifica datos (`save`, `delete`, `submit`) debe tener `data-llm-action`.
-- El número lo pone quien lo detecta: `LLM-01` (submit) y `LLM-02` (destructivo), en
-  `pre-write-guard`. Esta sección tenía un número propio de la familia A11Y que no
-  emitía ningún detector: una regla citada y no existente manda a buscar algo que no está.
+### `data-llm-action` en botones de mutación — lo emiten `LLM-01` y `LLM-02`
+- Toda acción que modifica datos (`save`, `delete`, `submit`) debe tener `data-llm-action`.
 
 ## Por qué importa
 Los guardrails agénticos (y los tests de accesibilidad automatizados) dependen de atributos

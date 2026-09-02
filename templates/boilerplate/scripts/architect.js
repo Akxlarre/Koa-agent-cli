@@ -376,6 +376,22 @@ function getLineSpan(sourceFile, node) {
     return { startLine: start + 1, endLine: end + 1, lines: (end - start) + 1 };
 }
 
+/**
+ * Las líneas del CUERPO de una clase: del primer miembro al último (INC-008).
+ *
+ * `getLineSpan` sobre un ClassDeclaration incluye los decoradores, porque en el
+ * AST de TypeScript son parte del nodo. En un componente Angular con template
+ * inline eso es casi todo el archivo, y medir HTML no dice nada sobre si la
+ * clase es demasiado compleja. Una clase sin miembros mide 0.
+ */
+function getBodyLineSpan(sourceFile, node) {
+    const miembros = node.members;
+    if (!miembros || miembros.length === 0) return 0;
+    const primero = sourceFile.getLineAndCharacterOfPosition(miembros[0].getStart(sourceFile)).line;
+    const ultimo = sourceFile.getLineAndCharacterOfPosition(miembros[miembros.length - 1].getEnd()).line;
+    return (ultimo - primero) + 1;
+}
+
 function analyzeTypeScript(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
 
@@ -493,15 +509,37 @@ function analyzeTypeScript(filePath) {
     }
 
     // ── ARCH-09 (WARNING): shared/**/*.component.ts con clase >200 líneas ────
+    //
+    // INC-008: esto medía el span del ClassDeclaration, y en TypeScript los
+    // decoradores son parte del nodo. En un componente Angular con template
+    // inline —que es como escribe TODO este boilerplate— eso significa que
+    // ARCH-09 contaba el markup y lo reportaba como «clase demasiado grande».
+    // Medido sobre el propio boilerplate:
+    //
+    //   section-hero  1.170 «líneas de clase» → 910 son el @Component, 258 la clase
+    //   tabs            298 «líneas de clase» → 248 son el @Component,  48 la clase
+    //
+    // Una clase de 48 líneas denunciada por tener 298. La regla no medía lo que
+    // su nombre y su fix («divide el componente, extrae lógica a servicios»)
+    // dicen medir: medía cuánto HTML tiene el archivo.
+    //
+    // Ahora mide el CUERPO. El total sigue en el mensaje porque un template
+    // inline enorme es una señal real — pero es otra señal, y decirla con las
+    // palabras de esta no ayudaba a nadie a arreglar nada.
     if (isComponent && isInShared) {
         walkAst(sourceFile, node => {
             if (!ts.isClassDeclaration(node)) return;
-            const span = getLineSpan(sourceFile, node);
-            if (span.lines > 200) {
+            const total = getLineSpan(sourceFile, node).lines;
+            const cuerpo = getBodyLineSpan(sourceFile, node);
+            if (cuerpo > 200) {
+                const decorador = total - cuerpo;
                 reportWarning(
                     'ARCH-09',
                     filePath,
-                    `Clase demasiado grande (${span.lines} líneas). Límite recomendado: 200.`,
+                    `Clase demasiado grande (${cuerpo} líneas de cuerpo). Límite recomendado: 200.`
+                    + (decorador > cuerpo
+                        ? ` (El archivo tiene ${total} líneas de declaración: ${decorador} son el @Component —template y estilos inline—, que no cuentan para este límite.)`
+                        : ''),
                 );
             }
         });

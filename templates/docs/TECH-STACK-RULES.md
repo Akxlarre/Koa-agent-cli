@@ -44,7 +44,8 @@
 
 <a id="arch-09"></a>
 ### ARCH-09: Complexity warning (shared components)
-- Warning si un `shared/**/*.component.ts` tiene una clase muy grande (recomendación: \(\le 200\) líneas de clase).
+- Warning si un `shared/**/*.component.ts` tiene una clase muy grande (recomendación: \(\le 200\) líneas de **cuerpo**: del primer miembro al último).
+- El `@Component` **no cuenta**: el template y los estilos inline son markup, no complejidad de la clase. La regla medía el span completo de la declaración —decoradores incluidos, que es como los guarda el AST de TypeScript— y con template inline eso denunciaba componentes de 48 líneas por tener 298 (`INC-008`). Cuando el decorador pesa más que la clase, el aviso lo aclara.
 - Solución: dividir en subcomponentes, extraer helpers y mantener `shared/` como UI presentacional.
 
 <a id="arch-10"></a>

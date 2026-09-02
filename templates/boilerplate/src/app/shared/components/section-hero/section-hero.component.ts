@@ -18,7 +18,16 @@ import { GsapAnimationsService } from '@core/services/gsap-animations.service';
 import { IconComponent } from '@shared/components/icon/icon.component';
 import { BadgeComponent } from '@shared/components/badge/badge.component';
 import { SkeletonBlockComponent } from '@shared/components/skeleton-block/skeleton-block.component';
-import { getSparklinePoints } from '@core/utils/sparkline.utils';
+import {
+  type ChipVariant,
+  chipVariant,
+  getSparklinePoints,
+  kpiBgTint,
+  kpiValueColor,
+  sparklineColor,
+  trendColor,
+  trendDisplay,
+} from './section-hero.tokens';
 import type {
   SectionHeroAction,
   SectionHeroChip,
@@ -474,7 +483,7 @@ import type {
               @if (chips().length) {
                 <div class="flex items-center gap-1.5 flex-wrap">
                   @for (chip of chips(); track chip.label) {
-                    <app-badge [variant]="getChipVariant(chip)" class="whitespace-nowrap">
+                    <app-badge [variant]="chipVariant(chip)" class="whitespace-nowrap">
                       @if (chip.icon) {
                         <app-icon [name]="chip.icon" [size]="11" />
                       }
@@ -1012,40 +1021,16 @@ export class SectionHeroComponent implements AfterViewInit, OnDestroy {
 
   /**
    * El chip del hero es un badge de estado: se delega en BadgeComponent en vez
-   * de recomponer la píldora con utilidades sueltas (ARCH-15). Los estilos
-   * inline que había antes duplicaban lo que ya hacen las utilidades badge-*.
+   * de recomponer la píldora con utilidades sueltas (ARCH-15).
+   *
+   * Los mapeos a tokens del DS viven en `section-hero.tokens.ts` (INC-008): son
+   * puros, se testean sin montar el componente, y acá quedan como un método de
+   * una línea porque un template de Angular solo llama miembros de la clase.
+   * `getChipStyle` y `getChipIconColor` no sobrevivieron a la mudanza: ningún
+   * template las usaba.
    */
-  protected chipVariant(chip: SectionHeroChip): 'neutral' | 'warning' | 'error' | 'success' {
-    switch (chip.style) {
-      case 'warning': return 'warning';
-      case 'error': return 'error';
-      case 'success': return 'success';
-      default: return 'neutral';
-    }
-  }
-
-  /**
-   * Estilos inline para chips usando tokens CSS del DS.
-   * Dentro de .surface-hero, var(--bg-subtle) y var(--border-subtle)
-   * se resuelven automáticamente como glass blanco (token cascade).
-   */
-  // Chips siempre glass blanco + texto blanco. El estado se comunica por el ícono.
-  getChipStyle(_chip: SectionHeroChip): string {
-    return 'background: var(--bg-subtle); color: var(--color-primary-text); border-color: var(--border-subtle)';
-  }
-
-  // Color semántico solo para el ícono — independiente del texto del chip.
-  getChipIconColor(chip: SectionHeroChip): string {
-    switch (chip.style) {
-      case 'error':
-        return 'var(--state-error)';
-      case 'warning':
-        return 'var(--state-warning)';
-      case 'success':
-        return 'var(--state-success)';
-      default:
-        return 'var(--color-primary-text)';
-    }
+  protected chipVariant(chip: SectionHeroChip): ChipVariant {
+    return chipVariant(chip);
   }
 
   onActionClick(id: string): void {
@@ -1143,64 +1128,28 @@ export class SectionHeroComponent implements AfterViewInit, OnDestroy {
     this.actionClick.emit(item.id);
   }
 
-  // ── Slim-mode helpers ──────────────────────────────────────────
-
-  getChipVariant(chip: SectionHeroChip): 'success' | 'warning' | 'error' | 'neutral' {
-    switch (chip.style) {
-      case 'error':
-        return 'error';
-      case 'warning':
-        return 'warning';
-      case 'success':
-        return 'success';
-      default:
-        return 'neutral';
-    }
-  }
+  // ── Puentes al template ─────────────────────────────────────────────────────
+  // La lógica está en `section-hero.tokens.ts`. Estos métodos existen solo
+  // porque el template no puede llamar una función importada (INC-008).
 
   getTrendColor(trend: number): string {
-    return trend > 0 ? 'var(--state-success)' : 'var(--state-error)';
+    return trendColor(trend);
   }
 
   getTrendDisplay(trend: number): string {
-    return String(Math.abs(trend));
+    return trendDisplay(trend);
   }
 
   getSparklineColor(kpi: SectionHeroKpi): string {
-    if (kpi.color === 'success' || (kpi.trend !== undefined && kpi.trend > 0))
-      return 'var(--state-success)';
-    if (kpi.color === 'error' || (kpi.trend !== undefined && kpi.trend < 0))
-      return 'var(--state-error)';
-    if (kpi.color === 'warning') return 'var(--state-warning)';
-    return 'var(--ds-brand)';
+    return sparklineColor(kpi);
   }
 
   getKpiValueColor(kpi: SectionHeroKpi): string {
-    switch (kpi.color) {
-      case 'success':
-        return 'var(--state-success)';
-      case 'error':
-        return 'var(--state-error)';
-      case 'warning':
-        return 'var(--state-warning)';
-      default:
-        return 'var(--text-primary)';
-    }
+    return kpiValueColor(kpi);
   }
 
   getKpiBgTint(kpi: SectionHeroKpi): string {
-    const hasValue = +kpi.value > 0;
-    if (!hasValue) return 'transparent';
-    switch (kpi.color) {
-      case 'error':
-        return 'var(--state-error-bg)';
-      case 'warning':
-        return 'var(--state-warning-bg)';
-      case 'success':
-        return 'var(--state-success-bg)';
-      default:
-        return 'transparent';
-    }
+    return kpiBgTint(kpi);
   }
 
   getSparklinePoints(data: number[], w = 40, h = 20): string {

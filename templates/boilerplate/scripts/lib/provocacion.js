@@ -204,6 +204,30 @@ export class FixtureComponent {}
     ruta: 'supabase/migrations/001_fixture.sql',
     contenido: `CREATE TABLE public.notas (\n  id uuid PRIMARY KEY,\n  user_id uuid NOT NULL\n);\n\nALTER TABLE public.notas ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY notas_write ON public.notas\n  FOR UPDATE USING (true);\n`,
   },
+
+  'ARCH-09': {
+    // Un componente de shared/ con 201 miembros triviales: el cuerpo pasa de 200
+    // líneas sin que ninguna otra regla tenga nada que decir.
+    //
+    // El template es de una línea A PROPÓSITO (INC-008). Antes ARCH-09 medía el
+    // span del ClassDeclaration, y en el AST de TypeScript los decoradores son
+    // parte de ese nodo: con template inline la regla contaba HTML y lo llamaba
+    // «clase demasiado grande». Un fixture con template largo habría disparado
+    // igual y no habría distinguido una regla arreglada de una rota.
+    ruta: 'src/app/shared/components/fixture/fixture.component.ts',
+    contenido: `import { ChangeDetectionStrategy, Component } from '@angular/core';
+
+@Component({
+  selector: 'app-fixture',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<p>x</p>',
+})
+export class FixtureComponent {
+${Array.from({ length: 201 }, (_, i) => `  campo${i} = ${i};`).join('\n')}
+}
+`,
+  },
 };
 
 /**

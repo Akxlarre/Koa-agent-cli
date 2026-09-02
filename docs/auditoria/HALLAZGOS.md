@@ -85,7 +85,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → **18/28**; las 3 de RLS y las 2 que motivaron el script, cubiertas. Las 10 restantes siguen en el baseline |
 | `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | resuelto · las tres RLS tienen fixture; la corrida sale en 0 |
 | `HUE-018` | S2 | `S-01` | `require('typescript')` sin guarda: con TypeScript 7 el linter muere con un `TypeError`, no con un mensaje | abierto |
-| `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | abierto |
+| `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | resuelto · la regla medía el `@Component` (template inline), no la clase: `tabs` era falso positivo; `section-hero` 258 → 198. `lint:arch` limpio |
 | `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | abierto |
 | `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | resuelto · interruptor `specs/AUTHORS.md`: apagada → mensaje y `exit 0` |
 | `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | abierto |
@@ -142,6 +142,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DEC-009` | S2 | `diseño` | El provocador de reglas leía solo stdout: una regla que reporta con `reportWarning` no podía darse por probada nunca — el linter sale en 0 y su aviso va a stderr | resuelto · se leen las dos salidas; ARCH-11 pasó de muda a verde sin tocar la regla |
 | `INC-021` | S3 | `diseño` | `writeBlueprintJson(targetDir, projectName, isFull, stack)` acepta `projectName` y no lo usa: el `name` del blueprint es una constante. Una firma que promete algo que la función ignora | abierto |
 | `INC-022` | **S2** | `diseño` | La plantilla canónica de `ASSIGNMENTS.md` no traía **ningún** marcador `AUTO-GENERATED`, y `assignments-sync` se niega a escribir sin ellos: el único camino de escritura de la capa fallaba incluso en un proyecto que hubiera hecho todo bien | resuelto · marcadores en la plantilla + el error dice cómo arreglar un tablero viejo |
+| `HUE-033` | **S2** | `ejecución` | El trinquete de `CAR-003` estuvo **en rojo desde el commit siguiente al que lo fijó**, y no me enteré: la suite de `scripts/lib/` no entraba en la verificación de cada tanda. El mecanismo funcionó; el que no corría era yo | resuelto · el presupuesto vuelve a estar bajo el tope sin subirlo, y las cuatro suites entran en la verificación |
 
 ---
 
@@ -1459,7 +1460,48 @@ ejemplo que la regla es negociable.
 Decidir explícitamente: dividir `section-hero`, o subir el límite con motivo escrito, o
 excluir el boilerplate del chequeo. Lo que no puede quedar es el warning permanente.
 
-**Estado:** abierto
+**Resolución** — ninguna de las tres. Al medirlo apareció una cuarta: **la regla no medía
+lo que dice medir**.
+
+`ARCH-09` usaba el span del `ClassDeclaration`, y en el AST de TypeScript los decoradores
+son parte de ese nodo. Todo este boilerplate escribe componentes con template inline, así
+que la regla contaba HTML y lo reportaba como «clase demasiado grande»:
+
+```
+                span    @Component    clase
+section-hero    1.170       910        258
+tabs              298       248         48   ← una clase de 48 líneas, denunciada por 298
+```
+
+`tabs` nunca tuvo un problema. Su advertencia era falsa, y su fix («divide el componente,
+extrae lógica a servicios») no describía nada que se pudiera hacer: no había lógica que
+extraer. El usuario del primer día veía dos advertencias, y una de las dos era mentira.
+
+Ahora mide el **cuerpo** (del primer miembro al último). El total sigue en el mensaje
+cuando el decorador pesa más que la clase, porque un template inline enorme es una señal
+real — pero es otra señal, y decirla con las palabras de esta no ayudaba a arreglar nada.
+`tabs` quedó limpio sin tocarlo.
+
+`section-hero` sí tenía un problema real: 258 líneas de cuerpo. Se hizo lo que el fix de la
+propia regla dice — se extrajeron a `section-hero.tokens.ts` los mapeos puros dato → token
+del DS, que se testean sin montar un componente. La clase conserva un método de una línea
+por cada uno porque un template de Angular solo llama miembros de la clase; eso es
+andamiaje, y la decisión de qué token corresponde a qué estado ya no vive ahí. De paso:
+
+- `getChipStyle` y `getChipIconColor` eran **código muerto** — ningún template las llamaba.
+- `chipVariant` y `getChipVariant` eran la **misma función con dos nombres**, una por rama
+  del template. Quedó una.
+
+Resultado: **258 → 198**, y `npm run lint:arch` sobre el boilerplate da **0 errores,
+0 advertencias**.
+
+Y `ARCH-09` salió del baseline de provocación: tiene fixture (9/28 sin fixture, era 10).
+El fixture lleva template de una línea a propósito — uno con template largo habría
+disparado también con la regla vieja, y no habría distinguido una regla arreglada de una
+rota. La comprobación inversa —600 líneas de markup con 5 miembros **no** disparan— vive en
+`scripts/lib/arch09-cuerpo.test.mjs`.
+
+**Estado:** resuelto · la regla mide el cuerpo de la clase; el boilerplate pasa su propio linter
 
 ---
 
@@ -1971,3 +2013,57 @@ valiosa registrada primero desaparece tras 22 fallas de un error con pipes.
 
 El arreglo no cambia: escapar el separador en el productor. Lo que cambia es el motivo por el
 que urge — no es que el archivo se degrade, es que la memoria institucional se vacía sola.
+
+---
+
+## HUE-033 · El trinquete de `CAR-003` estuvo en rojo tres tandas y nadie lo miró
+
+- **Tipo / severidad:** `HUE` · S2
+- **Unidad:** encontrado ejecutando, no auditando
+- **Contexto:** B (harness) — y sobre todo, sobre cómo se verifica el trabajo
+
+**Qué encontré**
+
+Al correr la suite de `scripts/lib/` —que no venía corriendo— apareció esto:
+
+```
+src/app/features/reportes/reportes.ts paga 72.216 chars (tope 72.000) en 14 reglas
+```
+
+El tope lo fijé yo al cerrar `CAR-003`, con la medición escrita al lado: `72.000 // 71.975`.
+El commit **siguiente** (`cc3be68`, el que sacó la regla fantasma `A11Y-04`) agregó 241
+caracteres de explicación a `a11y-spec.md`, y esa regla aplica a tres de las ocho rutas
+medidas. Las tres subieron exactamente 241.
+
+**Por qué importa**
+
+El trinquete hizo exactamente su trabajo: detectó que una edición a las reglas encarecía
+cada escritura en la ruta más cara del proyecto, y lo dijo. Estuvo diciéndolo durante tres
+tandas de trabajo. Nadie escuchó, porque la verificación de cada tanda corría los hooks
+(`.claude/tests/`) y el CLI (`test/`), y no la tercera suite.
+
+Un mecanismo que nadie corre es indistinguible de uno que no existe — que es literalmente
+la tesis de esta auditoría, aplicada a mí mismo. Y el modo de fallo es más incómodo que el
+de una regla decorativa: acá el mecanismo *funcionaba*.
+
+**Lo que agregaban esos 241 caracteres** también es parte del hallazgo. Eran tres líneas
+explicando por qué `A11Y-04` había dejado de existir: arqueología del harness, correcta y
+útil, metida en una regla *path-scoped* que se le inyecta al agente en **cada escritura**
+de `reportes.ts`. El presupuesto existe para atrapar justamente eso.
+
+**Arreglo**
+
+El tope no se subió. Se recortó la prosa a lo que el agente necesita —los números los
+emiten `LLM-01` y `LLM-02`— y el porqué histórico quedó donde va, en la auditoría:
+
+```
+antes:  72.216 / 72.000   EXCEDE
+ahora:  71.951 / 72.000   ok
+```
+
+Y la verificación de cada tanda pasó a ser **cuatro** suites, no dos:
+`.claude/tests/` (hooks), `test/` (CLI), `scripts/lib/*.test.mjs` (guardrails del linter) y
+`provocar-reglas.mjs` (que cada regla pueda fallar) — las dos últimas en el layout de un
+proyecto generado, que es donde el linter puede resolver `typescript`.
+
+**Estado:** resuelto · el presupuesto está bajo el tope sin haberlo subido

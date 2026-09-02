@@ -59,7 +59,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 |---|---|---|---|---|
 | `INC-001` | S2 | `S-01` | **(reescrito)** El namespace ARCH está repartido en tres implementaciones sin registro único; `ARCH-14` está documentado y no lo emite nadie | resuelto en su mitad verificable · `lib/guard-rules.js` es el registro del guard; un test cruza los IDs emitidos contra el registro y contra sus anclas en el doc. `ARCH-14` sigue siendo fantasma (lo cubre `HUE-026`) |
 | `CAR-001` | **S1** | `H-06` | `plan-injector` inyecta ~6.155 tokens en CADA Edit, sin dedup ni techo — la única pieza del harness sin ningún control de costo | resuelto · `lib/budget.js` — 246.220 → 24.330 chars en 10 ediciones |
-| `DEC-002` | S2 | `H-05` | `GATE-A1` de `harness-gate` se satisface con la palabra «cuando»; 12 de 15 reglas reales ya lo cumplen sin intentarlo | abierto |
+| `DEC-002` | S2 | `H-05` | `GATE-A1` de `harness-gate` se satisface con la palabra «cuando»; 12 de 15 reglas reales ya lo cumplen sin intentarlo | resuelto · se evalúa por párrafo, no por archivo: era peor de lo descrito — una lección buena arriba absolvía todo lo de abajo, para siempre |
 | `INC-005` | S2 | `H-03` | `spec-gate` y `plan-injector` clasifican el mismo archivo con listas de exención distintas | resuelto · las dos preguntas son `paths.isProductCode`; hay un test que compara gate contra injector archivo por archivo |
 | `HUE-010` | S2 | `H-03` | Los 3 hooks de `sdd/` y `context-enrichment-guard` leen stdin sin el cap SEC-04 | resuelto · `spec-gate` y `context-enrichment-guard` migrados a `lib/payload.js`; ningún hook acumula stdin sin tope |
 | `HUE-011` | S2 | `H-03` | Cero tests en todo `sdd/`: 3 hooks, ~360 líneas, el motor SDD entero | resuelto · los tres hooks de `sdd/` tienen test: 42 + 35 + 16 = 93 |
@@ -941,7 +941,41 @@ Dos caminos posibles — exigir que el marcador esté en la **misma frase** que 
 (más estricto, todavía evadible), o aceptar que este chequeo es heurístico y bajar el tono
 de lo que promete. Lo que no puede quedar es la brecha entre ambas cosas.
 
-**Estado:** abierto
+**Resolución** — los dos caminos, porque no eran alternativos.
+
+Al implementarlo apareció algo peor que el falso negativo suelto que el hallazgo describe.
+El chequeo corría sobre el **texto entero del archivo**, y el archivo que vigila —
+`context/learnings.md` — es el que **crece**. Una sola lección bien escrita arriba absolvía
+a todas las recetas agregadas después, para siempre:
+
+```
+"## Cache
+ Cuando una query se repite en dos facades, extraela a un repository.
+
+ En fix-042 el boton no andaba. Le puse un margin-top de 4px."   ← receta pura
+
+antes:    exit 0     el «Cuando» de la lección de arriba la cubría
+después:  exit 2     y el mensaje cita el párrafo culpable
+```
+
+El gate no era débil: **se apagaba solo**, y el disparador era usarlo bien una vez.
+
+La unidad de evaluación pasó a ser el **párrafo** (línea en blanco, ítem de lista o
+encabezado abren uno nuevo): el criterio tiene que estar donde está el track. Una línea
+suelta sería demasiado poco —una lección bien escrita ocupa dos o tres— y el archivo entero
+era el bug. En una lista, cada viñeta se juzga sola.
+
+Y el tono bajó donde correspondía: el mensaje ahora dice que es un chequeo léxico y que
+busca el criterio *junto al track*, en vez de prometer un juicio que un regex no puede dar.
+
+Verificado que no rompe lo que el blueprint reparte: las **16 reglas** del template, los dos
+`CLAUDE.md`, `ANTI-PATTERNS.md` y `learnings.md` siguen pasando — hay un test que lo fija,
+porque un gate más estricto que rechaza el contenido de su propia casa no es más estricto,
+está roto.
+
+Provocado: con el gate anterior, 3 tests en rojo.
+
+**Estado:** resuelto · el criterio se busca en el párrafo del track, no en el archivo entero
 
 ---
 

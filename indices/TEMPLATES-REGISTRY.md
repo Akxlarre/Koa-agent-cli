@@ -8,7 +8,7 @@
 | Ruta en templates/ | Destino en proyecto | Propósito |
 |---|---|---|
 | `templates/CLAUDE.md` | `CLAUDE.md` | Entry point para Claude Code. Stub que apunta a `.claude/CLAUDE.md`. Indica que otros AI tools deben usar `AGENTS.md`. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
-| `templates/AGENTS.md` | `AGENTS.md` | **Master universal** self-contained para todos los AI tools (OpenCode, Copilot, Codex…). Workflow de 5 pasos, reglas arquitectónicas, anti-patterns, los 10 índices. Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
+| `templates/AGENTS.md` | `AGENTS.md` | **Master universal** self-contained para todos los AI tools (OpenCode, Copilot, Codex…). Workflow de 5 pasos, reglas arquitectónicas, anti-patterns, los 15 índices (eran 10 hasta `HUE-030`; `contracts.test.js` compara ahora esa lista contra `templates/indices/`). Contiene `{{PROJECT_NAME}}` y `{{BLUEPRINT_VERSION}}`. |
 | `templates/gitignore.template` | `.gitignore` | .gitignore con entradas para Angular, Supabase, GSAP, Vitest, Playwright. |
 | `templates/docs/` | `docs/` | Guías de usuario: HOOKS-SYSTEM.md, TECH-STACK-RULES.md, BRAND_GUIDELINES.md, PRODUCT-VISION.md. |
 | `templates/indices/` | `indices/` | 15 índices. **13 se auto-generan** con `npm run indices:sync` (COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, GUARDS, UTILS, PIPES, STYLES, STORES, DATABASE, ROUTES, USAGE-MAP): el contenido va entre marcadores `<!-- AUTO-GENERATED:BEGIN/END -->` y se sobrescribe. Los 2 restantes (ANTI-PATTERNS, LAYOUTS) son manuales. **ANTI-PATTERNS.md no viene vacío**: 12 anti-patrones en dos grupos — AP-001→006 los bloquea el Architect Guard, AP-007→012 son de diseño y solo los ve `code-judge` o una persona. |
@@ -29,12 +29,13 @@
 | `templates/.claude/settings.local.json` | `.claude/settings.local.json` | Permisos de desarrollo pre-configurados. |
 | `templates/.claude/author.local.json.example` | `.claude/author.local.json.example` | Plantilla del código de autor (una letra) para la capa multi-dev del SDD. Se copia a `author.local.json`, que va gitignored. |
 | `templates/.claude/commands/` | `.claude/commands/` | 12 slash commands del SDD: `/spec-*` (5), `/fix-*` (2), `/hotfix`, `/hotfix-close`, `/assign-*` (3). |
-| `templates/.claude/hooks/` | `.claude/hooks/` | 18 archivos: 16 cableados en settings.json (incl. `sdd/` y `harness-gate.js`), `context-enrichment-guard.js` opt-in (no cableado), y `validators/validate-file-contains.js` invocado por skills (ver tabla de hooks abajo). |
+| `templates/.claude/hooks/` | `.claude/hooks/` | 19 archivos: 17 cableados en settings.json (incl. `sdd/` y `harness-gate.js`; el 18º comando cableado es `.claude/scripts/post-edit.js`), `context-enrichment-guard.js` opt-in (no cableado), y `validators/validate-file-contains.js` invocado por skills (ver tabla de hooks abajo). |
+| `templates/.claude/hooks/lib/` | `.claude/hooks/lib/` | Núcleo compartido (ADR-001), 8 módulos CommonJS: `payload` (stdin, la única fuente contractual), `session` (estado por sesión e hilo — `CLAUDE_SESSION_ID` no existe), `paths` (clasificación de rutas), `budget` (recorte, dedup por contenido y avisos), `contracts` (los artefactos del harness como datos, con test contra el filesystem), `blueprint` (validación de `blueprint.json`), `guard-rules` (las 20 reglas que emite el Architect Guard) y `lessons` (el formato de `LESSONS_LEARNED.md`). |
 | `templates/.claude/agents/` | `.claude/agents/` | 5 subagentes con ventana de contexto propia (ver tabla abajo). |
 | `templates/.claude/rules/` | `.claude/rules/` | 15 reglas arquitectónicas path-scoped. |
 | `templates/.claude/skills/` | `.claude/skills/` | 15 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático), más `package.json` que declara la carpeta como ESM — sin él, cada edición del proyecto generado imprime un `MODULE_TYPELESS_PACKAGE_JSON` (`DEC-003`). |
-| `templates/.claude/tests/` | `.claude/tests/` | 29 archivos de tests de contrato, 746 tests (`node --test`, `npm run claude:test-hooks`). Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada, `harness-gate.test.js` (11 tests del Generalization Gate) y `contracts.test.js`, que contrasta el registro de artefactos contra el filesystem. |
+| `templates/.claude/tests/` | `.claude/tests/` | 29 archivos de tests de contrato, 752 tests (`node --test`, `npm run claude:test-hooks`). Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada, `harness-gate.test.js` (17 tests del Generalization Gate, incl. la localidad de `GATE-A1`) y `contracts.test.js`, que contrasta el registro de artefactos contra el filesystem. |
 
 ## Adapters de AI tools (condicional)
 

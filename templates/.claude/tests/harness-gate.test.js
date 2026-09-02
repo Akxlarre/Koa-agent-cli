@@ -70,6 +70,68 @@ describe('GATE-A1 — track ID sin criterio de aplicabilidad', () => {
   });
 });
 
+// ─── DEC-002: el criterio tiene que estar DONDE está el track ──────────────
+describe('GATE-A1 — el gate se apagaba solo a medida que crecía el archivo (DEC-002)', () => {
+  const learningsPath = '/project/context/learnings.md';
+
+  // El chequeo corría sobre el TEXTO ENTERO. «cuando» y «nunca» son dos de las
+  // palabras más frecuentes de la prosa técnica en español, así que bastaba que
+  // aparecieran en cualquier lugar del archivo. Medido: 13 de las 16 reglas del
+  // template ya traían un marcador sin habérselo propuesto.
+  //
+  // Lo grave no era el falso negativo suelto: era que `learnings.md` CRECE. Una
+  // sola lección bien escrita arriba dejaba pasar todas las recetas agregadas
+  // después, para siempre. El guardrail se desactivaba solo, en el único archivo
+  // cuyo crecimiento vigila.
+
+  const RECETA = 'En fix-042 el boton no andaba. Le puse un margin-top de 4px.';
+  const BUENA = 'Cuando una query se repite en dos facades, extraela a un repository.';
+
+  test('la receta sola sigue bloqueada', () => {
+    assert.equal(runHook(makeInput(learningsPath, RECETA)).exitCode, 2);
+  });
+
+  test('una lección buena ARRIBA ya no absuelve a la receta de abajo', () => {
+    const r = runHook(makeInput(learningsPath, `## Cache\n\n${BUENA}\n\n${RECETA}`));
+    assert.equal(r.exitCode, 2, 'esto pasaba en verde: el marcador estaba en otro párrafo');
+    assert.match(r.stderr, /GATE-A1/);
+  });
+
+  test('el mensaje señala QUÉ párrafo, no solo que hay uno', () => {
+    const r = runHook(makeInput(learningsPath, `## Cache\n\n${BUENA}\n\n${RECETA}`));
+    assert.match(r.stderr, /En fix-042 el boton no andaba/,
+      'sin el párrafo citado, en un learnings.md largo el aviso es inaccionable');
+  });
+
+  test('en una lista, cada viñeta se juzga sola', () => {
+    const r = runHook(makeInput(learningsPath,
+      '- Cuando una migracion agrega una tabla, siempre lleva RLS.\n'
+      + '- En spec-0012 faltaba el indice, lo agregue a mano.'));
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /spec-0012/);
+  });
+
+  test('una lección con su criterio en el MISMO párrafo pasa, aunque ocupe varias líneas', () => {
+    const r = runHook(makeInput(learningsPath,
+      '## Espaciado\n\n'
+      + 'Cuando un boton queda pegado al borde en mobile, el problema es el contenedor,\n'
+      + 'no el boton (visto en fix-042).'));
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('las 16 reglas reales del template siguen pasando', () => {
+    // Un gate más estricto que rompe el contenido que el propio blueprint
+    // reparte no es más estricto: está roto.
+    const fs = require('fs');
+    const dir = path.resolve(__dirname, '..', 'rules');
+    const rotas = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).filter((f) => {
+      const contenido = fs.readFileSync(path.join(dir, f), 'utf-8');
+      return runHook(makeInput(`/project/.claude/rules/${f}`, contenido)).exitCode !== 0;
+    });
+    assert.deepEqual(rotas, []);
+  });
+});
+
 // ─── GATE-A2: keyword-matching literal ─────────────────────────────────────
 describe('GATE-A2 — despacho por keyword-matching literal', () => {
   const learningsPath = '/project/context/learnings.md';

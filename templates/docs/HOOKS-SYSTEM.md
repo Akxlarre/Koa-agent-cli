@@ -292,10 +292,18 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
 
   | Chequeo | Superficie | Qué bloquea |
   |---|---|---|
-  | GATE-A1 | Guía | Cita un track (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin ningún criterio de aplicabilidad cerca — receta memorizada en vez de regla reusable |
+  | GATE-A1 | Guía | Cita un track (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin ningún criterio de aplicabilidad **en el mismo párrafo** — receta memorizada en vez de regla reusable |
   | GATE-A2 | Guía | Snippet de despacho por keyword-matching literal (`if ("token" in text)`) — ni siquiera como prosa/pseudo-código |
   | GATE-B1 | Guía | Lógica ejecutable real (`require`/`process.exit`/`fs.*`) colada en un archivo que debería ser solo prosa |
   | GATE-B2 | Capacidad | `console.log`/`console.warn` con tono de consejo y sin ningún `process.exit(2)` que lo respalde — guía disfrazada de script |
+
+  `GATE-A1` es un chequeo **léxico**, y su alcance es el párrafo a propósito: antes
+  miraba el archivo entero, y como «cuando» y «nunca» son de las palabras más comunes
+  de la prosa técnica en español, una sola lección bien escrita arriba de
+  `learnings.md` absolvía a todas las recetas agregadas después (`DEC-002`). El
+  guardrail se apagaba solo, y el disparador era usarlo bien una vez. No pretende
+  distinguir un principio de una receta —un regex no puede—: pretende que el criterio
+  esté escrito **donde está el track**.
 
   La intuición: una lección que sobrevive a una sesión debe quedar escrita como un
   **principio + criterio de cuándo aplica**, nunca como la respuesta memorizada a un

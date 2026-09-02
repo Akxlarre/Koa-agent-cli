@@ -44,6 +44,31 @@
 
 const path = require('path');
 
+/**
+ * El texto partido en las unidades donde una lección cabe entera (DEC-002).
+ *
+ * Una línea suelta es demasiado poco —una lección bien escrita ocupa dos o tres
+ * y el criterio puede ir en la segunda—; el archivo entero es demasiado, que es
+ * justo el bug. El párrafo es la unidad: se corta en línea en blanco, y también
+ * al empezar un ítem de lista o un encabezado, porque una lista de viñetas es
+ * un solo párrafo markdown y cada viñeta es una lección distinta.
+ *
+ * Las líneas de continuación (indentadas) se quedan con su viñeta.
+ */
+function parrafosDe(texto) {
+  const unidades = [];
+  let actual = [];
+  const cerrar = () => { if (actual.length) { unidades.push(actual.join('\n')); actual = []; } };
+
+  for (const linea of String(texto).split('\n')) {
+    if (!linea.trim()) { cerrar(); continue; }
+    if (/^\s{0,3}(?:[-*+]\s|\d+[.)]\s|#{1,6}\s|\|)/.test(linea)) cerrar();
+    actual.push(linea);
+  }
+  cerrar();
+  return unidades;
+}
+
 // SEC-04: Limit stdin to 10 MB to prevent memory exhaustion (DoS) from crafted hook inputs.
 const MAX_STDIN_BYTES = 10 * 1024 * 1024;
 let data = '';
@@ -94,12 +119,31 @@ process.stdin.on('end', () => {
       const GENERALIZATION_MARKER_RE =
         /\b(cuando|siempre que|nunca|cada vez que|toda vez que|regla:|criterio|aplicabilidad|aplica cuando|no aplica|excepci[oó]n|independientemente de)\b/i;
 
-      if (TRACK_ID_RE.test(newContent) && !GENERALIZATION_MARKER_RE.test(newContent)) {
+      // DEC-002: esto se evaluaba sobre el TEXTO ENTERO, y «cuando» y «nunca»
+      // son dos de las palabras mas frecuentes de la prosa tecnica en espanol.
+      // Bastaba que el marcador apareciera en cualquier lugar del archivo, sin
+      // ninguna relacion con el track citado. Medido: 13 de las 16 reglas del
+      // template ya traen un marcador sin habérselo propuesto, y —lo peor— un
+      // `learnings.md` con UNA sola leccion bien escrita arriba dejaba pasar
+      // cualquier receta agregada despues, para siempre. El gate se apagaba
+      // solo, a medida que crecia justo el archivo que vigila.
+      //
+      // Ahora se evalua por parrafo: el criterio tiene que estar DONDE esta el
+      // track. Sigue siendo una heuristica lexica —lo dice el mensaje— y sigue
+      // siendo evadible a proposito; lo que ya no hace es evadirse sola.
+      const conRecetaSuelta = parrafosDe(newContent)
+        .filter((p) => TRACK_ID_RE.test(p) && !GENERALIZATION_MARKER_RE.test(p));
+
+      if (conRecetaSuelta.length > 0) {
+        const muestra = conRecetaSuelta[0].trim().split('\n')[0].slice(0, 90);
         violations.push(
-          '[GATE-A1] Citas un track (fix-/spec-/hotfix-/task-NNN) sin ningún criterio de aplicabilidad cerca.\n' +
+          `[GATE-A1] Citas un track (fix-/spec-/hotfix-/task-NNN) sin ningún criterio de aplicabilidad EN EL MISMO PÁRRAFO.\n` +
+          `     Párrafo: "${muestra}${muestra.length >= 90 ? '…' : ''}"` +
+          (conRecetaSuelta.length > 1 ? ` (y ${conRecetaSuelta.length - 1} más)` : '') + '\n' +
           '     Una lección de guía debe sobrevivir sin el ID: "cuando X, hacer Y; si Z, hacer W".\n' +
           '     El ID puede quedar como referencia histórica, pero el PRINCIPIO reusable tiene que estar escrito.\n' +
-          '     Litmus test: ¿esto seguiría ayudando en un proyecto que nunca vio ese track?'
+          '     Litmus test: ¿esto seguiría ayudando en un proyecto que nunca vio ese track?\n' +
+          '     (Chequeo léxico: busca el criterio junto al track, no en el resto del archivo.)'
         );
       }
 

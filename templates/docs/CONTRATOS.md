@@ -27,7 +27,7 @@ respeta. Los dos campos que más cuesta adivinar leyendo el código:
 | `task-spec` | `.claude/temp/task-spec-YYYYMMDD-HHMMSS.md` | `.claude/skills/plan/SKILL.md` | `.claude/hooks/spec-reflection.js`<br>`.claude/hooks/prompt-context.js`<br>`.claude/hooks/compact-recovery.js`<br>`.claude/hooks/session-start.js`<br>`.claude/hooks/validators/validate-file-contains.js` | permanente | proyecto |
 | `blueprint.json` | `blueprint.json` | *el CLI, al generar* | `.claude/hooks/pre-write-guard.js`<br>`scripts/architect.js` | permanente | proyecto |
 | `LESSONS_LEARNED.md` | `.claude/temp/LESSONS_LEARNED.md` | `.claude/hooks/failure-tracker.js`<br>`scripts/lint-arch-wrapper.js` | `.claude/hooks/pre-write-guard.js`<br>`.claude/hooks/lib/lessons.js` | permanente | proyecto |
-| `indices-cache.json` | `scripts/indices-cache.json` | `scripts/indices-sync.js` | `scripts/indices-sync.js` | permanente | proyecto |
+| `indices-cache.json` | `.claude/temp/indices-cache.json` | `scripts/indices-sync.js` | `scripts/indices-sync.js` | sesion | proyecto |
 | `specs/.active` | `specs/.active` | `.claude/commands/spec-activate.md`<br>`.claude/commands/hotfix.md` | `.claude/hooks/sdd/spec-gate.js`<br>`.claude/hooks/sdd/plan-injector.js`<br>`.claude/hooks/sdd/hotfix-autoclose.js` | permanente | proyecto |
 | `review-diff.patch` | `.claude/temp/review-diff.patch` | `.claude/skills/review/SKILL.md` | `.claude/agents/code-judge.md` | turno | sesion |
 | `DETAIL:BEGIN` | `indices/*.md` | `.claude/agents/index-syncer.md` | `.claude/hooks/session-start.js`<br>`.claude/hooks/compact-recovery.js`<br>`.claude/hooks/lib/budget.js` | permanente | proyecto |
@@ -89,6 +89,12 @@ HUE-005 (S1): su `stack` crudo decide que guardrails corren y nadie lo valida.
 **Formato:** tabla markdown entre marcadores AUTO-GENERATED; fuera de ellos, prosa libre. El separador "|" va escapado — lo hace lib/lessons.js, que es quien conoce el formato
 
 DUP-002 y HUE-016, cerrados. Eran: dos productores donde uno reescribia el archivo entero y borraba las secciones del otro; y un "|" sin escapar que partia la fila y devolvia la firma truncada, rompiendo el dedup para siempre.
+
+### `indices-cache.json`
+
+**Formato:** objeto JSON de mtimes; decide que se re-parsea
+
+ACO-003. La ruta estaba MAL declarada —decia scripts/— y nada lo verificaba: el test miraba que las PIEZAS existieran, no que el `path` fuera real. Vive bajo .claude/temp/, que va gitignored y se limpia; por eso su lifetime es de sesion aunque el artefacto sobreviva a la corrida: perderlo solo cuesta un re-parseo.
 
 ### `review-diff.patch`
 

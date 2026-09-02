@@ -126,11 +126,11 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-003` | S2 | `C-01` | `compact-recovery` conoce 10 de 15 índices; GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan | resuelto · la lista sale de `indices/` en el disco: 10 → 15, sin dejar de ser selectivo |
 | `HUE-004` | S2 | `C-03` | `spec-reflection` calla cuando no hay ninguna casilla marcada — el caso exacto que debería atrapar | resuelto · lo que separa las dos situaciones son las escrituras de la sesión, no las casillas |
 | `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | resuelto · `task-spec.test.js`: las tres convenciones que atan al productor con sus cinco consumidores, con los consumidores corriendo de verdad |
-| `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | abierto |
+| `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | resuelto · cuatro situaciones, cuatro mensajes; la estructura gana sobre la edad, y sin `--require-file` la edad sigue sin opinar |
 | `INC-003` | S2 | `C-05` | `pre-write-guard.js` no figura como consumidor del blueprint en ninguna documentación | abierto |
 | `DUP-001` | S3 | `C-04` | Dos fail modes para el mismo contrato: `indices-sync` avisa y sigue, `assignments-sync` lanza | resuelto · «nada que hacer» ≠ «algo roto» en los dos scripts, y el fallo de `sync` dejó de ser un stack trace |
-| `ACO-002` | S3 | `C-03` | `spec-reflection-seen.json` no está declarado como artefacto | abierto |
-| `ACO-003` | S3 | `C-04` | `indices-cache.json` decide qué se re-parsea y no está declarado como dependencia | abierto |
+| `ACO-002` | S3 | `C-03` | `spec-reflection-seen.json` no está declarado como artefacto | resuelto · declarado en `contracts.js` (lifetime `turno`, scope `hilo`) y publicado en `docs/CONTRATOS.md` |
+| `ACO-003` | S3 | `C-04` | `indices-cache.json` decide qué se re-parsea y no está declarado como dependencia | resuelto · declarado — y al verificarlo apareció que su **ruta estaba mal**: el registro decía `scripts/` y se escribe en `.claude/temp/`. Ahora hay un test que contrasta cada `path` contra su productor |
 | `HUE-007` | S3 | `C-04` | Nada impide editar dentro de los marcadores y perder el trabajo en el siguiente sync | resuelto · `GATE-D1`: la superficie se detecta por los marcadores **en disco**, no por una lista de rutas; el mensaje nombra el generador que corresponde |
 | `HUE-008` | S3 | `C-04` | Ningún test fija la partición 13 auto-generados / 2 manuales | abierto |
 | `INC-020` | **S1** | `diseño` | `SessionStart` no corre una vez por sesión: corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin matcher | resuelto · matcher `startup\|resume\|clear\|fork` + `cleanup()` por antigüedad |
@@ -2510,3 +2510,83 @@ el camino de salida convierte un guardrail en un muro.
 Provocado: apagando `GATE-D1`, 4 tests en rojo.
 
 **Estado:** resuelto · la superficie se detecta por los marcadores en disco
+
+---
+
+## INC-002 · Un mensaje que mandaba a romper el artefacto que vigila
+
+- **Tipo / severidad:** `INC` · S2
+- **Unidad:** `C-03` (task-spec)
+- **Contexto:** B (harness)
+
+**Resolución**
+
+El filtro de `--max-age` vaciaba la lista de candidatos, y el único mensaje que existía
+decía *«Crealo antes de terminar»*. En cualquier sesión de más de una hora sin tocar el
+spec, el agente recibía la orden de crear un spec **que ya existe**. Si obedece, el
+duplicado pasa a ser «el más reciente por orden alfabético» para los otros cuatro
+consumidores del contrato y el original queda huérfano: un mensaje equivocado rompiendo el
+artefacto que el validador existe para proteger.
+
+Ahora la lista completa se guarda antes de filtrar por edad, y hay cuatro situaciones con
+cuatro respuestas:
+
+| Situación | Qué dice |
+|---|---|
+| Completo y fresco | pasa |
+| **No hay ninguno** | «no se encontró ningún archivo… creálo» |
+| **Existe pero es viejo** | lo nombra, dice cuántos minutos lleva, y **«NO crees uno nuevo»** — marcá las casillas, o corré `/plan` si es otra tarea |
+| Viejo **e** incompleto | gana la estructura |
+
+Ese último orden es una decisión: arreglar la sección faltante actualiza el `mtime`, así
+que resuelve las dos cosas de una vez. Al revés, el agente arregla la edad y vuelve a
+chocar con la estructura en el turno siguiente.
+
+El aviso de edad además dice **por qué** duplicar es peor que dejarlo viejo. Un guardrail
+que solo prohíbe deja al agente eligiendo a ciegas entre dos caminos que se ven iguales.
+
+**Un test existente marcó el borde correcto.** Al implementarlo se puso en rojo
+*«`--max-age` ignora archivos viejos»*: yo había hecho que el archivo viejo se validara
+siempre. Y el test tenía razón — sin `--require-file`, *«fuera de ventana»* significa
+*«nada que validar»*, que es lo que `--max-age` promete por sí solo. La caída al archivo
+viejo quedó acotada a cuando el llamador **exige** que haya uno.
+
+El umbral de 60 minutos se deja como está: con el mensaje corregido, que un spec lleve una
+hora sin tocarse **sí** es algo que vale la pena decir — lo que estaba mal no era el
+umbral, era la conclusión que sacaba de él.
+
+Provocado: con el validador anterior, 4 tests en rojo.
+
+**Estado:** resuelto · cuatro situaciones, cuatro mensajes
+
+---
+
+## ACO-002 y ACO-003 · Las dos últimas filas sin declarar
+
+- **Tipo / severidad:** `ACO` · S3 · **Unidades:** `C-03` y `C-04` · **Contexto:** B
+
+Los dos los cerró `lib/contracts.js` al declarar los 21 artefactos: `spec-reflection-seen.json`
+(lifetime `turno`, scope `hilo` — es la marca anti-bucle de un hook de `Stop`) e
+`indices-cache.json`.
+
+**Y verificar el segundo destapó algo.** Su ruta estaba **mal declarada**: el registro decía
+`scripts/indices-cache.json` y `indices-sync.js` lo escribe en `.claude/temp/`. Nadie lo
+notó en dos tandas, y desde `ACO-013` esa ruta equivocada además **viaja al proyecto
+generado** dentro de `docs/CONTRATOS.md` — un agente que la siguiera no encontraría el
+archivo.
+
+El registro existe para ser verificable y ese campo no se verificaba: el test miraba que
+las **piezas** existieran, no que el `path` fuera real. Ahora hay un test que lo contrasta
+contra el código del productor. El detector tiene que distinguir un directorio de otro, no
+solo el nombre del archivo —si no, la ruta equivocada habría pasado igual—, así que acepta
+el literal completo o bien el nombre del archivo **más cada segmento del directorio** como
+string, que es como se ve un `path.join(ROOT, '.claude', 'temp')`. Corre sobre los 11
+artefactos de ruta concreta; los que nombran una familia (`ctx-<categoria>.json`) o llevan
+un patrón (`task-spec-YYYYMMDD-HHMMSS.md`) quedan fuera por construcción.
+
+De paso, su `lifetime` pasó de `permanente` a `sesion`: vive bajo `.claude/temp/`, que va
+gitignored y se limpia. Perderlo solo cuesta un re-parseo.
+
+Provocado: devolviendo la ruta vieja, 3 tests en rojo.
+
+**Estado:** resueltos · declarados, y el `path` de cada artefacto ahora se verifica

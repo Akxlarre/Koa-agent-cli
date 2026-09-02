@@ -75,6 +75,60 @@ describe('CADA PIEZA NOMBRA EL ARTEFACTO QUE DICE USAR', () => {
   }
 });
 
+describe('EL `path` DECLARADO ES EL QUE EL PRODUCTOR ESCRIBE (ACO-003)', () => {
+  // El registro existe para ser verificable, y este campo no se verificaba: el
+  // test miraba que las PIEZAS existieran, no que el `path` fuera real.
+  //
+  // `indices-cache.json` estaba declarado en `scripts/` y `indices-sync.js` lo
+  // escribe en `.claude/temp/`. Nadie lo notó en dos tandas, y desde ACO-013 esa
+  // ruta equivocada además VIAJA al proyecto generado dentro de
+  // `docs/CONTRATOS.md`: un agente que la siguiera no encontraría el archivo.
+  //
+  // El productor casi nunca escribe la ruta entera: la arma con `path.join`. Así
+  // que se acepta el literal completo, o bien el nombre del archivo MÁS cada
+  // segmento del directorio como string. Es lo que separa `.claude/temp/x.json`
+  // de `scripts/x.json` cuando el código dice `join(ROOT, '.claude', 'temp')`.
+
+  /** Rutas que nombran una FAMILIA o llevan un patrón, no un archivo concreto. */
+  const esPatron = (p) => /[*<]/.test(p) || p.includes(',') || /YYYY|HHMMSS|NNN/.test(p);
+
+  function loEscribe(entry) {
+    const productores = (entry.producers || []).filter((p) => !p.startsWith('<'));
+    if (productores.length === 0) return null; // lo escribe un humano o el CLI
+
+    const segmentos = entry.path.split('/');
+    const archivo = segmentos.pop();
+
+    return productores.some((p) => {
+      let src;
+      try { src = fs.readFileSync(enRepo(p), 'utf-8'); } catch { return false; }
+      if (src.includes(entry.path)) return true;
+      if (!src.includes(archivo)) return false;
+      return segmentos.every((s) => new RegExp(`['"\`]${s.replace(/\./g, '\\.')}['"\`]`).test(src));
+    });
+  }
+
+  for (const entry of C.all()) {
+    if (esPatron(entry.path)) continue;
+    const veredicto = loEscribe(entry);
+    if (veredicto === null) continue;
+
+    test(`${entry.id} → ${entry.path}`, () => {
+      assert.ok(veredicto,
+        `el registro declara "${entry.path}" y su productor no escribe ahí`);
+    });
+  }
+
+  test('el detector distingue un directorio de otro', () => {
+    // Sin esto, un test verde no probaría nada: si el detector solo mirara el
+    // nombre del archivo, la ruta equivocada de ACO-003 habría pasado igual.
+    const cache = C.CONTRACTS['indices-cache.json'];
+    assert.equal(loEscribe(cache), true);
+    assert.equal(loEscribe({ ...cache, path: 'scripts/indices-cache.json' }), false,
+      'la ruta que estuvo declarada dos tandas tiene que dar en rojo');
+  });
+});
+
 describe('LIFETIME Y SCOPE — los dos campos que los ADR agregaron', () => {
   const LIFETIMES = ['turno', 'sesion', 'permanente'];
   const SCOPES = ['sesion', 'hilo', 'proyecto'];

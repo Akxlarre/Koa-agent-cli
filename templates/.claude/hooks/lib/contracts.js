@@ -147,12 +147,16 @@ const CONTRACTS = {
   },
 
   'indices-cache.json': {
-    path: 'scripts/indices-cache.json',
+    path: '.claude/temp/indices-cache.json',
     format: 'objeto JSON de mtimes; decide que se re-parsea',
     producers: ['scripts/indices-sync.js'],
     consumers: ['scripts/indices-sync.js'],
-    lifetime: 'permanente',
+    lifetime: 'sesion',
     scope: 'proyecto',
+    nota: 'ACO-003. La ruta estaba MAL declarada —decia scripts/— y nada lo verificaba: '
+        + 'el test miraba que las PIEZAS existieran, no que el `path` fuera real. Vive bajo '
+        + '.claude/temp/, que va gitignored y se limpia; por eso su lifetime es de sesion '
+        + 'aunque el artefacto sobreviva a la corrida: perderlo solo cuesta un re-parseo.',
   },
 
   'specs/.active': {

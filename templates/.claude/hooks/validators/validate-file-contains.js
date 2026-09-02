@@ -88,16 +88,33 @@ try {
   process.exit(0); // fail-open
 }
 
+// INC-002: «no existe ninguno» y «existe pero es viejo» NO son la misma
+// situacion y no piden la misma accion. El filtro de edad vaciaba la lista y el
+// unico mensaje decia «Crealo antes de terminar», asi que en cualquier sesion de
+// mas de una hora sin tocar el spec, el agente recibia la orden de crear un spec
+// QUE YA EXISTE. Si obedece, el duplicado pasa a ser «el mas reciente por orden
+// alfabetico» para los otros cuatro consumidores del contrato, y el original
+// queda huerfano.
+//
+// Ahora se guarda la lista completa antes de filtrar por edad. Lo que la edad
+// cambia es el CONSEJO, no si hay archivo que validar: la estructura del spec se
+// verifica igual, porque un spec roto es un problema con o sin edad.
+const todos = candidates.slice();
 if (opts.maxAge > 0) {
   const cutoff = Date.now() - opts.maxAge * 60000;
   candidates = candidates.filter(c => c.mtime >= cutoff);
 }
 
-if (candidates.length === 0) {
+// Solo se cae al archivo viejo cuando el llamador EXIGE que haya uno. Sin
+// `--require-file`, «fuera de ventana» sigue significando «nada que validar»,
+// que es lo que `--max-age` promete por si solo: es el llamador el que decide
+// si la ausencia importa.
+const porEdad = candidates.length === 0 && todos.length > 0 && opts.requireFile;
+
+if (todos.length === 0) {
   if (opts.requireFile) {
     process.stderr.write(
-      `\u{1F4CB} VALIDACION: no se encontro ningun archivo ${opts.pattern} en ${opts.directory}/` +
-      (opts.maxAge > 0 ? ` modificado en los ultimos ${opts.maxAge} min.\n` : '.\n') +
+      `\u{1F4CB} VALIDACION: no se encontro ningun archivo ${opts.pattern} en ${opts.directory}/.\n` +
       `Crealo antes de terminar.`
     );
     process.exit(2);
@@ -105,8 +122,10 @@ if (candidates.length === 0) {
   process.exit(0);
 }
 
-candidates.sort((a, b) => b.mtime - a.mtime);
-const target = candidates[0];
+if (candidates.length === 0 && !porEdad) process.exit(0);
+
+const ordenados = (porEdad ? todos : candidates).sort((a, b) => b.mtime - a.mtime);
+const target = ordenados[0];
 
 // ─── Verificar substrings requeridos ─────────────────────────────────────────
 let content;
@@ -118,7 +137,24 @@ try {
 
 const missing = opts.contains.filter(needle => !content.includes(needle));
 
-if (missing.length === 0) process.exit(0);
+// El orden importa: una seccion faltante es un problema mas duro que la edad, y
+// arreglarla actualiza el mtime, o sea que resuelve las dos cosas de una vez.
+// Al reves, el agente arreglaria la edad y volveria a chocar con la estructura.
+if (missing.length === 0) {
+  if (porEdad && opts.requireFile) {
+    const minutos = Math.round((Date.now() - target.mtime) / 60000);
+    process.stderr.write(
+      `\u{1F4CB} VALIDACION: ${path.join(opts.directory, target.name)} existe y esta completo, ` +
+      `pero lleva ${minutos} min sin tocarse (el umbral es ${opts.maxAge}).\n` +
+      `NO crees uno nuevo: si es el spec de esta tarea, marca las casillas que hayas ` +
+      `completado — eso lo actualiza.\n` +
+      `Si estas en OTRA tarea, corre /plan para abrir su propio spec.\n` +
+      `Duplicar el spec deja huerfano al original: los hooks toman el mas reciente.`
+    );
+    process.exit(2);
+  }
+  process.exit(0);
+}
 
 process.stderr.write(
   `\u{1F4CB} VALIDACION DE ESTRUCTURA: a ${path.join(opts.directory, target.name)} le faltan ` +

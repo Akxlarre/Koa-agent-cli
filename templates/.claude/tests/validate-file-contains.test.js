@@ -115,3 +115,79 @@ describe('VALIDATE FILE CONTAINS — contrato con /plan', () => {
     assert.equal(run(root, args).exitCode, 0);
   });
 });
+
+describe('INC-002 — «no existe» y «existe pero es viejo» son dos cosas', () => {
+  // El filtro de edad vaciaba la lista de candidatos, y el único mensaje que
+  // había decía «Crealo antes de terminar». En cualquier sesión de más de una
+  // hora sin tocar el spec, el agente recibía la orden de crear un spec QUE YA
+  // EXISTE. Si obedece, el duplicado pasa a ser «el más reciente por orden
+  // alfabético» para los otros cuatro consumidores del contrato y el original
+  // queda huérfano — un mensaje equivocado rompiendo el artefacto que vigila.
+
+  const COMPLETO = '## Objetivo\nx\n## Criterio de done\n- [ ] y\n';
+  const ARGS = ['-d', 'specs', '--pattern', 'spec-*.md', '--max-age', '60', '--require-file',
+    '-c', '## Objetivo', '-c', '## Criterio de done'];
+
+  /** Envejece un archivo del proyecto. */
+  function envejecer(root, nombre, minutos) {
+    const full = path.join(root, 'specs', nombre);
+    const t = (Date.now() - minutos * 60_000) / 1000;
+    fs.utimesSync(full, t, t);
+  }
+
+  test('un spec completo y fresco pasa', () => {
+    const root = makeProject({ 'spec-1.md': COMPLETO });
+    assert.equal(run(root, ARGS).exitCode, 0);
+  });
+
+  test('sin ningún spec: dice que lo cree', () => {
+    const root = makeProject({});
+    const r = run(root, ARGS);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /no se encontro ningun archivo/);
+    assert.match(r.stderr, /Crealo/);
+  });
+
+  test('con un spec viejo: NO dice que lo cree — dice que lo actualice', () => {
+    const root = makeProject({ 'spec-1.md': COMPLETO });
+    envejecer(root, 'spec-1.md', 120);
+    const r = run(root, ARGS);
+    assert.equal(r.exitCode, 2);
+    assert.ok(!r.stderr.includes('no se encontro ningun archivo'),
+      'este es el bug: decía que no existe un archivo que sí existe');
+    assert.match(r.stderr, /NO crees uno nuevo/);
+  });
+
+  test('y lo nombra, con su antigüedad real', () => {
+    // Sin el nombre, el agente no sabe cuál de los specs del directorio es.
+    const root = makeProject({ 'spec-1.md': COMPLETO });
+    envejecer(root, 'spec-1.md', 120);
+    const r = run(root, ARGS);
+    assert.match(r.stderr, /spec-1\.md/);
+    assert.match(r.stderr, /120 min/);
+  });
+
+  test('avisa por qué duplicarlo es peor que dejarlo viejo', () => {
+    const root = makeProject({ 'spec-1.md': COMPLETO });
+    envejecer(root, 'spec-1.md', 120);
+    assert.match(run(root, ARGS).stderr, /huerfano/);
+  });
+
+  test('viejo E incompleto: gana la estructura', () => {
+    // Arreglar la sección actualiza el mtime, así que resuelve las dos cosas de
+    // una vez. Al revés, el agente arregla la edad y vuelve a chocar.
+    const root = makeProject({ 'spec-1.md': '## Objetivo\nx\n' });
+    envejecer(root, 'spec-1.md', 120);
+    const r = run(root, ARGS);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /VALIDACION DE ESTRUCTURA/);
+    assert.match(r.stderr, /Criterio de done/);
+  });
+
+  test('sin --max-age, la edad no opina', () => {
+    const root = makeProject({ 'spec-1.md': COMPLETO });
+    envejecer(root, 'spec-1.md', 100000);
+    const sinEdad = ARGS.filter((a, i) => a !== '--max-age' && ARGS[i - 1] !== '--max-age');
+    assert.equal(run(root, sinEdad).exitCode, 0);
+  });
+});

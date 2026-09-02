@@ -290,4 +290,42 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
     assert.deepEqual([...new Set(citas)].sort(), [],
       'una regla citada y no existente manda al agente a buscar algo que no esta');
   });
+
+  test('y ningun doc miente sobre CUANTAS reglas valida el linter (INC-019)', () => {
+    // `CLAUDE-USER-GUIDE.md` decia 8 y eran 28. No es un typo: describe un
+    // linter con menos de un tercio de las reglas que tiene, y el usuario que
+    // lee eso no corre `lint:arch` esperando que le encuentre algo.
+    //
+    // La cifra se deriva de RULES, que es la fuente. Cualquier frase del payload
+    // que afirme un numero de reglas del linter tiene que coincidir con ella.
+    const architect = dirsDeCodigo()
+      .map((d) => path.join(d, 'architect.js'))
+      .find((p) => fs.existsSync(p));
+    assert.ok(architect, 'no se encontro architect.js');
+
+    const reales = new Set(
+      [...fs.readFileSync(architect, 'utf-8')
+        .matchAll(/^\s{4}'((?:ARCH|A11Y|LLM|SEC-RLS|NAV|ICON)-\d{2})':\s*\{/gm)]
+        .map((m) => m[1]),
+    );
+    assert.ok(reales.size >= 20, `solo ${reales.size} reglas detectadas en RULES — revisa el regex`);
+
+    const mentiras = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/\*{0,2}(\d{1,3})\*{0,2}\s+reglas?\b/gi)) {
+        // Solo las frases que hablan del LINTER. `.claude/rules/` tiene su
+        // propio conteo (16 reglas path-scoped) y no es esta cifra.
+        const ventana = txt.slice(Math.max(0, m.index - 120), m.index + 40).toLowerCase();
+        if (!/linter|lint:arch|architect/.test(ventana)) continue;
+        if (Number(m[1]) !== reales.size) {
+          mentiras.push(`${rel}: dice ${m[1]}, son ${reales.size}`);
+        }
+      }
+    }
+    assert.deepEqual(mentiras, [],
+      'un doc afirma un numero de reglas del linter que no es el que tiene');
+  });
 });

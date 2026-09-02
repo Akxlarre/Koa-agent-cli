@@ -114,7 +114,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DEC-006` | S2 | `L-02` | El umbral de 80 chars no salta las plantillas de `context/`: se inyectan enteras, ~3.240 tokens por compactación en un proyecto sin contexto llenado | resuelto · el detector es `budget.sinLlenar`, que mide contenido real |
 | `HUE-030` | S2 | `L-05` | `AGENTS.md` y `compact-recovery.js` omiten exactamente los mismos cinco índices; agregar uno obliga a actualizar consumidores independientes y nada lo verifica | resuelto · el hook dejó de tener lista (la lee del disco) y el que sigue teniéndola tiene test |
 | `INC-018` | S2 | `L-03` | Dos de tres servidores MCP usan `@latest`, incluido `@angular/cli@latest`, que `lib/config.js` prohíbe con tres párrafos | resuelto · `@angular/cli@{{ANGULAR_MAJOR}}`, sustituido por el scaffolder |
-| `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | abierto |
+| `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | resuelto · la frase se corrigió **y** la cifra dejó de escribirse a mano: un test la deriva de `RULES` y falla contra cualquier doc del payload que afirme otra |
 | `HUE-029` | S3 | `L-04` | Los adapters no llevan ningún mecanismo y nada le dice al usuario que ahí las reglas son solo prosa | abierto |
 | `ACO-013` | S2 | Lente 1 | 21 artefactos compartidos, 3 declarados. Y `templates-contract.md` vive en este repo, no en el payload: el proyecto generado no recibe ninguna declaración de sus propios contratos | abierto |
 | `HUE-031` | S3 | Lente 2 | `pre-write-guard` capa 1 y `harness-gate` protegen superficies complementarias del harness sin criterio común; ninguno cubre `.claude/skills/` ni `.claude/agents/` | abierto |
@@ -125,7 +125,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-001` | S2 | `C-01` | El Discovery Gate solo comprueba que el flag exista; leer `context/` lo levanta sin ningún índice | resuelto · el Gate exige una línea que nombre `indices/`; leer solo `context/` ya no lo levanta |
 | `HUE-003` | S2 | `C-01` | `compact-recovery` conoce 10 de 15 índices; GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan | resuelto · la lista sale de `indices/` en el disco: 10 → 15, sin dejar de ser selectivo |
 | `HUE-004` | S2 | `C-03` | `spec-reflection` calla cuando no hay ninguna casilla marcada — el caso exacto que debería atrapar | resuelto · lo que separa las dos situaciones son las escrituras de la sesión, no las casillas |
-| `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | abierto |
+| `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | resuelto · `task-spec.test.js`: las tres convenciones que atan al productor con sus cinco consumidores, con los consumidores corriendo de verdad |
 | `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | abierto |
 | `INC-003` | S2 | `C-05` | `pre-write-guard.js` no figura como consumidor del blueprint en ninguna documentación | abierto |
 | `DUP-001` | S3 | `C-04` | Dos fail modes para el mismo contrato: `indices-sync` avisa y sigue, `assignments-sync` lanza | resuelto · «nada que hacer» ≠ «algo roto» en los dos scripts, y el fallo de `sync` dejó de ser un stack trace |
@@ -638,7 +638,37 @@ ls templates/.claude/tests/ | grep -E "write-tracker|sync-check|spec-diff"
 
 Es la entrada más rentable del backlog de tests que salga de la Lente 3.
 
-**Estado:** abierto
+**Resolución** — primero hay que corregir el hallazgo: la premisa ya no se sostiene.
+`write-tracker.test.js`, `sync-check.test.js` y `spec-diff-check.test.js` existen desde que
+se cerró `DEC-001`, así que `session-writes.json` dejó de ser el contrato descubierto. El
+que quedaba sin nada es el **task-spec**, con **cinco** consumidores — y `contracts.js` ya
+lo decía en su nota, apuntando a este mismo `HUE-006`.
+
+El detalle que importa: los cinco consumidores tienen su propio archivo de test. Lo que no
+tenía ninguno era **lo que los ata**, que es exactamente donde esto se rompe: tres
+convenciones que comparten sin que ningún `import` las obligue a estar de acuerdo.
+
+`task-spec.test.js` prueba las tres:
+
+1. **Los encabezados.** Los `--contains` del hook declarado en el frontmatter de `/plan` se
+   extraen del archivo y se contrastan contra la plantilla que esa misma skill reparte.
+   Renombrar una sección en un lado deja al otro rechazando el archivo que él mismo genera.
+2. **El nombre.** Con `task-spec-YYYYMMDD-HHMMSS.md`, orden alfabético y cronológico
+   coinciden. El test fija también el modo de fallo: con un formato humano, `1-2-2026` es
+   posterior en el calendario y anterior alfabéticamente, y los hooks tomarían el spec
+   viejo como activo sin ningún error.
+3. **Las casillas.** `compact-recovery`, `prompt-context` y `session-start` **se ejecutan de
+   verdad** contra un spec armado desde la plantilla: los tres tienen que ver lo pendiente,
+   descartar lo hecho, y coincidir en cuál spec está activo. Un desacuerdo ahí es
+   silencioso — cada uno trabajaría sobre un spec distinto.
+
+Más el validador contra lo que `/plan` produce: acepta el spec completo, rechaza el que
+perdió una sección (y dice cuál), rechaza que no haya ninguno.
+
+Provocado: renombrando una sección en la plantilla y desactivando el filtro de casillas de
+un consumidor, un test cae en cada caso.
+
+**Estado:** resuelto · `task-spec.test.js`, 13 tests
 
 ---
 

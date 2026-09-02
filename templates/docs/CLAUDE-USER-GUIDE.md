@@ -51,7 +51,7 @@ Claude automaticamente: leera los indices (Discovery Gate lo obliga), usara OnPu
 ### C. Para Auditoria Completa
 > "Ejecuta `npm run lint:arch` y corrige todos los errores."
 
-El linter arquitectonico (v2.0) valida 8 reglas via AST: Facade pattern, OnPush, TDD, directivas deprecadas, colores hardcodeados, animaciones, y mas.
+El linter arquitectonico (v2.0) valida **28 reglas**: arquitectura (Facade pattern, OnPush, TDD, directivas deprecadas), sistema visual (tokens muertos, clases ad-hoc, contraste AA), accesibilidad, navegacion, iconos y politicas RLS de Supabase. Las 28 tienen un fixture que las pone delante de su propia violacion — `npm run lint:arch:provocar` lo comprueba.
 
 ## 4. Limites Actuales y Como Mitigarlos
 

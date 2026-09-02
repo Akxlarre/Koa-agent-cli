@@ -35,7 +35,7 @@
 | `templates/.claude/rules/` | `.claude/rules/` | 15 reglas arquitectónicas path-scoped. |
 | `templates/.claude/skills/` | `.claude/skills/` | 15 skills, incl. `harness-feedback` (ver tabla de skills abajo). |
 | `templates/.claude/scripts/` | `.claude/scripts/` | post-edit.js (Prettier automático), más `package.json` que declara la carpeta como ESM — sin él, cada edición del proyecto generado imprime un `MODULE_TYPELESS_PACKAGE_JSON` (`DEC-003`). |
-| `templates/.claude/tests/` | `.claude/tests/` | 29 archivos de tests de contrato, 752 tests (`node --test`, `npm run claude:test-hooks`). Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada, `harness-gate.test.js` (17 tests del Generalization Gate, incl. la localidad de `GATE-A1`) y `contracts.test.js`, que contrasta el registro de artefactos contra el filesystem. |
+| `templates/.claude/tests/` | `.claude/tests/` | 30 archivos de tests de contrato, 766 tests (`node --test`, `npm run claude:test-hooks`). Incluye `doc-links.test.js`, que verifica que toda referencia `archivo.md#ancla` del payload resuelva y que toda regla emitida esté documentada, `harness-gate.test.js` (17 tests del Generalization Gate, incl. la localidad de `GATE-A1`), `contracts.test.js`, que contrasta el registro de artefactos contra el filesystem, y `task-spec.test.js`, que prueba las tres convenciones que atan a `/plan` con sus cinco consumidores. |
 
 ## Adapters de AI tools (condicional)
 

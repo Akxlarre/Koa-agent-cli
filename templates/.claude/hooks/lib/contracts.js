@@ -117,7 +117,10 @@ const CONTRACTS = {
     ],
     lifetime: 'permanente',
     scope: 'proyecto',
-    nota: 'El contrato con mas consumidores y el unico de los cinco sin test (HUE-006).',
+    nota: 'El contrato con mas consumidores. Era el unico de los cinco sin test (HUE-006): '
+        + 'los cinco consumidores tenian el suyo, y lo que NO tenia ninguno era lo que los '
+        + 'ata — los encabezados, el orden del nombre y las casillas. Eso prueba '
+        + '.claude/tests/task-spec.test.js, corriendo los consumidores de verdad.',
   },
 
   'blueprint.json': {

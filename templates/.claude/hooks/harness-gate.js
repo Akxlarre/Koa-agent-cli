@@ -43,6 +43,78 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+
+const AUTO_INICIO = '<!-- AUTO-GENERATED:BEGIN -->';
+const AUTO_FIN = '<!-- AUTO-GENERATED:END -->';
+
+/** El cuerpo entre los marcadores, o `null` si el texto no los tiene. */
+function regionAuto(texto) {
+  const a = texto.indexOf(AUTO_INICIO);
+  const b = texto.indexOf(AUTO_FIN, a);
+  if (a === -1 || b === -1) return null;
+  return texto.slice(a + AUTO_INICIO.length, b);
+}
+
+/** Quién regenera este archivo. Es lo que hay que decirle a quien fue frenado. */
+function generadorDe(rutaNormalizada) {
+  if (/(^|\/)indices\/[^/]+\.md$/.test(rutaNormalizada)) {
+    return '`npm run indices:sync` (o delegá en el subagente `index-syncer`)';
+  }
+  if (/ASSIGNMENTS\.md$/.test(rutaNormalizada)) return '`npm run assignments:sync`';
+  if (/LESSONS_LEARNED\.md$/.test(rutaNormalizada)) {
+    return 'el hook `failure-tracker`, solo (no se edita a mano)';
+  }
+  return 'el generador que mantiene ese archivo';
+}
+
+/**
+ * ¿La escritura cae DENTRO de la región auto-generada? (HUE-007)
+ *
+ * Se compara contra el archivo EN DISCO, que es lo único que dice dónde están
+ * hoy los marcadores:
+ *
+ *   Edit  — `old_string` es el texto que se reemplaza. Si vive adentro de la
+ *           región, el generador lo va a pisar.
+ *   Write — reemplaza todo. Se comparan las dos regiones: si difieren, la
+ *           escritura toca lo auto-generado. Si son idénticas, el cambio está
+ *           afuera y pasa.
+ *
+ * Fail-open en todo lo demás: sin marcadores, sin archivo o sin permiso de
+ * lectura, este guard no opina.
+ */
+function protegerRegionAuto(filePath, { oldString, contenidoCompleto }) {
+  let enDisco;
+  try {
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
+    enDisco = fs.readFileSync(filePath, 'utf-8');
+  } catch { return false; }
+
+  const region = regionAuto(enDisco);
+  if (region === null) return false;
+
+  let motivo = null;
+  if (oldString) {
+    if (region.includes(oldString)) motivo = 'el texto que estás reemplazando vive adentro';
+  } else if (contenidoCompleto) {
+    const nueva = regionAuto(contenidoCompleto);
+    if (nueva === null) motivo = 'el contenido nuevo ni siquiera conserva los marcadores';
+    else if (nueva !== region) motivo = 'el contenido de la región cambia';
+  }
+  if (!motivo) return false;
+
+  const normalizada = filePath.replace(/\\/g, '/');
+  process.stderr.write(
+    `\u{1F9ED} HARNESS GATE: ${path.basename(filePath)} tiene una región AUTO-GENERATED.\n` +
+    `  ❌ [GATE-D1] Estás escribiendo DENTRO de esa región — ${motivo}.\n` +
+    '     Lo de adentro lo reescribe entero su generador: tu cambio no falla ahora,\n' +
+    '     desaparece en la próxima corrida y sin dejar rastro de qué había.\n' +
+    `     Para cambiar lo de adentro: corré ${generadorDe(normalizada)}.\n` +
+    '     Para agregar algo tuyo: escribilo FUERA de los marcadores — ese texto\n' +
+    '     se conserva, y es el lugar que existe justamente para eso.\n'
+  );
+  return true;
+}
 
 /**
  * El texto partido en las unidades donde una lección cabe entera (DEC-002).
@@ -85,11 +157,32 @@ process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
     const filePath = input.tool_input?.file_path || input.tool_input?.path || '';
-    const newContent = input.tool_input?.new_string || input.tool_input?.content || '';
+    const oldString = input.tool_input?.old_string || '';
+    const contenidoCompleto = input.tool_input?.content || '';
+    const newContent = input.tool_input?.new_string || contenidoCompleto || '';
     const normalizedPath = filePath.replace(/\\/g, '/');
 
     if (!filePath || !newContent) {
       process.exit(0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // D. REGION GUARD — no escribir dentro de AUTO-GENERATED (HUE-007)
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Es el patrón más reusado del blueprint: tres productores lo escriben
+    // (`indices-sync`, `assignments-sync`, `lib/lessons`) y el trato es siempre
+    // el mismo — adentro se reescribe entero, afuera no se toca nunca.
+    //
+    // El trato no lo sostenía nada. Escribir adentro no falla: falla DESPUÉS,
+    // en la próxima corrida del generador, que borra el trabajo sin decir nada
+    // y sin dejar rastro de qué había. `DUP-003` mostró que no es hipotético:
+    // la propia skill `/sync-indices` editaba ahí adentro.
+    //
+    // La superficie no es una lista de rutas —eso se desactualiza, como en
+    // `HUE-003`—: es «el archivo en disco tiene los marcadores».
+    if (protegerRegionAuto(filePath, { oldString, contenidoCompleto })) {
+      process.exit(2);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

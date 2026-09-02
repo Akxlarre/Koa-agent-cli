@@ -131,7 +131,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `DUP-001` | S3 | `C-04` | Dos fail modes para el mismo contrato: `indices-sync` avisa y sigue, `assignments-sync` lanza | resuelto · «nada que hacer» ≠ «algo roto» en los dos scripts, y el fallo de `sync` dejó de ser un stack trace |
 | `ACO-002` | S3 | `C-03` | `spec-reflection-seen.json` no está declarado como artefacto | abierto |
 | `ACO-003` | S3 | `C-04` | `indices-cache.json` decide qué se re-parsea y no está declarado como dependencia | abierto |
-| `HUE-007` | S3 | `C-04` | Nada impide editar dentro de los marcadores y perder el trabajo en el siguiente sync | abierto |
+| `HUE-007` | S3 | `C-04` | Nada impide editar dentro de los marcadores y perder el trabajo en el siguiente sync | resuelto · `GATE-D1`: la superficie se detecta por los marcadores **en disco**, no por una lista de rutas; el mensaje nombra el generador que corresponde |
 | `HUE-008` | S3 | `C-04` | Ningún test fija la partición 13 auto-generados / 2 manuales | abierto |
 | `INC-020` | **S1** | `diseño` | `SessionStart` no corre una vez por sesión: corre en `startup`, `resume`, `clear`, `compact` y `fork`, y el harness lo registra sin matcher | resuelto · matcher `startup\|resume\|clear\|fork` + `cleanup()` por antigüedad |
 | `CAR-004` | S2 | `diseño` | Tras una compactación corren `session-start` **y** `compact-recovery`: 85% del output del primero es idéntico al del segundo | resuelto · 26.006 → 8.783 chars por compactación |
@@ -2457,3 +2457,56 @@ Provocado: quitando la línea de `paths.js`, 3 tests en rojo; con el mensaje ant
 `sync-check`, 2 más.
 
 **Estado:** resuelto · las migraciones se rastrean, y el aviso nombra el índice correcto
+
+---
+
+## HUE-007 · El trato de los marcadores no lo sostenía nada
+
+- **Tipo / severidad:** `HUE` · S3
+- **Unidad:** `C-04` (marcadores `AUTO-GENERATED`)
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+`AUTO-GENERATED:BEGIN`/`END` es el patrón más reusado del blueprint: tres productores lo
+escriben (`indices-sync`, `assignments-sync`, `lib/lessons`) y el trato es siempre el mismo
+— **adentro se reescribe entero, afuera no se toca nunca**. Nada lo sostenía.
+
+**Por qué importa, y por qué el modo de fallo es peor que un error**
+
+Escribir adentro **no falla**. Falla después, en la próxima corrida del generador, que pisa
+el trabajo sin decir nada y sin dejar rastro de qué había. El agente no aprende: entre la
+causa y el efecto hay una sesión entera.
+
+Y no es hipotético. `DUP-003` lo encontró en el propio blueprint: la skill `/sync-indices`
+—la que el harness le dice al usuario que invoque para sincronizar— editaba ahí adentro.
+
+**Arreglo — `GATE-D1`**
+
+En `harness-gate`, con una decisión que sale de `HUE-003`: **la superficie no es una lista
+de rutas**. Una lista se desactualiza —es exactamente el bug de los diez índices—. La
+superficie es *«el archivo en disco tiene los marcadores»*, y por eso cubre sin más
+trabajo los tres artefactos declarados y cualquiera que se agregue después.
+
+La detección se compara siempre contra el disco, que es lo único que dice dónde están hoy
+los marcadores:
+
+| Tool | Qué se mira |
+|---|---|
+| `Edit` | Si `old_string` vive dentro de la región, el generador lo va a pisar |
+| `Write` | Se comparan las dos regiones; si difieren, la escritura toca lo auto-generado |
+
+Editar **fuera** pasa, y eso es la mitad del diseño: congelar el archivo entero rompería el
+patrón en vez de protegerlo. Lo de afuera existe justamente para escribir a mano.
+
+Un caso más que el guard cubre y que `INC-022` volvió concreto: un `Write` que **borra los
+marcadores** también se frena. Sin ellos `assignments-sync` se niega a escribir y
+`indices-sync` no tiene dónde.
+
+Y el mensaje nombra el generador que corresponde a ese archivo —`indices:sync`,
+`assignments:sync`, o «lo escribe `failure-tracker`, no se edita a mano»—. Frenar sin decir
+el camino de salida convierte un guardrail en un muro.
+
+Provocado: apagando `GATE-D1`, 4 tests en rojo.
+
+**Estado:** resuelto · la superficie se detecta por los marcadores en disco

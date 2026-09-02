@@ -296,6 +296,8 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
   | GATE-A2 | Guía | Snippet de despacho por keyword-matching literal (`if ("token" in text)`) — ni siquiera como prosa/pseudo-código |
   | GATE-B1 | Guía | Lógica ejecutable real (`require`/`process.exit`/`fs.*`) colada en un archivo que debería ser solo prosa |
   | GATE-B2 | Capacidad | `console.log`/`console.warn` con tono de consejo y sin ningún `process.exit(2)` que lo respalde — guía disfrazada de script |
+  | GATE-C1 | Capacidad declarada | Tocar `tools:`, `hooks:`, `model:` o `permission-mode:` en `.claude/agents/`, `.claude/skills/` o `.claude/commands/`. El texto de esos archivos es del agente; esas claves deciden qué puede hacer y las cambia el humano (`HUE-031`) |
+  | GATE-D1 | Cualquier archivo con marcadores | Escribir DENTRO de una región `AUTO-GENERATED`. No falla ahora: desaparece en la próxima corrida del generador, sin rastro (`HUE-007`) |
 
   `GATE-A1` es un chequeo **léxico**, y su alcance es el párrafo a propósito: antes
   miraba el archivo entero, y como «cuando» y «nunca» son de las palabras más comunes

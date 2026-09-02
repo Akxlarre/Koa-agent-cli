@@ -7,7 +7,7 @@
  * Usa node:test nativo (Node 18+) y child_process para simular el hook.
  */
 
-const { test, describe } = require('node:test');
+const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('child_process');
 const path = require('path');
@@ -249,6 +249,104 @@ describe('GATE-B2 — consejo sin mecanismo en script', () => {
     const r = runHook(makeInput('/project/scripts/architect.js',
       'console.warn("Recuerda revisar esto");'
     ));
+    assert.equal(r.exitCode, 0);
+  });
+});
+
+// ─── GATE-D1: la región AUTO-GENERATED (HUE-007) ───────────────────────────
+describe('GATE-D1 — escribir dentro de la región auto-generada', () => {
+  // Es el patrón más reusado del blueprint —`indices-sync`, `assignments-sync`
+  // y `lib/lessons` lo escriben— y el trato es siempre el mismo: adentro se
+  // reescribe entero, afuera no se toca. El trato no lo sostenía nada.
+  //
+  // Escribir adentro no falla: falla DESPUÉS, en la próxima corrida del
+  // generador, que borra el trabajo sin decir nada. Y no es hipotético: hasta
+  // `DUP-003` la propia skill `/sync-indices` editaba ahí adentro.
+  const fs2 = require('fs');
+  const os2 = require('os');
+
+  let dir;
+  let archivo;
+
+  const CONTENIDO = [
+    '# COMPONENTS',
+    '',
+    'Notas a mano que quiero conservar.',
+    '',
+    '<!-- AUTO-GENERATED:BEGIN -->',
+    '| Componente | Tipo |',
+    '|---|---|',
+    '| `app-kpi-card` | Molecula |',
+    '<!-- AUTO-GENERATED:END -->',
+    '',
+    'Mas notas mias, abajo.',
+    '',
+  ].join('\n');
+
+  beforeEach(() => {
+    dir = fs2.mkdtempSync(path.join(os2.tmpdir(), 'koa-d1-'));
+    fs2.mkdirSync(path.join(dir, 'indices'));
+    archivo = path.join(dir, 'indices', 'COMPONENTS.md');
+    fs2.writeFileSync(archivo, CONTENIDO);
+  });
+
+  afterEach(() => { try { fs2.rmSync(dir, { recursive: true, force: true }); } catch { /* */ } });
+
+  const editar = (old_string, new_string) => runHook({
+    tool_name: 'Edit', tool_input: { file_path: archivo, old_string, new_string },
+  });
+  const escribir = (content) => runHook({
+    tool_name: 'Write', tool_input: { file_path: archivo, content },
+  });
+
+  test('un Edit DENTRO de la región queda bloqueado', () => {
+    const r = editar('| `app-kpi-card` | Molecula |', '| `app-kpi-card` | Atomo |');
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /GATE-D1/);
+  });
+
+  test('un Edit FUERA pasa — el objetivo no es congelar el archivo', () => {
+    // Lo de afuera existe justamente para escribir a mano. Un guard que
+    // bloqueara el archivo entero rompería el patrón en vez de protegerlo.
+    assert.equal(editar('Notas a mano que quiero conservar.', 'Notas ampliadas.').exitCode, 0);
+  });
+
+  test('un Write que cambia la región queda bloqueado', () => {
+    assert.equal(escribir(CONTENIDO.replace('Molecula', 'Atomo')).exitCode, 2);
+  });
+
+  test('un Write que solo cambia lo de afuera pasa', () => {
+    assert.equal(escribir(CONTENIDO.replace('Mas notas mias, abajo.', 'Mas notas.')).exitCode, 0);
+  });
+
+  test('y uno que borra los marcadores, también bloqueado', () => {
+    // El modo de fallo más caro: sin marcadores, `assignments-sync` se niega a
+    // escribir (INC-022) y `indices-sync` deja de tener dónde escribir.
+    const r = escribir('# COMPONENTS\n\nsin marcadores\n');
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /marcadores/);
+  });
+
+  test('el mensaje nombra al generador que corresponde', () => {
+    // Frenar sin decir el camino de salida convierte un guardrail en un muro.
+    assert.match(editar('| `app-kpi-card` | Molecula |', 'x').stderr, /indices:sync/);
+  });
+
+  test('un archivo sin marcadores no le importa a este guard', () => {
+    const otro = path.join(dir, 'indices', 'SUELTO.md');
+    fs2.writeFileSync(otro, '# Suelto\n\ncontenido a mano\n');
+    const r = runHook({
+      tool_name: 'Edit',
+      tool_input: { file_path: otro, old_string: 'contenido a mano', new_string: 'otro' },
+    });
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('y un archivo que no existe tampoco — fail-open', () => {
+    const r = runHook({
+      tool_name: 'Write',
+      tool_input: { file_path: path.join(dir, 'indices', 'NUEVO.md'), content: 'nuevo' },
+    });
     assert.equal(r.exitCode, 0);
   });
 });

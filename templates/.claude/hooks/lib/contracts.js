@@ -226,13 +226,17 @@ const CONTRACTS = {
       'scripts/assignments-sync.js',
       '.claude/hooks/lib/lessons.js',
       '.claude/agents/index-syncer.md',
+      '.claude/hooks/harness-gate.js',
     ],
     lifetime: 'permanente',
     scope: 'proyecto',
     nota: 'ACO-013: es el patron mas reusado del blueprint —tres productores— y no estaba '
-        + 'declarado en ningun lado. HUE-007: nada impide editar ADENTRO y perder el trabajo '
-        + 'en el proximo sync. INC-022: assignments-sync se niega a escribir sin marcadores, '
-        + 'y la plantilla canonica no los traia.',
+        + 'declarado en ningun lado. INC-022: assignments-sync se niega a escribir sin '
+        + 'marcadores, y la plantilla canonica no los traia. HUE-007, cerrado: nada impedia '
+        + 'editar ADENTRO, y el trabajo no fallaba —desaparecia en la proxima corrida del '
+        + 'generador, sin rastro—. Lo frena GATE-D1 en harness-gate, que detecta la superficie '
+        + 'por los marcadores EN DISCO y no por una lista de rutas, que es lo que se '
+        + 'desactualiza (HUE-003).',
   },
 
   'author.local.json': {

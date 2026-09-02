@@ -33,7 +33,7 @@ respeta. Los dos campos que más cuesta adivinar leyendo el código:
 | `DETAIL:BEGIN` | `indices/*.md` | `.claude/agents/index-syncer.md` | `.claude/hooks/session-start.js`<br>`.claude/hooks/compact-recovery.js`<br>`.claude/hooks/lib/budget.js` | permanente | proyecto |
 | `last_updated:` | `context/brief.md` | *el humano* | `.claude/hooks/session-start.js`<br>`.claude/hooks/discovery-tracker.js` | permanente | proyecto |
 | `provocacion.baseline.json` | `scripts/provocacion.baseline.json` | `scripts/provocar-reglas.mjs` | `scripts/provocar-reglas.mjs` | permanente | proyecto |
-| `AUTO-GENERATED:BEGIN` | `indices/*.md, specs/ASSIGNMENTS.md, .claude/temp/LESSONS_LEARNED.md` | `scripts/indices-sync.js`<br>`scripts/assignments-sync.js`<br>`.claude/hooks/lib/lessons.js` | `scripts/indices-sync.js`<br>`scripts/assignments-sync.js`<br>`.claude/hooks/lib/lessons.js`<br>`.claude/agents/index-syncer.md` | permanente | proyecto |
+| `AUTO-GENERATED:BEGIN` | `indices/*.md, specs/ASSIGNMENTS.md, .claude/temp/LESSONS_LEARNED.md` | `scripts/indices-sync.js`<br>`scripts/assignments-sync.js`<br>`.claude/hooks/lib/lessons.js` | `scripts/indices-sync.js`<br>`scripts/assignments-sync.js`<br>`.claude/hooks/lib/lessons.js`<br>`.claude/agents/index-syncer.md`<br>`.claude/hooks/harness-gate.js` | permanente | proyecto |
 | `author.local.json` | `.claude/author.local.json` | *el humano, copiando author.local.json.example* | `.claude/commands/assign-new.md`<br>`.claude/commands/assign-list.md`<br>`.claude/commands/assign-claim.md` | permanente | proyecto |
 | `arch-last-failure.json` | `.claude/temp/arch-last-failure.json` | `scripts/lint-arch-wrapper.js` | `.claude/agents/arch-auditor.md` | sesion | proyecto |
 | `class-discipline.baseline.json` | `scripts/class-discipline.baseline.json` | `scripts/architect.js` | `scripts/architect.js`<br>`scripts/lib/class-discipline.js` | permanente | proyecto |
@@ -118,7 +118,7 @@ ACO-009: la provocacion depende de que architect.js nombre el codigo de la regla
 
 **Formato:** par de marcadores HTML; adentro se reescribe entero, afuera no se toca nunca
 
-ACO-013: es el patron mas reusado del blueprint —tres productores— y no estaba declarado en ningun lado. HUE-007: nada impide editar ADENTRO y perder el trabajo en el proximo sync. INC-022: assignments-sync se niega a escribir sin marcadores, y la plantilla canonica no los traia.
+ACO-013: es el patron mas reusado del blueprint —tres productores— y no estaba declarado en ningun lado. INC-022: assignments-sync se niega a escribir sin marcadores, y la plantilla canonica no los traia. HUE-007, cerrado: nada impedia editar ADENTRO, y el trabajo no fallaba —desaparecia en la proxima corrida del generador, sin rastro—. Lo frena GATE-D1 en harness-gate, que detecta la superficie por los marcadores EN DISCO y no por una lista de rutas, que es lo que se desactualiza (HUE-003).
 
 ### `author.local.json`
 

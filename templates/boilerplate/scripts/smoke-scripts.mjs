@@ -143,9 +143,11 @@ console.log(`\n${c.cyan}🔥 Smoke de scripts — ¿pueden fallar, o sólo pasar
 
 const saltados = [];
 const veredictos = [];
+let seleccionados = 0;
 
 for (const [nombre, comando] of Object.entries(scripts)) {
   if (solo && !solo.includes(nombre)) continue;
+  seleccionados++;
 
   const clase = clasificar(nombre, comando);
   if (clase !== 'verificable') {
@@ -175,7 +177,7 @@ if (saltados.length > 0) {
   console.log(`\n${c.gris}No se corren: ${saltados.map((s) => `${s.nombre} (${s.clase})`).join(', ')}${c.reset}`);
 }
 
-const r = resumir(veredictos);
+const r = resumir(veredictos, { scriptsEncontrados: Object.keys(scripts).length, seleccionados });
 console.log('');
 
 const decorativos = veredictos.filter((v) => v.estado === 'decorativo');
@@ -183,6 +185,15 @@ if (decorativos.length > 0) {
   console.log(`${c.rojo}🎭 ${decorativos.length} script(s) decorativos — pasan sin comprobar nada:${c.reset}`);
   for (const d of decorativos) console.log(`   ${d.nombre}: ${d.motivo}`);
   console.log(`${c.amarillo}   Un script que sale 0 sin mirar nada es peor que uno ausente: el ausente se nota.${c.reset}\n`);
+}
+
+if (r.vacio) {
+  // DEC-005: acá salía `✅ 0 script(s) comprobados` con exit 0. Salir en verde
+  // sin haber comprobado nada es, en pequeño, exactamente el patrón que este
+  // script existe para condenar.
+  console.error(`${c.rojo}❌ El smoke no comprobó nada: ${r.vacio}.${c.reset}`);
+  console.error(`${c.amarillo}   Un chequeo verde que no miró nada es lo que este smoke busca.${c.reset}\n`);
+  process.exit(1);
 }
 
 if (r.falla) {

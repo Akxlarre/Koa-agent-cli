@@ -88,7 +88,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-008` | S2 | `S-01` | El boilerplate que el CLI reparte incumple su propia `ARCH-09`: `section-hero.component.ts` tiene 1.170 líneas contra un límite de 200 | resuelto · la regla medía el `@Component` (template inline), no la clase: `tabs` era falso positivo; `section-hero` 258 → 198. `lint:arch` limpio |
 | `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | resuelto · las 9 que faltaban tienen fixture; 7 dispararon a la primera, 1 era un fixture mal escrito y 1 destapó `INC-023` |
 | `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | resuelto · interruptor `specs/AUTHORS.md`: apagada → mensaje y `exit 0` |
-| `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | abierto |
+| `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | resuelto · sale en 1, y distingue las **tres** formas de estar vacío porque cada una pide algo distinto |
 | `ACO-009` | S3 | `S-05` | La provocación depende de que la salida de `architect.js` nombre el código de la regla; ese formato no está declarado | abierto |
 | `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | abierto |
 | `HUE-020` | **S1** | `G-02` | `parseJsonc` se come lo que siga a `//` dentro de un string: un `tsconfig.json` con `$schema` deja el proyecto sin path aliases y sin compilar | resuelto · `stripJsonComments` recorre respetando strings; el parche de `tsconfig` pasó a requerido |
@@ -102,7 +102,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-012` | S3 | `G-02` | Los nombres reservados de Windows solo se validan **en** Windows | resuelto · se validan siempre, no solo en win32 |
 | `INC-013` | S3 | `G-07` | La mitigación de `deriveSingular` («el prompt permite corregirlo») no existe en modo no-interactivo | resuelto · `--singular <Nombre>` + se imprime lo derivado en modo no-interactivo |
 | `ACO-011` | S3 | `A-01` | `.claude/temp/review-diff.patch` es el canal entre `/review` y `code-judge` y no está declarado | resuelto · declarado (lifetime `turno`, scope `sesion`) y publicado en `docs/CONTRATOS.md` |
-| `ACO-012` | S3 | `T-01` | Ningún test fija el formato del payload que reciben los hooks; cada uno lo construye a mano | abierto |
+| `ACO-012` | S3 | `T-01` | Ningún test fija el formato del payload que reciben los hooks; cada uno lo construye a mano | resuelto · `lib/payload.js` lo fija; medido que **5 hooks** seguían parseando stdin por su cuenta, migrado uno y los otros 4 en un baseline que solo se achica |
 | `CAR-003` | S2 | `R-01` | **(remedido)** Editar un componente de `features/` inyecta **13 reglas** completas (~19.100 tokens); `visual-system.md` sola es el 28% y matchea seis globs | resuelto · peor caso 76.391 → 71.975; `shared/` −38%, `.scss` −58%, SQL −40%; con tope testeado por ruta |
 | `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | resuelto · los dos npm scripts en `lib/scaffolder.js`, con test que ata comando y script |
 | `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | resuelto · una convención con dos formas y el interruptor decide; `parseTrackName` compartido, con test de las dos ramas |
@@ -2794,3 +2794,82 @@ una por una antes de marcarlas, que es la diferencia entre cerrar y dar por cerr
 | `HUE-017` | `compact-recovery` tiene `MAX_INDEX_CHARS`, `budget.recortar` y corte en `DETAIL:BEGIN`; su test exige que el aviso diga que recortó |
 
 **Estado:** resueltos
+
+---
+
+## DEC-005 · El auditor cometía el error que audita
+
+- **Tipo / severidad:** `DEC` · S3 · **Unidad:** `S-06` · **Contexto:** B
+
+`smoke-scripts` existe para condenar los chequeos que salen verdes sin mirar nada — su
+propio docblock lo dice: *«un script que sale 0 sin haber mirado nada es peor que uno
+ausente, porque el ausente se nota»*. Y salía así:
+
+```
+🔥 Smoke de scripts — ¿pueden fallar, o sólo pasar?
+✅ 0 script(s) comprobados
+exit=0
+```
+
+Ahora sale en 1. Y distingue **tres** formas de estar vacío, porque cada una pide algo
+distinto y colapsarlas en un mensaje genérico manda a mirar el lugar equivocado — que es
+exactamente el error de `INC-002`:
+
+| Situación | Qué dice |
+|---|---|
+| El `package.json` no declara scripts | «no declara ningún script» |
+| El `--solo` no coincidió con ninguno | «el filtro `--solo` no coincidió con ningún script» |
+| Todos los seleccionados son no-corribles | «ninguno resultó verificable: externos, que no terminan, o destructivos» |
+
+El segundo es el caro: un typo en el flag producía un visto bueno vacío, y quien lo corría
+se iba creyendo que sus scripts estaban auditados.
+
+Provocado: quitando `vacio` de la condición de fallo, 1 test en rojo.
+
+**Estado:** resuelto · cero comprobados ya no es un visto bueno
+
+---
+
+## ACO-012 · Cinco hooks seguían leyendo su entrada por su cuenta
+
+- **Tipo / severidad:** `ACO` · S3 · **Unidad:** `T-01` · **Contexto:** B
+
+**Qué encontré, midiendo**
+
+El hallazgo decía que ningún test fija el formato del payload y que cada hook lo construye
+a mano. `lib/payload.js` (ADR-001 §2) cerró la primera mitad — es el dueño de la entrada, y
+tiene 16 tests. La segunda quedó a medias, y esto lo cuantifica:
+
+```
+19 hooks
+  12  leen por lib/payload.js
+   5  parsean stdin A MANO   bash-guard, discovery-tracker, failure-tracker,
+                             harness-gate, pre-write-guard
+   0  leen la entrada de una variable de entorno   ← DEC-001 sí está cerrado
+```
+
+Cada uno de esos cinco reimplementa el tope de 10 MB de `SEC-04`, el `JSON.parse`, el
+fail-open y la normalización `file_path`/`path` — *«y no todos igual»*, como dice el propio
+docblock de `payload.js`. Y los 16 tests del módulo **no los cubren**, porque no pasan por
+ahí: es cobertura que se ve como cobertura y no lo es.
+
+**Arreglo**
+
+`harness-gate` migrado —el que mejor conozco, y con 32 tests para atrapar una regresión— y
+los otros cuatro declarados en un **baseline que solo se achica**, el mismo patrón que
+`provocacion.baseline.json`. Un hook nuevo que parsee a mano hace fallar el test, que es el
+momento correcto para decírselo a quien lo escribe.
+
+Más una comprobación que va al fondo del asunto: **ningún hook lee su entrada de una
+variable de entorno**, ignorando comentarios — varios *nombran* `TOOL_INPUT` para explicar
+por qué no la usan, y eso es documentación, no una lectura. Es el modo de fallo que fundó
+el módulo: una env var inventada no falla, devuelve vacío, y el guardrail queda decorativo
+para siempre.
+
+Y una comprobación inversa, porque un regex roto haría que las tres anteriores pasaran por
+vacío: el detector tiene que encontrar `pre-write-guard` —el hook más grande— y recorrer al
+menos 15 archivos.
+
+Provocado: devolviendo `harness-gate` a parsear a mano, 2 tests en rojo.
+
+**Estado:** resuelto · 5 → 4, y el baseline solo se achica

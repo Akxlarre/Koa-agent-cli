@@ -154,3 +154,72 @@ describe('SEC-04 — tope de entrada', () => {
     assert.equal(p.newContent, 'hola');
   });
 });
+
+describe('ACO-012 — un solo dueño de la entrada, y la lista solo se achica', () => {
+  // `lib/payload.js` existe para que leer stdin tenga un dueño: ahí viven la
+  // lección de `DEC-001` (un hook leía `process.env.TOOL_INPUT`, que no existe,
+  // y por eso nunca bloqueó nada) y el tope de `SEC-04`.
+  //
+  // Pero cinco hooks seguían parseando stdin por su cuenta —tope, `JSON.parse`,
+  // fail-open y la normalización de `file_path`/`path`, reimplementados en cada
+  // uno—, y los 16 tests de este archivo no los cubrían: no pasan por acá.
+  //
+  // El baseline se achica, nunca crece. Un hook nuevo que parsee a mano falla
+  // este test, que es el momento correcto para decírselo a quien lo escribe.
+  const fs2 = require('fs');
+  const HOOKS = path.resolve(__dirname, '..', 'hooks');
+
+  /** Los hooks que TODAVÍA leen stdin por su cuenta. Medido, no supuesto. */
+  const A_MANO = [
+    'bash-guard.js',
+    'discovery-tracker.js',
+    'failure-tracker.js',
+    'pre-write-guard.js',
+  ];
+
+  function hooksJs(dir, base = '') {
+    return fs2.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      const rel = base ? `${base}/${e.name}` : e.name;
+      if (e.isDirectory()) return e.name === 'lib' ? [] : hooksJs(full, rel);
+      return e.name.endsWith('.js') ? [{ rel, full }] : [];
+    });
+  }
+
+  const parseanAMano = hooksJs(HOOKS)
+    .filter(({ full }) => /process\.stdin\.on\(/.test(fs2.readFileSync(full, 'utf-8')))
+    .map(({ rel }) => rel)
+    .sort();
+
+  test('la lista de los que parsean a mano es exactamente la declarada', () => {
+    assert.deepEqual(parseanAMano, [...A_MANO].sort(),
+      'si aparece uno nuevo: hacelo pasar por lib/payload.js. '
+      + 'Si migraste uno: sacalo de A_MANO — este baseline solo se achica');
+  });
+
+  test('y solo puede achicarse', () => {
+    assert.ok(parseanAMano.length <= A_MANO.length,
+      `eran ${A_MANO.length} y ahora son ${parseanAMano.length}`);
+  });
+
+  test('ningún hook lee la entrada de una variable de entorno (DEC-001, HUE-002)', () => {
+    // El modo de fallo que fundó este módulo: una env var inventada no falla,
+    // devuelve vacío, y el guardrail queda decorativo para siempre.
+    const culpables = hooksJs(HOOKS).filter(({ full }) => {
+      const src = fs2.readFileSync(full, 'utf-8');
+      // Se ignoran los comentarios: varios hooks NOMBRAN la variable para
+      // explicar por qué no la usan, y eso es documentación, no una lectura.
+      const codigo = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      return /process\.env\.(TOOL_INPUT|CLAUDE_SESSION_ID)/.test(codigo);
+    });
+    assert.deepEqual(culpables.map((c) => c.rel), []);
+  });
+
+  test('el detector encuentra lo que ya sabemos que está', () => {
+    // Sin esto, un regex roto haría que las tres pruebas de arriba pasaran por
+    // vacío — exactamente el falso verde que esta auditoría cataloga.
+    assert.ok(parseanAMano.includes('pre-write-guard.js'),
+      'el detector no encontró el hook más grande: revisá el regex');
+    assert.ok(hooksJs(HOOKS).length >= 15, 'no se están recorriendo los hooks');
+  });
+});

@@ -150,8 +150,40 @@ export function veredicto({ nombre, exitLimpio, salida, exitProvocado }) {
 }
 
 /** Resumen para decidir el exit code del smoke. */
-export function resumir(veredictos) {
+export function resumir(veredictos, { scriptsEncontrados = null, seleccionados = null } = {}) {
   const cuenta = { ok: 0, roto: 0, decorativo: 0, 'sin-comprobar': 0 };
   for (const v of veredictos) cuenta[v.estado]++;
-  return { ...cuenta, falla: cuenta.roto > 0 || cuenta.decorativo > 0 };
+
+  // DEC-005: esto salia `✅ 0 script(s) comprobados` con exit 0 — en pequeño, el
+  // mismo patron que el smoke existe para condenar: un chequeo verde que no
+  // comprobo nada. Un package.json sin los scripts esperados, o un `--solo` mal
+  // escrito, producian un visto bueno vacio.
+  //
+  // Las dos formas de estar vacio no son la misma y no piden lo mismo:
+  //
+  //   ningun script encontrado   el filtro no matcheo nada, o no hay scripts.
+  //                              La auditoria no ocurrio.
+  //   ninguno verificable        los scripts existen y todos son externos, no
+  //                              terminan o son destructivos. Es un estado
+  //                              legitimo, pero tampoco es un visto bueno.
+  // Tres formas de estar vacio, y cada una pide algo distinto. Colapsarlas en
+  // un mensaje generico manda a mirar el lugar equivocado, que es el mismo error
+  // que INC-002.
+  let vacio = null;
+  if (veredictos.length === 0) {
+    if (scriptsEncontrados === 0) {
+      vacio = 'el package.json no declara ningun script';
+    } else if (seleccionados === 0) {
+      vacio = 'el filtro --solo no coincidio con ningun script del package.json';
+    } else {
+      vacio = 'ningun script resulto verificable: los seleccionados quedaron clasificados '
+            + 'como externos, que no terminan, o destructivos';
+    }
+  }
+
+  return {
+    ...cuenta,
+    vacio,
+    falla: cuenta.roto > 0 || cuenta.decorativo > 0 || vacio !== null,
+  };
 }

@@ -44,6 +44,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const payload = require('./lib/payload.js');
 
 const AUTO_INICIO = '<!-- AUTO-GENERATED:BEGIN -->';
 const AUTO_FIN = '<!-- AUTO-GENERATED:END -->';
@@ -141,25 +142,22 @@ function parrafosDe(texto) {
   return unidades;
 }
 
-// SEC-04: Limit stdin to 10 MB to prevent memory exhaustion (DoS) from crafted hook inputs.
-const MAX_STDIN_BYTES = 10 * 1024 * 1024;
-let data = '';
-let dataSize = 0;
-process.stdin.on('data', chunk => {
-  dataSize += chunk.length;
-  if (dataSize > MAX_STDIN_BYTES) {
-    process.stderr.write('harness-gate: stdin payload exceeds 10 MB limit — aborting (fail-open).\n');
-    process.exit(0);
-  }
-  data += chunk;
-});
-process.stdin.on('end', () => {
+// ACO-012: esto parseaba stdin a mano —tope de 10 MB, JSON.parse, fail-open y la
+// normalizacion de file_path/path, todo reimplementado acá—. `lib/payload.js`
+// existe justamente para que esa lógica tenga un solo dueño: es donde vive la
+// lección de DEC-001 (un hook leía `process.env.TOOL_INPUT`, que no existe) y de
+// SEC-04. Cinco hooks todavía lo hacían por su cuenta y `payload.test.js` no los
+// cubría, porque no pasaban por ahí.
+//
+// `old_string` y `content` no están entre los campos normalizados y se toman del
+// `raw`: son de este guard, no de todos.
+payload.read().then((entrada) => {
   try {
-    const input = JSON.parse(data);
-    const filePath = input.tool_input?.file_path || input.tool_input?.path || '';
+    const input = entrada.raw;
+    const filePath = entrada.filePath;
     const oldString = input.tool_input?.old_string || '';
     const contenidoCompleto = input.tool_input?.content || '';
-    const newContent = input.tool_input?.new_string || contenidoCompleto || '';
+    const newContent = entrada.newContent || contenidoCompleto || '';
     const normalizedPath = filePath.replace(/\\/g, '/');
 
     if (!filePath || !newContent) {

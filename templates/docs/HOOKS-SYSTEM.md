@@ -204,7 +204,12 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
 - **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contexto
   que el agente estaba usando. Tres decisiones de diseño:
   - **Selectiva** — solo los índices que el agente había leído (más los 3 core),
-    según el flag de discovery. No los 11.
+    según el flag de discovery. No los 15.
+  - **Sin lista propia** — los índices candidatos salen de `indices/` en el disco.
+    Antes eran un mapa a mano de diez entradas contra los quince del template, y
+    `GUARDS`, `LAYOUTS`, `ROUTES`, `USAGE-MAP` y `UTILS` no volvían nunca aunque el
+    agente los hubiera leído (`HUE-003`). Si agregas `indices/NUEVO.md`, se re-inyecta
+    solo: no hay nada que actualizar acá.
   - **Parcial** — corta cada índice en `<!-- DETAIL:BEGIN -->`: vuelve la Quick
     Reference, no los ejemplos de código.
   - **Solo lo pendiente** — del task-spec activo re-inyecta únicamente las casillas

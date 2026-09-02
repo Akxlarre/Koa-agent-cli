@@ -72,7 +72,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-006` | S3 | `H-02` | `koa-prompt-ctx-{sessionId}.json` no declarado | resuelto · el estado pasó a `budget-<clave>.json`, declarado en `contracts.js` |
 | `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | resuelto · `breaker.json` y `ctx-<categoria>.json` declarados; un test lee las claves que los hooks escriben de verdad |
 | `SEC-001` | **S1** | `H-11` | `post-edit.js` interpola la ruta del payload en una cadena de shell: una ruta con comillas ejecuta comandos arbitrarios | resuelto · `execFileSync` con argv — 6 cargas de ataque en el test |
-| `DEC-003` | **S1** | `H-11` | `post-edit.js` usa `import` bajo un `package.json` sin `type:module`: no carga en Node 20/21, el mínimo que el CLI exige | descartado · Node ejecuta el archivo igual (detección por sintaxis); verificado |
+| `DEC-003` | **S1** | `H-11` | `post-edit.js` usa `import` bajo un `package.json` sin `type:module`: no carga en Node 20/21, el mínimo que el CLI exige | descartado en su premisa · pero el costo real —un warning por cada edición, solo visible en el proyecto generado— existía y se cerró: `.claude/scripts/package.json` |
 | `HUE-016` | S2 | `H-12` | **(remedido)** Un error con `\|` corrompe la fila UNA vez y se estabiliza; lo que se rompe para siempre es el dedup de esa entrada | resuelto · `lib/lessons.js` escapa el `|` y lo desescapa al leer; 5 fallas con pipe → 1 fila con contador 5 |
 | `DUP-002` | S2 | `H-12` | `failure-tracker` y `lint-arch-wrapper` escriben ambos en `LESSONS_LEARNED.md` con formatos distintos | resuelto · la tabla vive entre marcadores `AUTO-GENERATED` y lo de afuera se preserva; verificado que una sección del wrapper sobrevive a 20 fallas |
 | `CAR-002` | S2 | `H-17` | `context-guardian` avisa en cada respuesta indefinidamente: no tiene anti-bucle | resuelto · `budget.avisar()`, cuyo default es no repetir |
@@ -112,7 +112,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | abierto |
 | `INC-016` | S3 | `D-07` | `fix-close.md` manda registrar en `indices/DOMAIN-GOTCHAS.md`, que no existe | abierto |
 | `DEC-006` | S2 | `L-02` | El umbral de 80 chars no salta las plantillas de `context/`: se inyectan enteras, ~3.240 tokens por compactación en un proyecto sin contexto llenado | resuelto · el detector es `budget.sinLlenar`, que mide contenido real |
-| `HUE-030` | S2 | `L-05` | `AGENTS.md` y `compact-recovery.js` omiten exactamente los mismos cinco índices; agregar uno obliga a actualizar consumidores independientes y nada lo verifica | abierto |
+| `HUE-030` | S2 | `L-05` | `AGENTS.md` y `compact-recovery.js` omiten exactamente los mismos cinco índices; agregar uno obliga a actualizar consumidores independientes y nada lo verifica | resuelto · el hook dejó de tener lista (la lee del disco) y el que sigue teniéndola tiene test |
 | `INC-018` | S2 | `L-03` | Dos de tres servidores MCP usan `@latest`, incluido `@angular/cli@latest`, que `lib/config.js` prohíbe con tres párrafos | resuelto · `@angular/cli@{{ANGULAR_MAJOR}}`, sustituido por el scaffolder |
 | `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | abierto |
 | `HUE-029` | S3 | `L-04` | Los adapters no llevan ningún mecanismo y nada le dice al usuario que ahí las reglas son solo prosa | abierto |
@@ -123,7 +123,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-005` | **S1** | `C-05` | `blueprint.json` no se valida dentro del proyecto generado, y su `stack` crudo decide qué guardrails corren | resuelto · `lib/blueprint.js`, solo booleanos en claves conocidas |
 | `ACO-001` | S2 | `C-02` | `sync-check` borra `session-writes.json` en cada `Stop` (que es por respuesta, no por sesión) | resuelto · la limpieza se mudó a `session-start` con origen `startup` |
 | `HUE-001` | S2 | `C-01` | El Discovery Gate solo comprueba que el flag exista; leer `context/` lo levanta sin ningún índice | resuelto · el Gate exige una línea que nombre `indices/`; leer solo `context/` ya no lo levanta |
-| `HUE-003` | S2 | `C-01` | `compact-recovery` conoce 10 de 15 índices; GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan | abierto |
+| `HUE-003` | S2 | `C-01` | `compact-recovery` conoce 10 de 15 índices; GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan | resuelto · la lista sale de `indices/` en el disco: 10 → 15, sin dejar de ser selectivo |
 | `HUE-004` | S2 | `C-03` | `spec-reflection` calla cuando no hay ninguna casilla marcada — el caso exacto que debería atrapar | resuelto · lo que separa las dos situaciones son las escrituras de la sesión, no las casillas |
 | `HUE-006` | S2 | `C-02` | El contrato con más consumidores (4) es el único de los cinco sin ningún test | abierto |
 | `INC-002` | S2 | `C-03` | `--max-age 60` + `--require-file` reportan "no existe ningún spec" cuando existe pero lleva >1h sin tocarse | abierto |
@@ -531,7 +531,35 @@ no re-inyectables: GUARDS, LAYOUTS, ROUTES, USAGE-MAP, UTILS
 Derivar la lista del contenido de `indices/` en vez de mantenerla a mano, que es lo que
 garantiza que vuelva a desincronizarse. Cubrirlo con un test que compare ambas listas.
 
-**Estado:** abierto
+**Resolución** — se hizo exactamente eso, y se cerró junto con `HUE-030`, que es el mismo
+mapa visto desde el otro consumidor.
+
+`ALL_INDEX_FILES` ya no existe. `indicesEnDisco(raiz)` hace `readdirSync('indices/')`: no
+hay lista que actualizar, así que no hay lista que pueda quedarse atrás. Los tres `CORE`
+siguen escritos a mano porque **sí** son una decisión —se inyectan aunque nadie los haya
+abierto—, no un mapa.
+
+Medido, con un proyecto de 15 índices y un flag que dice que se leyeron los 15:
+
+```
+antes:    10 índices re-inyectados
+después:  15
+la diferencia: GUARDS, LAYOUTS, ROUTES, USAGE-MAP, UTILS  ← los cinco del hallazgo
+```
+
+La corrección **no** se convirtió en «inyectar todo»: la selectividad es lo que `CAR-004`
+acaba de comprar. Un test lo fija — leído `ROUTES`, vuelven `ROUTES` y los tres CORE, y
+`USAGE-MAP` no vuelve.
+
+`AGENTS.md` no puede derivar nada —es prosa para otras AI tools—, así que lista los quince
+y un test compara esa lista contra `templates/indices/`. Y una comprobación inversa falla
+si alguien vuelve a escribir un mapa literal en el hook: `contracts.js` conserva la lista
+canónica de 15 y `CONSUMIDORES_DE_INDICES` quedó con un solo nombre, el que mantiene la
+lista a mano.
+
+Provocado: con el hook y el `AGENTS.md` de antes, **7 tests en rojo**.
+
+**Estado:** resuelto · la lista sale del filesystem; 10 → 15 índices re-inyectables
 
 ---
 

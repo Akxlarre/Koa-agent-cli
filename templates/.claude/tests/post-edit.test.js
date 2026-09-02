@@ -89,6 +89,21 @@ describe('SOBRE QUE ARCHIVOS ACTUA', () => {
     // Si lo invocara, prettier se quejaria del archivo inexistente en stderr.
     assert.equal(correr('README.md').stderr, '');
   });
+
+  test('la carpeta declara su tipo de modulo (DEC-003, L-08)', () => {
+    // Este test existe porque el de arriba pasaba por el motivo equivocado.
+    //
+    // post-edit.js es ESM y .claude/scripts/ no tenia package.json: Node lo
+    // reparseaba con un MODULE_TYPELESS_PACKAGE_JSON a stderr. En el repo del
+    // CLI no se veia —el package.json raiz ya declara "module"— y el assert de
+    // stderr vacio pasaba en verde. En un proyecto Angular generado el raiz no
+    // lo declara, y el warning salia en CADA edicion: este hook corre en
+    // PostToolUse. Se descubrio corriendo esta misma suite en el layout del
+    // proyecto generado, que es donde el harness de verdad vive.
+    const pkg = path.resolve(__dirname, '..', 'scripts', 'package.json');
+    assert.ok(fs.existsSync(pkg), 'sin package.json el warning vuelve en el proyecto generado');
+    assert.equal(JSON.parse(fs.readFileSync(pkg, 'utf-8')).type, 'module');
+  });
 });
 
 describe('FAIL-OPEN — nunca bloquea una edicion', () => {

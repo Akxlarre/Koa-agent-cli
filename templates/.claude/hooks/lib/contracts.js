@@ -4,7 +4,7 @@
  * El harness tiene artefactos que una pieza escribe y otra lee. Tres estaban
  * declarados en `templates-contract.md`; el resto vivia solo en la cabeza de quien
  * escribio cada hook. De ahi salieron los 12 ACO de la auditoria y hallazgos como
- * HUE-003 (compact-recovery conoce 10 de los 15 indices) o HUE-005 (blueprint.json
+ * HUE-003 (compact-recovery conocia 10 de los 15 indices) o HUE-005 (blueprint.json
  * decide que guardrails corren y nadie lo valida).
  *
  * Una tabla en un .md no se puede verificar. Este registro si: su test contrasta
@@ -210,8 +210,17 @@ const CONTRACTS = {
   },
 };
 
-/** Los consumidores que deben conocer los 15 indices, y no uno menos (HUE-003, HUE-030). */
-const CONSUMIDORES_DE_INDICES = ['.claude/hooks/compact-recovery.js'];
+/**
+ * Los consumidores que MANTIENEN A MANO la lista de indices (HUE-003, HUE-030).
+ *
+ * Eran dos, y omitian exactamente los mismos cinco —GUARDS, LAYOUTS, ROUTES,
+ * USAGE-MAP, UTILS—: se agregaron despues y ninguno de los dos se entero.
+ *
+ * `compact-recovery.js` salio de esta lista porque dejo de tener lista: lee
+ * `indices/` del disco. Queda `AGENTS.md`, que es prosa para otras AI tools y
+ * no puede derivar nada — por eso su test compara contra el filesystem.
+ */
+const CONSUMIDORES_DE_INDICES = ['AGENTS.md'];
 
 /** Todo artefacto declarado, como lista. */
 function all() {

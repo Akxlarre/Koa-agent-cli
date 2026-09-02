@@ -138,9 +138,12 @@ mordió durante la auditoría—.
 | ID | Sev | Qué |
 |---|---|---|
 | `DUP-003` | S2 | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo |
-| `HUE-003` | S2 | `compact-recovery` conoce 10 de 15 índices: GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan |
+| `HUE-003` | S2 | `compact-recovery` conoce 10 de 15 índices: GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS nunca se re-inyectan — **resuelto** |
 
-`HUE-003` lo cierra el registro de contratos (`HUE-030` es el mismo mapa). `DUP-003` es una
+`HUE-003` lo cerró algo más barato que el registro de contratos: **borrar la lista**. El
+hook lee `indices/` del disco, así que no hay nada que sincronizar (10 → 15 medido).
+`HUE-030` era el mismo mapa en `AGENTS.md`, que no puede derivar nada por ser prosa: ahí la
+lista quedó, y `contracts.js` le puso el test que la compara contra el filesystem. `DUP-003` es una
 decisión pequeña —cuál es la autoridad y qué son las otras dos— que no llegó a merecer ADR
 pero sí una línea escrita en `templates-contract.md`.
 

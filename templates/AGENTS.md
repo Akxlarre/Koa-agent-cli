@@ -21,16 +21,21 @@
 
 Before touching any file in `src/app/`, read:
 
-- `indices/COMPONENTS.md` — what UI components already exist
-- `indices/SERVICES.md` — what services and facades already exist
-- `indices/FACADES.md` — facade inventory
-- `indices/MODELS.md` — TypeScript interfaces and models
-- `indices/DATABASE.md` — Supabase tables and RLS policies (if applicable)
 - `indices/ANTI-PATTERNS.md` — known pitfalls
+- `indices/COMPONENTS.md` — what UI components already exist
+- `indices/DATABASE.md` — Supabase tables and RLS policies (if applicable)
 - `indices/DIRECTIVES.md` — custom directives
-- `indices/STYLES.md` — shared styles and tokens
+- `indices/FACADES.md` — facade inventory
+- `indices/GUARDS.md` — route guards and resolvers
+- `indices/LAYOUTS.md` — shells and page layouts
+- `indices/MODELS.md` — TypeScript interfaces and models
 - `indices/PIPES.md` — custom pipes
+- `indices/ROUTES.md` — the route map and its lazy boundaries
+- `indices/SERVICES.md` — what services and facades already exist
 - `indices/STORES.md` — state stores (if applicable)
+- `indices/STYLES.md` — shared styles and tokens
+- `indices/USAGE-MAP.md` — who consumes what, and where
+- `indices/UTILS.md` — shared helpers
 
 Then read context files if they exist:
 - `context/domain.md` — business domain, entities, terminology

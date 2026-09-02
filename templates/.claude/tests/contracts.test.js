@@ -192,23 +192,41 @@ describe('LOS 15 ÍNDICES — la lista canónica contra el filesystem (HUE-030)'
   test('son 15', () => assert.equal(C.INDICES.length, 15));
 });
 
-describe('HUE-003 — el hueco conocido, fijado tal como está hoy', () => {
-  // Test de caracterización: describe el comportamiento ACTUAL, bug incluido.
-  // Cuando la tanda 3 migre compact-recovery, este test falla y hay que
-  // actualizarlo a propósito. Es la diferencia entre un hueco documentado y uno
-  // olvidado.
-  const AUSENTES_HOY = ['GUARDS', 'LAYOUTS', 'ROUTES', 'USAGE-MAP', 'UTILS'];
+describe('HUE-003 / HUE-030 — el hueco, cerrado', () => {
+  // Este describe era un test de CARACTERIZACIÓN: fijaba el bug tal como estaba
+  // —«conoce 10 de los 15»— para que cerrarlo tuviera que ser un acto
+  // deliberado. Lo fue. Ahora fija lo contrario, y los cinco índices que
+  // faltaban siguen nombrados: son la regresión a vigilar.
+  const LOS_QUE_FALTABAN = ['GUARDS', 'LAYOUTS', 'ROUTES', 'USAGE-MAP', 'UTILS'];
 
   for (const pieza of C.CONSUMIDORES_DE_INDICES) {
-    test(`${pieza} conoce 10 de los 15 índices`, () => {
+    test(`${pieza} nombra los 15 índices`, () => {
       const src = fs.readFileSync(enRepo(pieza), 'utf-8');
-      const conocidos = C.INDICES.filter((n) => src.includes(n));
-      const faltan = C.INDICES.filter((n) => !src.includes(n));
-      assert.deepEqual(faltan.sort(), [...AUSENTES_HOY].sort(),
-        'cambió qué índices ignora compact-recovery: actualizá este test a propósito');
-      assert.equal(conocidos.length, 10);
+      const faltan = C.INDICES.filter((n) => !src.includes(`indices/${n}.md`));
+      assert.deepEqual(faltan, [],
+        `${pieza} mantiene la lista a mano y quedó atrás: agregá ${faltan.join(', ')}`);
     });
   }
+
+  test('los cinco que se agregaron después están, y por nombre', () => {
+    const src = fs.readFileSync(enRepo('AGENTS.md'), 'utf-8');
+    for (const n of LOS_QUE_FALTABAN) {
+      assert.match(src, new RegExp(`indices/${n}\\.md`), `${n} volvió a caerse de AGENTS.md`);
+    }
+  });
+
+  test('compact-recovery ya no mantiene ninguna lista — la deriva del disco', () => {
+    // La comprobación inversa: si alguien vuelve a escribir un mapa a mano acá,
+    // vuelve a poder desincronizarse, y este test lo dice antes.
+    const src = fs.readFileSync(enRepo('.claude/hooks/compact-recovery.js'), 'utf-8');
+    assert.ok(!/ALL_INDEX_FILES/.test(src), 'el mapa literal volvió');
+    assert.match(src, /readdirSync\(path\.join\(raiz, 'indices'\)\)/,
+      'la lista tiene que salir del filesystem, no de un literal');
+    // Los tres CORE sí son una decisión y siguen escritos; el resto no.
+    const literales = C.INDICES.filter((n) => src.includes(`'${n}'`));
+    assert.deepEqual(literales.sort(), ['COMPONENTS', 'FACADES', 'SERVICES'],
+      'solo los CORE se nombran: son los que se inyectan aunque nadie los haya leído');
+  });
 });
 
 describe('API', () => {

@@ -40,22 +40,38 @@ const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
 // entraban enteros y los cuatro context/*.md en crudo.
 const MAX_INDEX_CHARS = 2500;
 
-// Índices siempre inyectados (base de todo proyecto)
+// Índices siempre inyectados (base de todo proyecto). Estos tres SÍ son una
+// decisión, no un mapa: son los que valen aunque el agente no los haya abierto.
 const CORE_INDICES = new Set(['COMPONENTS', 'SERVICES', 'FACADES']);
 
-// Mapa completo de índices disponibles
-const ALL_INDEX_FILES = {
-  COMPONENTS: 'indices/COMPONENTS.md',
-  SERVICES: 'indices/SERVICES.md',
-  FACADES: 'indices/FACADES.md',
-  MODELS: 'indices/MODELS.md',
-  DATABASE: 'indices/DATABASE.md',
-  DIRECTIVES: 'indices/DIRECTIVES.md',
-  STYLES: 'indices/STYLES.md',
-  PIPES: 'indices/PIPES.md',
-  'ANTI-PATTERNS': 'indices/ANTI-PATTERNS.md',
-  STORES: 'indices/STORES.md',
-};
+/**
+ * Los índices del proyecto, leídos del disco (HUE-003, HUE-030).
+ *
+ * Antes esto era un objeto literal con diez entradas escritas a mano. El
+ * template trae quince: GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS se agregaron
+ * después y nadie volvió acá. El agente podía leer `indices/ROUTES.md` antes de
+ * la compactación, el flag lo registraba, y el índice no volvía nunca — sin un
+ * solo error. LAYOUTS era el más visible: el propio Discovery Gate lo ofrece en
+ * su lista de archivos que levantan el bloqueo.
+ *
+ * Un mapa a mano de algo que ya está en el filesystem se vuelve a desincronizar.
+ * Este se deriva: agregar `indices/NUEVO.md` alcanza, acá no hay nada que tocar.
+ */
+function indicesEnDisco(raiz) {
+  try {
+    return fs.readdirSync(path.join(raiz, 'indices'))
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => f.replace(/\.md$/, ''))
+      .sort((a, b) => {
+        const ca = CORE_INDICES.has(a) ? 0 : 1;
+        const cb = CORE_INDICES.has(b) ? 0 : 1;
+        return ca - cb || a.localeCompare(b);
+      })
+      .map((nombre) => [nombre, `indices/${nombre}.md`]);
+  } catch {
+    return []; // sin carpeta indices/ no hay nada que re-inyectar
+  }
+}
 
 // ─── Leer discovery flag: qué índices leyó el agente antes del compact ───────
 const touchedIndexNames = new Set(CORE_INDICES);
@@ -79,8 +95,8 @@ output += '(Quick Reference — sin ejemplos de codigo para ahorrar tokens).\n\n
 
 let injectedCount = 0;
 
-for (const [name, relativePath] of Object.entries(ALL_INDEX_FILES)) {
-  if (!touchedIndexNames.has(name)) continue;
+for (const [name, relativePath] of indicesEnDisco(cwd)) {
+  if (!touchedIndexNames.has(name.toUpperCase())) continue;
 
   const fullPath = path.join(cwd, relativePath);
   if (!fs.existsSync(fullPath)) continue;

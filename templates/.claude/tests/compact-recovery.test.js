@@ -113,6 +113,81 @@ describe('COMPACT RECOVERY', () => {
   });
 });
 
+describe('HUE-003 — los QUINCE indices, no diez', () => {
+  // El mapa era un objeto literal con diez entradas. El template trae quince:
+  // GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS se agregaron despues y nadie
+  // volvio al hook. El agente podia haber leido indices/ROUTES.md antes de
+  // compactar —el flag lo registraba— y ese indice no volvia nunca, sin un solo
+  // error. Medido: 10 de 15 antes, 15 de 15 despues.
+  const LOS_QUINCE = [
+    'ANTI-PATTERNS', 'COMPONENTS', 'DATABASE', 'DIRECTIVES', 'FACADES',
+    'GUARDS', 'LAYOUTS', 'MODELS', 'PIPES', 'ROUTES',
+    'SERVICES', 'STORES', 'STYLES', 'USAGE-MAP', 'UTILS',
+  ];
+
+  /** Un proyecto con los quince indices y un flag que dice que se leyeron todos. */
+  function conLosQuince(sid = 's-15') {
+    const root = makeProject();
+    for (const n of LOS_QUINCE) {
+      fs.writeFileSync(path.join(root, 'indices', `${n}.md`), `# ${n}\nMARCA-${n}\n`);
+    }
+    const dir = path.join(root, '.claude', 'temp', 'session', sid);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'discovery.flag'),
+      LOS_QUINCE.map((n) => `2026-01-01T00:00:00Z | READ | indices/${n}.md`).join('\n'));
+    return root;
+  }
+
+  function correr(root, sid = 's-15') {
+    const r = spawnSync('node', [HOOK], {
+      input: JSON.stringify({ hook_event_name: 'PostCompact', session_id: sid, cwd: root }),
+      encoding: 'utf8', cwd: root,
+    });
+    return r.stdout || '';
+  }
+
+  test('los quince vuelven al contexto', () => {
+    const out = correr(conLosQuince());
+    const faltan = LOS_QUINCE.filter((n) => !out.includes(`MARCA-${n}`));
+    assert.deepEqual(faltan, [], `no se re-inyectaron: ${faltan.join(', ')}`);
+  });
+
+  test('los cinco que faltaban, uno por uno', () => {
+    const out = correr(conLosQuince());
+    for (const n of ['GUARDS', 'LAYOUTS', 'ROUTES', 'USAGE-MAP', 'UTILS']) {
+      assert.match(out, new RegExp(`indices/${n}\\.md`), `${n} sigue sin volver`);
+    }
+  });
+
+  test('un indice que el proyecto invente tambien vuelve — la lista sale del disco', () => {
+    // Esto es lo que el mapa a mano no podia hacer, y es lo que garantiza que
+    // no se vuelva a desincronizar: no hay lista que actualizar.
+    const root = conLosQuince('s-nuevo');
+    fs.writeFileSync(path.join(root, 'indices', 'WORKFLOWS.md'), '# WORKFLOWS\nMARCA-WORKFLOWS\n');
+    fs.appendFileSync(
+      path.join(root, '.claude', 'temp', 'session', 's-nuevo', 'discovery.flag'),
+      '\n2026-01-01T00:00:00Z | READ | indices/WORKFLOWS.md');
+    assert.match(correr(root, 's-nuevo'), /MARCA-WORKFLOWS/);
+  });
+
+  test('sigue siendo SELECTIVO: lo que no se leyo no vuelve (salvo los CORE)', () => {
+    // La correccion no puede convertirse en «inyectar todo»: eso duplicaria el
+    // costo de cada compactacion, que es justo lo que CAR-004 acaba de bajar.
+    const root = makeProject();
+    for (const n of LOS_QUINCE) {
+      fs.writeFileSync(path.join(root, 'indices', `${n}.md`), `# ${n}\nMARCA-${n}\n`);
+    }
+    const dir = path.join(root, '.claude', 'temp', 'session', 's-sel');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'discovery.flag'),
+      '2026-01-01T00:00:00Z | READ | indices/ROUTES.md');
+    const out = correr(root, 's-sel');
+    assert.match(out, /MARCA-ROUTES/, 'lo leido vuelve');
+    assert.match(out, /MARCA-COMPONENTS/, 'los CORE vuelven siempre');
+    assert.ok(!out.includes('MARCA-USAGE-MAP'), 'lo que no se leyo NO vuelve');
+  });
+});
+
 describe('CAR-004 / HUE-017 / DEC-006 — presupuesto de la re-inyeccion', () => {
   const fs2 = require('fs');
   const os2 = require('os');

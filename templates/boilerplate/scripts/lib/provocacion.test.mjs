@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { archivosDe, auditarProvocacion, disparo, FIXTURES } from './provocacion.js';
+import {
+  archivosDe, auditarColateral, auditarProvocacion, codigosNombrados,
+  COLATERAL, disparo, FIXTURES,
+} from './provocacion.js';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 
@@ -114,5 +117,71 @@ describe('FIXTURES', () => {
     for (const r of ['SEC-RLS-01', 'SEC-RLS-02', 'SEC-RLS-03']) {
       assert.ok(r in FIXTURES, `${r} sin fixture: su silencio es lectura publica`);
     }
+  });
+});
+
+describe('ACO-009 — el contrato de salida del linter, declarado', () => {
+  test('codigosNombrados lee los corchetes, no los IDs pelados', () => {
+    const salida = [
+      '🚨 [ARCH-10] Facade compleja: Demasiadas llamadas a inject() (6).',
+      '🚨 [ARCH-03] Test obligatorio: falta el .spec.ts.',
+      '📋 Reglas validadas:',
+      '   ARCH-04 — OnPush required — docs/TECH-STACK-RULES.md',
+      '   ARCH-26 — Token que pisa una utilidad nativa',
+    ].join('\n');
+    assert.deepEqual(codigosNombrados(salida).sort(), ['ARCH-03', 'ARCH-10']);
+  });
+
+  test('cada regla con fixture es reconocible por el mismo patrón', () => {
+    // `disparo()` usa `includes('[ID]')` y el colateral usa la regex. Si un ID
+    // nuevo no matcheara la regex, los dos dejarían de hablar del mismo
+    // conjunto y el colateral se volvería ciego justo para esa regla.
+    for (const ruleId of Object.keys(FIXTURES)) {
+      assert.deepEqual(codigosNombrados(`🚨 [${ruleId}] mensaje`), [ruleId],
+        `${ruleId} no lo reconoce la regex de codigosNombrados`);
+    }
+  });
+
+  test('un fixture que sólo nombra su regla pasa', () => {
+    const r = auditarColateral({ 'ARCH-04': ['ARCH-04'] }, {});
+    assert.deepEqual(r.noDeclarado, []);
+    assert.deepEqual(r.yaNoOcurre, []);
+  });
+
+  test('el colateral declarado no falla: es el estado medido', () => {
+    const r = auditarColateral({ 'ARCH-10': ['ARCH-10', 'ARCH-03'] }, { 'ARCH-10': ['ARCH-03'] });
+    assert.deepEqual(r.noDeclarado, []);
+  });
+
+  test('un colateral nuevo SÍ falla', () => {
+    const r = auditarColateral({ 'ARCH-10': ['ARCH-10', 'ARCH-03', 'ARCH-08'] }, { 'ARCH-10': ['ARCH-03'] });
+    assert.deepEqual(r.noDeclarado, ['ARCH-10 → ARCH-08']);
+  });
+
+  test('el resumen con corchetes hace fallar TODOS los fixtures', () => {
+    // Es el caso que motiva todo esto. Medido: poniéndole corchetes a la línea
+    // del resumen «📋 Reglas validadas» y desactivando el detector de ARCH-10,
+    // la provocación pasaba de `🔇 ARCH-10 NO dispara / exit 1` a
+    // `✅ 28 reglas y todas disparan / exit 0`. Verde con una regla muerta.
+    const todas = ['ARCH-01', 'ARCH-03', 'ARCH-04', 'ARCH-08'];
+    const observado = { 'ARCH-04': todas, 'ARCH-08': todas };
+    const r = auditarColateral(observado, {});
+    assert.equal(r.noDeclarado.length, 6, 'tres ajenos por fixture, dos fixtures');
+  });
+
+  test('el colateral que dejó de ocurrir hay que sacarlo: es un trinquete', () => {
+    const r = auditarColateral({ 'NAV-01': ['NAV-01'] }, { 'NAV-01': ['ARCH-03'] });
+    assert.deepEqual(r.yaNoOcurre, ['NAV-01 → ARCH-03']);
+  });
+
+  test('un fixture que no se corrió no vuelve obsoleta su declaración', () => {
+    // `--solo`, o una regla borrada de architect.js: no se provocó, no se juzga.
+    const r = auditarColateral({ 'ARCH-04': ['ARCH-04'] }, { 'NAV-01': ['ARCH-03'] });
+    assert.deepEqual(r.yaNoOcurre, []);
+  });
+
+  test('COLATERAL sólo declara fixtures que existen', () => {
+    const fantasmas = Object.keys(COLATERAL).filter((r) => !(r in FIXTURES));
+    assert.deepEqual(fantasmas, []);
   });
 });

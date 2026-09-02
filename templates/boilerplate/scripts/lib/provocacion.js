@@ -434,3 +434,86 @@ export function auditarProvocacion({ registradas, conFixture, baseline }) {
 export function disparo(salida, ruleId) {
   return salida.includes(`[${ruleId}]`);
 }
+
+/**
+ * ── El contrato de salida del linter (ACO-009) ──────────────────────────────
+ *
+ * Todo lo de arriba cuelga de una convención de `architect.js` que hasta ahora
+ * no estaba declarada en ninguna parte: **el linter escribe `[CÓDIGO]` entre
+ * corchetes cuando, y sólo cuando, esa regla reportó algo.** Lo emiten
+ * `reportError` y `reportWarning`; el resumen «📋 Reglas validadas» de una
+ * corrida fallida lista los 28 códigos SIN corchetes justamente para no
+ * confundirse con esto.
+ *
+ * El hallazgo original decía que si el formato cambiaba, la provocación
+ * empezaría a reportar reglas muertas que no lo están. Medido, es peor y va en
+ * la dirección contraria. Poniéndole corchetes a esa línea del resumen —una
+ * edición de consistencia perfectamente razonable, cuatro caracteres— y
+ * desactivando el detector de ARCH-10:
+ *
+ *     resumen sin corchetes (hoy)   🔇 ARCH-10 — NO dispara     exit 1
+ *     resumen con corchetes         ✅ 28 regla(s) y todas disparan   exit 0
+ *
+ * O sea: verde entero con una regla muerta adentro. El mecanismo que existe
+ * para cazar chequeos decorativos se vuelve decorativo él mismo, en silencio.
+ *
+ * Lo que sigue lo mecaniza. `COLATERAL` declara qué códigos AJENOS nombra hoy
+ * cada fixture; cualquier otro hace fallar la corrida. Si el resumen empezara a
+ * usar corchetes, cada fixture nombraría 27 códigos ajenos y la provocación se
+ * cae al instante en vez de mentir.
+ */
+export const CODIGO_NOMBRADO = /\[((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})\]/g;
+
+/** Los códigos que una salida del linter da por disparados. */
+export function codigosNombrados(salida) {
+  return [...new Set([...salida.matchAll(CODIGO_NOMBRADO)].map((m) => m[1]))];
+}
+
+/**
+ * Colateral medido: fixtures que además hacen hablar a otra regla.
+ *
+ * No es una excepción cómoda, es el estado real y sólo puede achicarse. Los dos
+ * casos de hoy son el mismo: un `.facade.ts` y un `.service.ts` sin su
+ * `.spec.ts` al lado, que es ARCH-03. Se podrían silenciar agregando el spec al
+ * fixture — vale la pena el día que ARCH-03 se rompa y estos dos la tapen.
+ *
+ * `docs/CHEQUEOS-QUE-NO-CHEQUEAN.md` prometía que «el fixture tiene que violar
+ * su regla y ninguna otra evidente, y hay un test que lo comprueba». El test que
+ * había miraba el texto de los fixtures buscando `changeDetection`: cubría
+ * ARCH-04 y nada más. Esto es lo que la promesa decía.
+ */
+export const COLATERAL = {
+  'ARCH-10': ['ARCH-03'],
+  'NAV-01': ['ARCH-03'],
+};
+
+/**
+ * Qué códigos ajenos nombró cada fixture, contra los declarados.
+ *
+ * @param {Record<string, string[]>} observado  ruleId → códigos que su corrida nombró
+ * @param {Record<string, string[]>} [declarado]
+ * @returns {{noDeclarado: string[], yaNoOcurre: string[]}}
+ */
+export function auditarColateral(observado, declarado = COLATERAL) {
+  const noDeclarado = [];
+  const yaNoOcurre = [];
+
+  for (const [ruleId, codigos] of Object.entries(observado)) {
+    const permitido = new Set([ruleId, ...(declarado[ruleId] ?? [])]);
+    for (const c of codigos) {
+      if (!permitido.has(c)) noDeclarado.push(`${ruleId} → ${c}`);
+    }
+  }
+
+  for (const [ruleId, codigos] of Object.entries(declarado)) {
+    // Sólo se juzga lo que se corrió: un fixture que no se provocó en esta
+    // vuelta (`--solo`, o una regla que ya no existe) no vuelve obsoleta su
+    // declaración.
+    if (!(ruleId in observado)) continue;
+    for (const c of codigos) {
+      if (!observado[ruleId].includes(c)) yaNoOcurre.push(`${ruleId} → ${c}`);
+    }
+  }
+
+  return { noDeclarado, yaNoOcurre };
+}

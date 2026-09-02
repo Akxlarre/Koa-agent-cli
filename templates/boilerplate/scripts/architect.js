@@ -343,6 +343,26 @@ function walkAst(node, visitor) {
     ts.forEachChild(node, child => walkAst(child, visitor));
 }
 
+/**
+ * ── Contrato de salida: `[CÓDIGO]` entre corchetes (ACO-009) ────────────────
+ *
+ * Los corchetes de acá abajo no son decoración tipográfica: son la señal de la
+ * que cuelga `scripts/provocar-reglas.mjs`, que arma un sandbox con una
+ * violación y exige que la salida NOMBRE la regla. Su lector es
+ * `disparo()`/`codigosNombrados()` en `scripts/lib/provocacion.js`.
+ *
+ * El contrato tiene dos mitades y las dos importan:
+ *
+ *   · el linter escribe `[CÓDIGO]` cuando esa regla reportó algo;
+ *   · y NO lo escribe cuando no reportó nada — por eso el resumen «📋 Reglas
+ *     validadas» del final lista los códigos pelados. Ponerle corchetes ahí
+ *     haría que toda regla se leyera como disparada y la provocación pasaría a
+ *     dar verde con reglas muertas adentro.
+ *
+ * Si esto cambia, cambia con `provocacion.js`. El chequeo de colateral de la
+ * provocación lo hace fallar si se rompe, pero el aviso vive acá porque acá es
+ * donde se rompe.
+ */
 function reportError(ruleId, filePath, message, solutionOverride) {
     const relativePath = path.relative(process.cwd(), filePath);
     const rule = RULES[ruleId];
@@ -948,6 +968,8 @@ if (errors > 0) {
     console.log(yellow, '📋 Reglas validadas:');
     for (const [ruleId, meta] of Object.entries(RULES)) {
         const doc = meta.doc ? ` — ${meta.doc}` : '';
+        // Sin corchetes, a propósito: ver el contrato de salida en reportError.
+        // `[${ruleId}]` acá le diría a la provocación que las 28 dispararon.
         console.log(`   ${ruleId} — ${meta.name}${doc}`);
     }
     console.log('');

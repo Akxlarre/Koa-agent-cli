@@ -1,6 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { clasificar, contarTests, veredicto, resumir } from './smoke-scripts.js';
+import {
+  clasificar, contarTests, veredicto, resumir, comprobacionesHuerfanas, COMPROBACIONES,
+} from './smoke-scripts.js';
 
 describe('clasificar', () => {
   test('un script que no termina no se puede correr en un smoke', () => {
@@ -92,6 +94,53 @@ describe('veredicto', () => {
     // Lo que no puede es pasar inadvertido, que es como llegaron acá los dos bugs.
     const v = veredicto({ nombre: 'indices:sync', exitLimpio: 0, salida: 'ok' });
     assert.equal(v.estado, 'sin-comprobar');
+  });
+});
+
+describe('ACO-010 — las dos dependencias que el smoke no declaraba', () => {
+  // (a) El defecto arquitectónico que se inyecta es un componente sin OnPush, o
+  //     sea ARCH-04. Si esa regla se desactivara, `lint:arch` pasaría con el
+  //     defecto adentro y el smoke lo llamaría decorativo: acusaría al linter
+  //     de no mirar cuando el que dejó de mirar es el defecto.
+  // (b) `COMPROBACIONES` indexa por nombre exacto de script, y esos nombres los
+  //     escribe `lib/scaffolder.js`, del otro lado de la frontera del CLI.
+
+  test('sin la regla que el defecto viola, el veredicto es «no se pudo comprobar»', () => {
+    const v = veredicto({
+      nombre: 'lint:arch',
+      exitLimpio: 0,
+      salida: '',
+      exitProvocado: 0, // pasó con el defecto adentro: parecería decorativo
+      defectoInvalido: 'el defecto viola ARCH-04, que ya no está registrada',
+    });
+    assert.equal(v.estado, 'sin-comprobar');
+    assert.match(v.motivo, /ARCH-04/);
+  });
+
+  test('y no tapa un script que además está roto', () => {
+    // «No pude juzgarlo» y «no corre» son dos cosas, y la segunda es del script.
+    const v = veredicto({
+      nombre: 'lint:arch', exitLimpio: 2, salida: '', defectoInvalido: 'lo que sea',
+    });
+    assert.equal(v.estado, 'roto');
+  });
+
+  test('con la regla viva, el veredicto sigue siendo el de siempre', () => {
+    const v = veredicto({
+      nombre: 'lint:arch', exitLimpio: 0, salida: '', exitProvocado: 0, defectoInvalido: null,
+    });
+    assert.equal(v.estado, 'decorativo');
+  });
+
+  test('una comprobación sin script que la reclame se ve', () => {
+    const huerfanas = comprobacionesHuerfanas({ typecheck: 'tsc', 'test:ci': 'ng test' });
+    assert.ok(huerfanas.includes('lint:arch'));
+    assert.ok(!huerfanas.includes('typecheck'));
+  });
+
+  test('con todos los scripts presentes no hay huérfanas', () => {
+    const todos = Object.fromEntries(Object.keys(COMPROBACIONES).map((n) => [n, 'x']));
+    assert.deepEqual(comprobacionesHuerfanas(todos), []);
   });
 });
 

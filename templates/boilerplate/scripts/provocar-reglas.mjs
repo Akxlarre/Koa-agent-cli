@@ -19,7 +19,9 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { extraerReglasRegistradas } from './lib/rule-wiring.js';
-import { FIXTURES, archivosDe, auditarProvocacion, disparo } from './lib/provocacion.js';
+import {
+  FIXTURES, archivosDe, auditarProvocacion, auditarColateral, codigosNombrados, disparo,
+} from './lib/provocacion.js';
 
 const raiz = process.cwd();
 const architect = path.join(raiz, 'scripts', 'architect.js');
@@ -67,12 +69,14 @@ function provocar(fixture) {
 }
 
 const mudas = [];
+const nombradosPorFixture = {};
 for (const [ruleId, fixture] of Object.entries(FIXTURES)) {
   if (!registradas.includes(ruleId)) {
     console.log(`${c.amarillo}❓ ${ruleId}${c.reset} ${c.gris}— hay fixture pero la regla ya no existe en architect.js${c.reset}`);
     continue;
   }
   const salida = provocar(fixture);
+  nombradosPorFixture[ruleId] = codigosNombrados(salida);
   if (disparo(salida, ruleId)) {
     console.log(`${c.verde}✅ ${ruleId}${c.reset} ${c.gris}— dispara ante su violación${c.reset}`);
   } else {
@@ -117,6 +121,27 @@ if (nuevasSinFixture.length > 0) {
 if (baselineObsoleto.length > 0) {
   console.error(`${c.rojo}📉 El baseline quedó viejo: ${baselineObsoleto.join(', ')} ya no corresponde(n).${c.reset}`);
   console.error(`${c.amarillo}   Corré con --actualizar-baseline. Un baseline que no se achica es una lista de excusas.${c.reset}\n`);
+  falla = true;
+}
+
+// ACO-009: que cada fixture nombre SÓLO su regla (más el colateral declarado)
+// es lo que hace que `disparo()` signifique algo. Si el linter empezara a
+// nombrar reglas que no dispararon —cambiando cómo imprime, o poniéndole
+// corchetes al resumen de reglas validadas—, esto se cae acá en vez de dar 28
+// verdes con una regla muerta adentro.
+const { noDeclarado, yaNoOcurre } = auditarColateral(nombradosPorFixture);
+
+if (noDeclarado.length > 0) {
+  console.error(`${c.rojo}🔀 ${noDeclarado.length} fixture(s) hacen hablar a una regla ajena sin declararlo:${c.reset}`);
+  for (const x of noDeclarado) console.error(`   ${x}`);
+  console.error(`${c.amarillo}   Un fixture que viola dos reglas no permite saber cuál disparó: el día que${c.reset}`);
+  console.error(`${c.amarillo}   una se rompa, la otra la tapa. Achicá el fixture o declaralo en COLATERAL.${c.reset}\n`);
+  falla = true;
+}
+
+if (yaNoOcurre.length > 0) {
+  console.error(`${c.rojo}📉 COLATERAL declara colateral que ya no ocurre: ${yaNoOcurre.join(', ')}.${c.reset}`);
+  console.error(`${c.amarillo}   Sacalo. Esa lista sólo puede achicarse.${c.reset}\n`);
   falla = true;
 }
 

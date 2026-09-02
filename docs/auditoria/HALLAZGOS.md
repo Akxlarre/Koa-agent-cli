@@ -89,8 +89,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `HUE-019` | S2 | `S-11` | Reglas con test de función pura pero sin fixture: nadie comprueba que el linter las reporte de verdad — el hueco donde vivían `ARCH-24` y `ARCH-26` | resuelto · las 9 que faltaban tienen fixture; 7 dispararon a la primera, 1 era un fixture mal escrito y 1 destapó `INC-023` |
 | `INC-010` | S2 | `S-08` | Los dos scripts de asignaciones salen en 1 en un proyecto que no las usa; `verificar-specs` resuelve el mismo caso con `exit 0` | resuelto · interruptor `specs/AUTHORS.md`: apagada → mensaje y `exit 0` |
 | `DEC-005` | S3 | `S-06` | `smoke-scripts` imprime `✅ 0 script(s) comprobados` y sale 0: comete en pequeño el error que audita | resuelto · sale en 1, y distingue las **tres** formas de estar vacío porque cada una pide algo distinto |
-| `ACO-009` | S3 | `S-05` | La provocación depende de que la salida de `architect.js` nombre el código de la regla; ese formato no está declarado | abierto |
-| `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | abierto |
+| `ACO-009` | S3 | `S-05` | La provocación depende de que la salida de `architect.js` nombre el código de la regla; ese formato no está declarado | resuelto · el hallazgo se quedaba corto: se rompe en la dirección **silenciosa**. Cuatro caracteres en el resumen y la provocación daba `✅ 28/28, exit 0` con una regla muerta adentro. Contrato declarado en `reportError` + trinquete de colateral |
+| `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | resuelto · las dos declaradas y mecanizadas: `comprobacionesHuerfanas()` contra los scripts que emite el scaffolder (test del lado A, único lugar donde los dos lados se ven), y el defecto declara su regla y la verifica contra `architect.js` |
 | `HUE-020` | **S1** | `G-02` | `parseJsonc` se come lo que siga a `//` dentro de un string: un `tsconfig.json` con `$schema` deja el proyecto sin path aliases y sin compilar | resuelto · `stripJsonComments` recorre respetando strings; el parche de `tsconfig` pasó a requerido |
 | `HUE-022` | **S1** | `G-10` | Los 9 parches son condicionales: si `ng new` cambia de forma no fallan, no hacen nada. Ningún test de integración corre `ng new` | resuelto · `patch()` con `requerido` (los tres archivos sin los que no hay proyecto paran el CLI) + `npm run test:integracion`, que corre `ng new` de verdad |
 | `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | abierto |
@@ -1654,7 +1654,42 @@ auditor comete el error que audita.
 regla. Ese formato de salida no está declarado en ninguna parte: si alguien cambia cómo
 `reportError` imprime, la provocación empieza a reportar reglas muertas que no lo están.
 
-**Estado:** abierto
+**Lo que la medición corrigió**
+
+Esa dirección existe y es la barata: se rompe en rojo, con 28 reglas mudas de golpe.
+La que no había visto es la contraria, y es silenciosa.
+
+`architect.js`, al final de toda corrida fallida, imprime el resumen «📋 Reglas
+validadas» con los 28 códigos **sin corchetes** — justamente para no confundirse con
+la marca de `reportError`. Ponerle corchetes a esa línea es una edición de
+consistencia perfectamente razonable, cuatro caracteres, y nada en el repositorio
+decía que no se puede. Medido con el detector de `ARCH-10` desactivado a propósito:
+
+```
+resumen sin corchetes (hoy)   🔇 ARCH-10 — NO dispara            exit 1
+resumen con corchetes         ✅ 28 regla(s) y todas disparan     exit 0
+```
+
+Verde entero con una regla muerta adentro. El mecanismo que este repositorio escribió
+para cazar chequeos decorativos, vuelto decorativo, sin ruido.
+
+**Qué se hizo**
+
+El contrato está declarado en `reportError` —las dos mitades: que se escriba
+`[CÓDIGO]` cuando la regla habló, y que **no** se escriba cuando no habló— y en el
+resumen, donde se rompe. Y se mecanizó: por cada fixture se anotan todos los códigos
+que la salida nombra, y cualquiera que no sea el suyo tiene que estar declarado en
+`COLATERAL`. Con el resumen entre corchetes eso pasa de 0 a **700** colaterales no
+declarados y la corrida falla.
+
+De paso cierra una promesa que `docs/CHEQUEOS-QUE-NO-CHEQUEAN.md` hacía sin
+respaldo: «el fixture tiene que violar su regla y ninguna otra evidente, y hay un
+test que lo comprueba». El test que había leía el texto de los fixtures buscando
+`changeDetection`: cubría `ARCH-04` y nada más. Medido de verdad, hay dos fixtures
+que además hacen hablar a `ARCH-03` —un `.facade.ts` y un `.service.ts` sin su
+`.spec.ts` al lado—, y ahora están declarados en una lista que sólo puede achicarse.
+
+**Estado:** resuelto
 
 ---
 
@@ -1667,7 +1702,38 @@ que **`ARCH-04` siga activa** — su defecto de arquitectura es un componente si
 Si alguien desactivara `ARCH-04`, el smoke reportaría que `lint:arch` es decorativo cuando
 el decorativo sería el smoke. Ninguna de las dos dependencias está declarada.
 
-**Estado:** abierto
+**Qué importa de cada una**
+
+Son dos daños distintos.
+
+El de los nombres **cruza la dualidad del repo**: los scripts los escribe
+`lib/scaffolder.js` (contexto A) y la tabla que los audita vive en
+`templates/boilerplate/scripts/lib/smoke-scripts.js` (contexto B). Renombrar uno allá
+deja la entrada de acá huérfana, y una huérfana no rompe nada — el script cae en
+`sin-comprobar`, que es informativo. O sea que el chequeo que existe para cazar
+comandos decorativos se vuelve decorativo él mismo, un script por vez, sin ponerse
+en rojo nunca.
+
+El del defecto es más chico pero apunta al culpable equivocado: sin `ARCH-04`,
+`lint:arch` pasa con el componente sin `OnPush` adentro y el smoke lo llama
+**decorativo**, acusando al linter de no mirar cuando el que dejó de mirar es el
+defecto.
+
+**Qué se hizo**
+
+`comprobacionesHuerfanas()` las lista en cada corrida —sin hacer fallar: sin Supabase,
+`test:functions` no existe y está bien— y `test/smoke-comprobaciones.test.mjs` las
+cuenta contra los scripts que el scaffolder realmente emite, con y sin Supabase. Es el
+único lugar del repositorio donde los dos lados de la dualidad se miran; vive del lado A
+porque es el que puede escribir un `package.json` y saber qué stack lo produjo.
+Provocado renombrando `lint:arch` en el scaffolder: 3 de 4 tests en rojo.
+
+El defecto declara ahora `regla: 'ARCH-04'` y se verifica contra `architect.js` con
+`extraerReglasRegistradas` —la misma derivación que usa la provocación, no una lista—
+antes de juzgar. Si la regla no está, el veredicto es `sin-comprobar` diciendo por qué,
+y no `decorativo`.
+
+**Estado:** resuelto
 
 <!-- ═══ Plantilla para copiar al agregar un hallazgo ═══
 

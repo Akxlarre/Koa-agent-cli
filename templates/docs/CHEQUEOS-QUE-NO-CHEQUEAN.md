@@ -61,6 +61,23 @@ pasar inadvertidos.
 El archivo tocado se restaura siempre, con el respaldo en el temp del sistema —
 un `.bak` olvidado en `src/` también rompe el build.
 
+### De qué depende el smoke, dicho en voz alta
+
+Dos cosas, y hasta hace poco ninguna estaba escrita (`ACO-010`).
+
+**El nombre exacto de cada script.** `COMPROBACIONES` indexa por `lint:arch`,
+`typecheck`, `test:ci`. Renombrar uno deja su comprobación huérfana, y una
+huérfana no rompe nada: el script pasa a *sin comprobar*, que es informativo.
+El smoke ahora lista las huérfanas en cada corrida, y del lado del generador hay
+un test que las cuenta contra los scripts que el scaffolder escribe.
+
+**Que la regla que el defecto viola siga activa.** El defecto arquitectónico es
+un componente sin `OnPush`, o sea `ARCH-04`. Si esa regla se desactivara,
+`lint:arch` pasaría con el defecto adentro y el smoke lo llamaría *decorativo*:
+acusaría al linter de no mirar cuando el que dejó de mirar es el defecto. El
+defecto declara su regla y se comprueba contra `architect.js` antes de juzgar;
+si no está, el veredicto es *sin comprobar* y dice por qué.
+
 ## `lint:arch:provocar` — el paso siguiente al cableado
 
 `rule-wiring.js` (ARCH-26) ya comprueba que toda regla registrada esté **cableada**.
@@ -72,6 +89,31 @@ necesitó cambios: ya lee de `process.cwd()`.
 
 **El fixture es el archivo más chico posible.** Uno que viola tres reglas no
 permite saber cuál disparó, y el día que una se rompa las otras dos la tapan.
+Eso se mide: por cada fixture se anotan **todos** los códigos que la salida
+nombra, y cualquiera que no sea el suyo tiene que estar declarado en `COLATERAL`
+—hoy dos, los dos por un `.spec.ts` que falta— o la corrida falla. Esa lista
+sólo puede achicarse.
+
+### El contrato del que cuelga todo esto
+
+El linter escribe `[ARCH-04]` **entre corchetes** cuando esa regla reportó algo,
+y no lo escribe cuando no reportó nada: por eso el resumen «📋 Reglas validadas»
+del final lista los códigos pelados. Es una convención de `architect.js` que la
+provocación lee, y no estaba declarada en ninguna parte (`ACO-009`).
+
+Vale la pena saber en qué dirección se rompe. Poniéndole corchetes a esa línea
+del resumen —cuatro caracteres, una edición de consistencia perfectamente
+razonable— y desactivando un detector:
+
+```
+resumen sin corchetes    🔇 ARCH-10 — NO dispara               exit 1
+resumen con corchetes    ✅ 28 regla(s) y todas disparan       exit 0
+```
+
+Verde entero con una regla muerta adentro: el mecanismo que existe para cazar
+chequeos decorativos, vuelto decorativo. El chequeo de colateral lo caza — con
+el resumen entre corchetes cada fixture nombra 27 códigos ajenos y la corrida se
+cae —, y el aviso vive en `reportError`, que es donde se rompe.
 
 Las reglas sin fixture quedan en `scripts/provocacion.baseline.json`, que **sólo
 puede achicarse**. Exigir un fixture para las 25 el primer día garantizaría que

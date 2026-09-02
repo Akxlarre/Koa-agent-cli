@@ -20,7 +20,10 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { execFileSync } from 'child_process';
-import { clasificar, veredicto, resumir, COMPROBACIONES } from './lib/smoke-scripts.js';
+import {
+  clasificar, veredicto, resumir, comprobacionesHuerfanas, COMPROBACIONES,
+} from './lib/smoke-scripts.js';
+import { extraerReglasRegistradas } from './lib/rule-wiring.js';
 
 const raiz = process.cwd();
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -48,8 +51,15 @@ const DEFECTOS = {
   /**
    * Una violación arquitectónica. Un componente sin OnPush es ARCH-04, que es
    * de las reglas más antiguas y menos probable que alguien desactive.
+   *
+   * «Menos probable» no es «imposible», y ahí estaba ACO-010: si ARCH-04 se
+   * desactivara, `lint:arch` pasaría con este archivo adentro y el smoke lo
+   * reportaría **decorativo** — acusando al linter de no mirar cuando el que
+   * dejó de mirar es el defecto. Por eso el defecto declara de qué regla
+   * depende y se comprueba contra `architect.js` antes de juzgar nada.
    */
   arquitectura: {
+    regla: 'ARCH-04',
     archivo: () => path.join('src', 'app', 'features', '__smoke-defecto.component.ts'),
     crear: true,
     contenido: [
@@ -139,7 +149,42 @@ function provocar(script, nombreDefecto) {
 const pkg = JSON.parse(fs.readFileSync(path.join(raiz, 'package.json'), 'utf8'));
 const scripts = pkg.scripts ?? {};
 
+/**
+ * ¿Sigue existiendo la regla de la que depende cada defecto? (ACO-010)
+ *
+ * Se deriva de `architect.js` con el mismo extractor que usa la provocación, no
+ * de una lista. Si el linter no está —un proyecto donde no se copió— no se
+ * inventa un veredicto: no se puede comprobar, y se dice.
+ */
+const rutaArchitect = path.join(raiz, 'scripts', 'architect.js');
+const reglasActivas = fs.existsSync(rutaArchitect)
+  ? extraerReglasRegistradas(fs.readFileSync(rutaArchitect, 'utf8'))
+  : null;
+
+function defectoInvalido(nombreDefecto) {
+  const regla = DEFECTOS[nombreDefecto]?.regla;
+  if (!regla) return null;
+  if (reglasActivas === null) {
+    return `el defecto viola ${regla} y no hay scripts/architect.js para saber si sigue activa`;
+  }
+  if (!reglasActivas.includes(regla)) {
+    return `el defecto viola ${regla}, que ya no está registrada — no prueba nada sobre el script`;
+  }
+  return null;
+}
+
 console.log(`\n${c.cyan}🔥 Smoke de scripts — ¿pueden fallar, o sólo pasar?${c.reset}\n`);
+
+// La otra mitad de ACO-010: `COMPROBACIONES` indexa por nombre exacto de
+// script, y esos nombres los escribe el generador del otro lado de la frontera.
+// Una entrada huérfana no rompe nada — el script cae en `sin-comprobar`, que no
+// hace fallar el smoke —, así que sin esto se degrada callada.
+const huerfanas = comprobacionesHuerfanas(scripts);
+if (huerfanas.length > 0) {
+  console.log(`${c.amarillo}❓ COMPROBACIONES declara ${huerfanas.length} script(s) que este package.json no tiene: ${huerfanas.join(', ')}${c.reset}`);
+  console.log(`${c.gris}   Si el proyecto se generó sin Supabase, test:functions y check:functions no existen y está bien.${c.reset}`);
+  console.log(`${c.gris}   Si es otro, alguien renombró el script y su comprobación quedó sin dueño.${c.reset}\n`);
+}
 
 const saltados = [];
 const veredictos = [];
@@ -159,13 +204,18 @@ for (const [nombre, comando] of Object.entries(scripts)) {
   const limpio = correr(nombre);
 
   let exitProvocado;
+  let invalido = null;
   const comprobacion = COMPROBACIONES[nombre];
-  if (limpio.exit === 0 && comprobacion?.modo === 'provocar') {
-    exitProvocado = provocar(nombre, comprobacion.defecto);
+  if (comprobacion?.modo === 'provocar') {
+    invalido = defectoInvalido(comprobacion.defecto);
+    if (limpio.exit === 0 && !invalido) {
+      exitProvocado = provocar(nombre, comprobacion.defecto);
+    }
   }
 
   const v = veredicto({
     nombre, exitLimpio: limpio.exit, salida: limpio.salida, exitProvocado,
+    defectoInvalido: invalido,
   });
   veredictos.push({ nombre, ...v, ms: limpio.ms });
 

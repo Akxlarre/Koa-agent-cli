@@ -106,7 +106,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `CAR-003` | S2 | `R-01` | **(remedido)** Editar un componente de `features/` inyecta **13 reglas** completas (~19.100 tokens); `visual-system.md` sola es el 28% y matchea seis globs | resuelto · peor caso 76.391 → 71.975; `shared/` −38%, `.scss` −58%, SQL −40%; con tope testeado por ruta |
 | `INC-015` | S2 | `K-07` | `sdd/SKILL.md` y dos comandos instruyen `npm run assignments:sync`/`audit`; el scaffolder nunca los escribe en `package.json` | resuelto · los dos npm scripts en `lib/scaffolder.js`, con test que ata comando y script |
 | `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | resuelto · una convención con dos formas y el interruptor decide; `parseTrackName` compartido, con test de las dos ramas |
-| `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | abierto |
+| `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | resuelto · la skill no nombraba **ni al script ni al subagente** y editaba dentro de los marcadores; ahora delega, y sin `Edit` en su frontmatter |
 | `HUE-027` | S3 | `R-01` | Nada distingue las 10 reglas mecanizadas de las 5 que son contrato social | abierto |
 | `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | abierto |
 | `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | abierto |
@@ -117,7 +117,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-019` | S3 | `L-05` | `CLAUDE-USER-GUIDE.md` dice que el linter valida 8 reglas; son 28 | resuelto · la frase se corrigió **y** la cifra dejó de escribirse a mano: un test la deriva de `RULES` y falla contra cualquier doc del payload que afirme otra |
 | `HUE-029` | S3 | `L-04` | Los adapters no llevan ningún mecanismo y nada le dice al usuario que ahí las reglas son solo prosa | abierto |
 | `ACO-013` | S2 | Lente 1 | 21 artefactos compartidos, 3 declarados. Y `templates-contract.md` vive en este repo, no en el payload: el proyecto generado no recibe ninguna declaración de sus propios contratos | resuelto · los **21** declarados en `contracts.js`, y `docs/CONTRATOS.md` —generado desde ahí, con test de sincronía— viaja al proyecto |
-| `HUE-031` | S3 | Lente 2 | `pre-write-guard` capa 1 y `harness-gate` protegen superficies complementarias del harness sin criterio común; ninguno cubre `.claude/skills/` ni `.claude/agents/` | abierto |
+| `HUE-031` | S3 | Lente 2 | `pre-write-guard` capa 1 y `harness-gate` protegen superficies complementarias del harness sin criterio común; ninguno cubre `.claude/skills/` ni `.claude/agents/` | resuelto · `GATE-C1`: el frontmatter que reparte permisos (`tools:`, `hooks:`) no lo edita el agente. La garantía de que `code-judge` no tiene `Bash` la sostenía una línea que él mismo podía cambiar |
 | `DEC-001` | **S1** | `C-02` | `spec-diff-check.js` lee el comando de `process.env.TOOL_INPUT` en vez de stdin — nunca bloquea ningún commit | resuelto · lee stdin vía `lib/payload.js` |
 | `HUE-002` | **S1** | `C-01` | **(ampliado)** `CLAUDE_SESSION_ID` **no existe**: `sessionId` es siempre `'default'`. Demostrado que una lectura en un proyecto levanta el Discovery Gate de otro | resuelto · `lib/session.js`; los seis hooks migrados, `prompt-context` el último |
 | `HUE-005` | **S1** | `C-05` | `blueprint.json` no se valida dentro del proyecto generado, y su `stack` crudo decide qué guardrails corren | resuelto · `lib/blueprint.js`, solo booleanos en claves conocidas |
@@ -2293,3 +2293,104 @@ Provocado devolviendo el bug de `ARCH-09` (`INC-008`): el test cae con
 algo que la ve antes que él.
 
 **Estado:** resuelto · el linter corre sobre la salida real de `ng new`
+
+---
+
+## HUE-031 · La superficie del harness que no vigilaba nadie
+
+- **Tipo / severidad:** `HUE` · S3 *(la severidad quedó corta; ver abajo)*
+- **Unidad:** Lente 2 del pase general
+- **Contexto:** B (harness)
+
+**Qué encontré**
+
+Dos piezas protegen el harness y el criterio que las separa nunca se escribió:
+
+| Pieza | Superficie | Postura |
+|---|---|---|
+| `pre-write-guard` capa 1 | `hooks/`, `settings.json`, `architect.js` | bloquea, sin excepción |
+| `harness-gate` | `rules/`, `learnings.md`, `ANTI-PATTERNS.md`, `CLAUDE.md`, `scripts/` | valida y deja pasar |
+
+Entre las dos quedaban afuera `.claude/agents/`, `.claude/skills/` y
+`.claude/commands/`. El criterio implícito que las dejaba afuera: *son markdown, o sea
+prosa*.
+
+**Por qué importa más de lo que dice su S3**
+
+No son prosa. Su frontmatter decide **qué puede hacer el agente**:
+
+```yaml
+# agents/code-judge.md
+tools: Read, Grep, Glob      ← sin Write, sin Edit, sin Bash
+
+# skills/plan/SKILL.md
+hooks:
+  Stop: … validate-file-contains --contains "## Criterio de done" …
+```
+
+Y `.claude/CLAUDE.md` vende lo primero como una garantía dura, con estas palabras: *«con
+`Bash` podría escribir usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en
+vez de un hecho»*. Esa garantía la sostenía **una línea de YAML que el propio agente podía
+editar**. Lo mismo con `/plan`: se le borra el bloque `hooks:` y el formato del task-spec
+—el contrato con más consumidores— deja de validarse.
+
+Un agente que puede ampliarse los permisos no está acotado por nada. Eso no es S3.
+
+**Arreglo — `GATE-C1`**
+
+`harness-gate` suma la tercera superficie con una postura propia, que no es ninguna de las
+dos anteriores: **el texto es del agente, el frontmatter es del humano**. Se bloquea tocar
+`tools:`, `allowed-tools:`, `hooks:`, `model:` y `permission-mode:` en
+`.claude/agents/*.md`, `.claude/skills/**/SKILL.md` y `.claude/commands/*.md`.
+
+El regex va anclado a principio de línea a propósito: una skill puede explicar *por qué* el
+juez no recibe tools de escritura sin que eso la bloquee. Un guardrail que estorba se
+termina desactivando, y entonces no protege nada.
+
+Verificado que no rompe lo que el blueprint reparte: se le pasa a cada uno de los cinco
+agentes su propio cuerpo y ninguno dispara.
+
+Provocado: apagando `GATE-C1`, 3 tests en rojo.
+
+**Estado:** resuelto · el frontmatter que reparte permisos ya no lo edita el agente
+
+---
+
+## DUP-003 · La autoridad triplicada de índices, decidida
+
+- **Tipo / severidad:** `DUP` · S2
+- **Unidad:** `K-04`
+- **Contexto:** B (harness)
+
+**Qué encontré** — y «sin reparto» resultó demasiado suave
+
+El hallazgo decía que las tres piezas hacen el mismo trabajo y nada dice cuál usar cuándo.
+Al abrirlas apareció algo peor: **`/sync-indices` no menciona ni al script ni al
+subagente**. Su procedimiento era leer cuatro índices, buscar archivos cambiados y
+reescribir las tablas a mano. O sea:
+
+- rehacía a mano —y peor— lo que el AST ya hace bien, para **4 de los 15** índices;
+- **editando dentro de los marcadores `AUTO-GENERATED`**, así que la próxima corrida de
+  `npm run indices:sync` borraba ese trabajo. Es `HUE-007` con culpable: la skill que el
+  propio blueprint le dice al usuario que invoque.
+
+Y no era un descuido de redacción. Su frontmatter era `allowed-tools: Read, Edit, Glob,
+Grep`: **sin `Bash`, no podía correr el auto-indexer ni aunque quisiera**. La duplicación
+estaba en los permisos, no en la prosa.
+
+**La decisión**
+
+| Pieza | Rol | Alcance |
+|---|---|---|
+| `scripts/indices-sync.js` | **La autoridad** | Los 13 auto-generables. Lo que deduce del AST manda |
+| `index-syncer` | **El único que escribe `indices/`** | Corre el script y completa lo que no deduce |
+| `/sync-indices` | **La puerta** | Delega. No edita nada |
+
+La skill se reescribió para delegar, y se le sacó `Edit` del frontmatter — pedirle en prosa
+que no edite es una guideline; sacarle la herramienta es un hecho. Las tres piezas se
+nombran entre sí, que es lo que impide que la cuarta versión de alguna vuelva a resolver el
+problema por su cuenta.
+
+Provocado: con la skill anterior, 4 tests en rojo.
+
+**Estado:** resuelto · la autoridad es el script, el que escribe es el subagente, la skill delega

@@ -18,7 +18,7 @@ Este proyecto tiene guardrails automáticos que se ejecutan sin intervención hu
 - **Subagent Cleanup** — Cuando un subagente termina, su estado de hilo (dedup de avisos, anti-bucle, breaker) se borra. Lo que descubrió o escribió no: eso es de la sesión.
 - **Approval Gate** — Las operaciones irreversibles de base de datos (`supabase db push`, `db reset`, `migration repair`, `link`, SQL destructivo) las ejecuta un humano, no tú. Escribe la migración y pide que la corran.
 - **Spec Reflection** — Al terminar de responder, se revisa el "Criterio de done" del task-spec activo y se te devuelven los puntos sin cerrar.
-- **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script.
+- **Harness Gate** — Cada edición a `.claude/rules/`, `context/learnings.md`, `indices/ANTI-PATTERNS.md`, `CLAUDE.md` o `scripts/*.js` se valida contra el Generalization Gate: bloquea lecciones que citan un track ID sin criterio de aplicabilidad, snippets de despacho por keyword-matching, código ejecutable colado en un archivo de guía, o consejos sin mecanismo colados en un script. Y en `.claude/agents/`, `.claude/skills/` y `.claude/commands/` bloquea tocar el **frontmatter que reparte permisos** (`tools:`, `hooks:`, `model:`): el texto de esos archivos es tuyo, esas claves las cambia el humano (`GATE-C1`). La prosa de este archivo no es decorativa — que `code-judge` no tenga `Bash` es la razón por la que «el juez no arregla nada» es un hecho y no una promesa.
 - **Sync Check** — Al terminar de responder, se verifica si los índices necesitan actualización.
 - **Context Guardian** — Al terminar de responder, pregunta si algo de esta sesión merece quedar en `context/learnings.md` (avisa si lleva más de 14 días sin crecer). La frescura del brief se audita al **arrancar**, no al cerrar.
 - **Spec Gate (SDD)** — Si el proyecto tiene carpeta `specs/`, no puedes tocar código de producto sin una spec activa con su plan. Sin `specs/`, no bloquea nada.
@@ -44,7 +44,7 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 2. **PLANIFICAR** — `/plan` genera el task-spec. Su formato **lo valida un hook**, no tu buena voluntad: si falta una sección obligatoria, no terminas. Marca las casillas `[x]` a medida que avanzas: Spec Reflection, Prompt Context y Compact Recovery dependen de eso.
 3. **EJECUTAR** — Escribe el código. Reutiliza siempre lo existente primero. Los hooks validarán cada escritura en tiempo real.
 4. **VALIDAR** — `arch-auditor` corre el linter y el build y te devuelve solo las violaciones. Después `/review` juzga el diseño contra la rúbrica, que es lo que los hooks de regex no pueden ver.
-5. **SINCRONIZAR** — `index-syncer` reconcilia `indices/*.md` con el código real. El Stop hook te lo recordará si lo olvidas.
+5. **SINCRONIZAR** — `index-syncer` reconcilia `indices/*.md` con el código real: corre `npm run indices:sync` (el AST manda sobre los 13 índices auto-generables) y completa a mano solo lo que ese script no puede deducir. Es el **único** que escribe en `indices/`. El Stop hook te lo recordará si lo olvidas.
 
 ## Skills disponibles
 
@@ -54,7 +54,7 @@ Detalle completo: @docs/HOOKS-SYSTEM.md
 | `/review` | Antes de commitear algo no trivial. Juzga el diseño contra la rúbrica del proyecto — lo que los guardrails de regex no alcanzan. |
 | `/angular-component` | Crear o refactorizar un componente Angular |
 | `/angular-signals` | Implementar estado reactivo con Signals |
-| `/sync-indices` | Sincronizar índices al cerrar sesión |
+| `/sync-indices` | Sincronizar índices al cerrar sesión. Es la **puerta**: delega en `index-syncer` y no edita nada (`DUP-003`) |
 | `/harness-feedback` | Reportar fricción con el harness (hooks/rules/skills) al cerrar sesión — distinto de sync-indices |
 | `sdd` | Ciclo Spec-Driven Development. Comandos: `/spec-new`, `/spec-activate`, `/spec-plan`, `/spec-tasks`, `/spec-verify`, `/fix-new`, `/fix-close`, `/hotfix`, `/hotfix-close`, `/assign-new`, `/assign-list`, `/assign-claim` (los `/assign-*` requieren `specs/AUTHORS.md`) |
 | `verify` | Verificar visualmente en el navegador (Playwright MCP) que un cambio funciona de verdad — no solo que compila |

@@ -132,6 +132,70 @@ describe('GATE-A1 — el gate se apagaba solo a medida que crecía el archivo (D
   });
 });
 
+// ─── GATE-C1: el frontmatter que reparte permisos (HUE-031) ────────────────
+describe('GATE-C1 — la superficie que no vigilaba nadie', () => {
+  // El File Protector bloquea lo ejecutable que decide (hooks/, settings.json,
+  // architect.js). El Generalization Gate valida la guía (rules/, learnings.md,
+  // CLAUDE.md). `.claude/agents/`, `.claude/skills/` y `.claude/commands/`
+  // quedaban afuera, y el criterio que las dejaba afuera era «son markdown».
+  //
+  // No lo son. `code-judge.md` declara `tools: Read, Grep, Glob` —sin Write ni
+  // Bash— y `.claude/CLAUDE.md` vende eso como una garantía dura. La sostenía
+  // una línea que el propio agente podía editar.
+
+  test('agregarle Bash al juez queda bloqueado', () => {
+    const r = runHook(makeInput('/p/.claude/agents/code-judge.md',
+      'tools: Read, Grep, Glob, Bash'));
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /GATE-C1/);
+  });
+
+  test('vaciar el hook de /plan también', () => {
+    // Sin ese hook de Stop, las cinco secciones del task-spec dejan de
+    // validarse y el contrato del artefacto con más consumidores se afloja.
+    const r = runHook(makeInput('/p/.claude/skills/plan/SKILL.md', 'hooks:\n  Stop: []'));
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /GATE-C1/);
+  });
+
+  test('y un comando del SDD, igual', () => {
+    assert.equal(
+      runHook(makeInput('/p/.claude/commands/hotfix.md', 'allowed-tools: Bash')).exitCode, 2);
+  });
+
+  test('la PROSA de esos archivos sigue siendo editable', () => {
+    // El objetivo no es congelar los archivos: es que el agente pueda mejorar
+    // las instrucciones sin poder ampliarse los permisos.
+    const r = runHook(makeInput('/p/.claude/agents/code-judge.md',
+      'Eres el juez de codigo. Calificas contra una rubrica fija y no arreglas nada.'));
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('mencionar «tools» en prosa no dispara', () => {
+    // Un regex sin anclar convertiría cada explicación del diseño en un bloqueo,
+    // y un guardrail que estorba se termina desactivando.
+    const r = runHook(makeInput('/p/.claude/skills/review/SKILL.md',
+      'El juez no recibe tools de escritura, y eso es a proposito.'));
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('fuera de esas tres carpetas no aplica', () => {
+    assert.equal(runHook(makeInput('/p/docs/GUIA.md', 'tools: Read, Bash')).exitCode, 0);
+  });
+
+  test('los agentes REALES del payload no se rompen con su propio contenido', () => {
+    // Verificación inversa: la superficie tiene que aceptar lo que el blueprint
+    // ya reparte cuando se edita su prosa. Solo el frontmatter se bloquea.
+    const fs2 = require('fs');
+    const dir = path.resolve(__dirname, '..', 'agents');
+    for (const f of fs2.readdirSync(dir).filter((x) => x.endsWith('.md'))) {
+      const cuerpo = fs2.readFileSync(path.join(dir, f), 'utf-8').split(/^---$/m).pop();
+      const r = runHook(makeInput(`/p/.claude/agents/${f}`, cuerpo));
+      assert.equal(r.exitCode, 0, `${f}: su propio cuerpo dispara el gate\n${r.stderr}`);
+    }
+  });
+});
+
 // ─── GATE-A2: keyword-matching literal ─────────────────────────────────────
 describe('GATE-A2 — despacho por keyword-matching literal', () => {
   const learningsPath = '/project/context/learnings.md';

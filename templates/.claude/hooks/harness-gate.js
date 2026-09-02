@@ -105,11 +105,55 @@ process.stdin.on('end', () => {
       (/(^|\/)scripts\/[^/]+\.js$/.test(normalizedPath) && !normalizedPath.endsWith('scripts/architect.js')) ||
       /\.claude\/scripts\/[^/]+\.js$/.test(normalizedPath);
 
-    if (!isGuidanceSurface && !isCapabilityScript) {
+    // HUE-031: la tercera superficie, que no vigilaba nadie.
+    //
+    // El File Protector (pre-write-guard capa 1) bloquea lo EJECUTABLE que
+    // decide —`hooks/`, `settings.json`, `architect.js`—. El Generalization
+    // Gate valida la GUÍA —`rules/`, `learnings.md`, `CLAUDE.md`—. Entre las
+    // dos quedaban afuera `.claude/agents/`, `.claude/skills/` y
+    // `.claude/commands/`, y el criterio que las dejaba afuera era «son
+    // markdown, o sea prosa».
+    //
+    // No lo son. Su frontmatter decide QUÉ PUEDE HACER el agente:
+    //
+    //   agents/code-judge.md      tools: Read, Grep, Glob   ← sin Write ni Bash
+    //   skills/plan/SKILL.md      hooks: Stop → el validador del task-spec
+    //
+    // Y `.claude/CLAUDE.md` vende lo primero como una garantía dura: «con Bash
+    // podría escribir usando `>`, y "el juez no arregla nada" pasaría a ser una
+    // promesa en vez de un hecho». Esa garantía la sostenía una línea que el
+    // propio agente podía editar. Lo mismo con `/plan`: borrás su `hooks:` y el
+    // formato del task-spec deja de validarse.
+    const isCapabilityDeclaration =
+      /\.claude\/agents\/[^/]+\.md$/.test(normalizedPath) ||
+      /\.claude\/skills\/.*SKILL\.md$/.test(normalizedPath) ||
+      /\.claude\/commands\/[^/]+\.md$/.test(normalizedPath);
+
+    if (!isGuidanceSurface && !isCapabilityScript && !isCapabilityDeclaration) {
       process.exit(0);
     }
 
     const violations = [];
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // C. CAPABILITY GUARD — el frontmatter que reparte permisos (HUE-031)
+    // ═══════════════════════════════════════════════════════════════════════
+    if (isCapabilityDeclaration) {
+      // Se mira solo la forma de clave de frontmatter, anclada a principio de
+      // línea: una skill puede hablar DE las tools en su prosa sin disparar.
+      const CLAVES = /^\s*(tools|allowed-tools|allowedTools|disallowed-tools|disallowedTools|hooks|model|permission-mode)\s*:/m;
+      const m = CLAVES.exec(newContent);
+      if (m) {
+        violations.push(
+          `[GATE-C1] Estás editando \`${m[1]}:\` en una declaración de capacidad.\n` +
+          '     Esa línea no es documentación: decide qué puede hacer un agente o qué hook\n' +
+          '     corre. `code-judge` no tiene Write ni Bash A PROPÓSITO, y `/plan` valida su\n' +
+          '     propio formato porque declara un hook de Stop.\n' +
+          '     Un agente que se amplía los permisos deja de estar acotado por nada.\n' +
+          '     El texto del archivo es tuyo; estas claves las cambia el humano.'
+        );
+      }
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // A. GENERALIZATION GATE — solo superficies de guía (nunca specs/**)

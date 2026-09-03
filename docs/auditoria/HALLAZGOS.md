@@ -94,9 +94,10 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | resuelto · las dos declaradas y mecanizadas: `comprobacionesHuerfanas()` contra los scripts que emite el scaffolder (test del lado A, único lugar donde los dos lados se ven), y el defecto declara su regla y la verifica contra `architect.js` |
 | `HUE-020` | **S1** | `G-02` | `parseJsonc` se come lo que siga a `//` dentro de un string: un `tsconfig.json` con `$schema` deja el proyecto sin path aliases y sin compilar | resuelto · `stripJsonComments` recorre respetando strings; el parche de `tsconfig` pasó a requerido |
 | `HUE-022` | **S1** | `G-10` | Los 9 parches son condicionales: si `ng new` cambia de forma no fallan, no hacen nada. Ningún test de integración corre `ng new` | resuelto · `patch()` con `requerido` (los tres archivos sin los que no hay proyecto paran el CLI) + `npm run test:integracion`, que corre `ng new` de verdad |
-| `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | abierto |
+| `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | resuelto · medido, son **dos ejes en estados opuestos**: evasión ya estaba bien (79 asserts de bloqueo contra 68 de paso), ejecución no tenía ningún mecanismo. `hook-wiring.test.js` cubre el segundo en sus tres direcciones |
 | `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | resuelto · no hacía falta `npm install`, solo **un paquete**: se instala el `typescript` que el propio proyecto declara y el linter corre sobre la salida real de `ng new` |
-| `HUE-023` | S3 | `A-01` | La calidad del resumen de los subagentes no es verificable por ningún mecanismo del repo | abierto |
+| `HUE-023` | S3 | `A-01` | La calidad del resumen de los subagentes no es verificable por ningún mecanismo del repo | resuelto · la calidad no, y va a seguir sin serlo. Lo demás sí: el formato que promete, los permisos con los que corre, y lo que el harness afirma de él |
+| `INC-026` | S2 | `A-01` | `.claude/CLAUDE.md` presenta a `index-syncer` y `code-judge` juntos como «permisos de escritura acotados», y sólo uno los tiene | resuelto · encontrado al cerrar `HUE-023`. El syncer corre con `Bash`, `Write` y `Edit`; el propio párrafo explicaba dos líneas más abajo por qué eso vuelve promesa una garantía |
 | `HUE-024` | S3 | `A-01` | Nadie verifica que los comandos que los procedimientos de los subagentes mencionan existan en `package.json` | resuelto · las **64** menciones de `npm run X` del payload se contrastan contra los scripts que declara el scaffolder |
 | `HUE-026` | S3 | `T-01` | `doc-links.test.js` verifica «regla emitida → documentada» pero no la inversa; por eso no atrapó `ARCH-14` | resuelto · `doc-links.test.js` verifica las dos direcciones; encontró un segundo fantasma, `A11Y-04`, que la auditoría no tenía |
 | `INC-011` | S3 | `G-01` | `bin/index.js` tiene 169 líneas contra el techo de ~150 que declara `cli-architecture.md` | resuelto · los prompts salieron a `lib/prompts.js`; 169 → 122 líneas, con test contra el techo de la regla |
@@ -1454,6 +1455,119 @@ aterriza el archivo, y ahí se vio que el comando no lo sabía.
 
 Los dos comandos usan `specs/fixes/<id>/fix.md`. `/fix-close` mantiene el fallback a la
 ruta vieja, igual que `/hotfix-close`, para no romper tracks ya abiertos.
+
+**Estado:** resuelto
+
+---
+
+## HUE-025 · La cobertura mide corrección, no ejecución ni evasión
+
+- **Tipo / severidad:** `HUE` · S2 · **Unidad:** `T-01` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+Los tests de hooks comprueban que la lógica sea correcta. Casi nunca que el sistema la
+ejecute, ni que alguien intente rodearla.
+
+**Lo que la medición corrigió: son dos ejes y están en estados opuestos**
+
+```
+EVASIÓN     79 asserts de bloqueo (exit 2) contra 68 de paso (exit 0)
+EJECUCIÓN   0 mecanismos
+```
+
+El eje de evasión es lo que la suite **más** ejercita: la mayoría de los asserts ponen al
+hook delante de lo que debe frenar. Ahí el hallazgo se queda corto.
+
+El de ejecución no tenía nada. Nada comprobaba que un hook con cuarenta tests en verde
+estuviera cableado en `settings.json`. Borrás su entrada y la suite entera sigue verde
+mientras el hook deja de correr — que es `ARCH-26` exacto (detector escrito, tests en
+verde, cero llamadores), la lección que este repositorio ya había aprendido del lado del
+linter cuando escribió `rule-wiring.js` y nunca aplicó a los hooks.
+
+Medido antes de tocar nada: 15 hooks en disco, 14 cableados, 17 rutas nombradas en
+`settings.json` y ninguna muerta. Todo consistente — y sostenido por nada.
+
+**Qué se hizo**
+
+`hook-wiring.test.js`, derivado del filesystem y de `settings.json`, en tres direcciones:
+
+- un hook en disco sin cablear (salvo el opt-in declarado, que sólo puede achicarse:
+  `context-enrichment-guard.js`, el Day 0 Context Guard, documentado como opt-in);
+- una entrada de `settings.json` que apunta a un archivo que ya no existe;
+- un validador referenciado desde el frontmatter de una skill o comando que no está en
+  disco, o que no parsea — ahí el fallo es el más callado de los tres: el comando
+  simplemente se queda sin guardrail.
+
+Provocado en las tres: descablear `harness-gate`, renombrar `sync-check` en el settings, y
+un typo en la ruta del validador de `/spec-new`. Rojo las tres veces.
+
+**Estado:** resuelto
+
+---
+
+## HUE-023 · La calidad del resumen de un subagente no es verificable
+
+- **Tipo / severidad:** `HUE` · S3 · **Unidad:** `A-01` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+Ningún mecanismo del repositorio puede juzgar si el resumen que devuelve un subagente
+sirve.
+
+**Por qué se cierra igual**
+
+Es cierto y va a seguir siéndolo: ningún test va a decidir si un veredicto de
+`code-judge` estuvo bien pensado. Pero «la calidad» no es lo único que se afirma sobre un
+subagente, y el resto sí se sostiene:
+
+| Afirmación | Dónde vive | ¿Verificable? |
+|---|---|---|
+| el formato que promete devolver | su propia definición | sí |
+| los permisos con los que corre | su frontmatter | sí |
+| lo que el harness afirma de él | `.claude/CLAUDE.md` | sí — y estaba suelto |
+
+`agent-contracts.test.js` cubre las tres: cada agente declara un `## Formato de salida`
+**con el bloque que muestra la forma** (nombrar la sección sin mostrarla no es un
+contrato), declara sus `tools:`, y ninguna afirmación de `CLAUDE.md` sobre permisos
+contradice el frontmatter. La tercera es la que destapó `INC-026`.
+
+**Estado:** resuelto
+
+---
+
+## INC-026 · Una garantía de permisos presentada junto a una que no lo es
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `A-01` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+`.claude/CLAUDE.md` decía: «Dos tienen permisos de escritura acotados a propósito.
+`index-syncer` escribe **solo** en `indices/`. Y `code-judge` no tiene `Write`, `Edit`
+**ni `Bash`**…».
+
+`index-syncer` corre con `tools: Bash, Read, Edit, Write, Grep, Glob`.
+
+**Por qué importa**
+
+El párrafo se refuta solo dos líneas más abajo: «Con `Bash` podría escribir usando `>`, y
+"el juez no arregla nada" pasaría a ser una promesa en vez de un hecho». Ese argumento
+—correcto— aplica idéntico a `index-syncer`, que está en la misma frase presentado como
+si tuviera la misma clase de garantía.
+
+Lo que acota al syncer es una línea de su prompt («NUNCA toques `src/app/`»), no el
+sistema de permisos. La diferencia importa justo cuando confiás: una la sostiene el
+harness, la otra la sostiene que el agente obedezca. Si el syncer escribe donde no debe,
+lo único que queda enfrente es el Architect Guard, que mira **qué** se escribe y no quién
+lo escribió.
+
+**Qué se hizo**
+
+No sacarle `Bash`: lo necesita para `npm run indices:sync`, que es lo que lo hace útil.
+Lo que se arregla es la afirmación. `CLAUDE.md` ahora dice cuál de las dos cosas te está
+protegiendo en cada caso, y un test prohíbe que la prosa describa como acotado a un
+agente que corre con `Bash`, `Write` o `Edit` — y exige que la distinción siga escrita,
+para que el test no se pueda satisfacer borrando la frase.
 
 **Estado:** resuelto
 

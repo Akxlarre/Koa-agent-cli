@@ -112,11 +112,17 @@ arreglo es tuyo. Si uno te devuelve algo que contradice lo que ves en el filesys
 no te exime: el Discovery Gate y el Architect Guard se aplican igual a lo que escribas
 después de consultar.
 
-Dos tienen permisos de escritura acotados a propósito. `index-syncer` escribe **solo**
-en `indices/`. Y `code-judge` no tiene `Write`, `Edit` **ni `Bash`** — recibe el diff
-como archivo (`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podría
-escribir usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un
-hecho.
+**Uno** tiene los permisos acotados de verdad: `code-judge` no tiene `Write`, `Edit`
+**ni `Bash`** — recibe el diff como archivo (`.claude/temp/review-diff.patch`, que deja
+`/review`). Con `Bash` podría escribir usando `>`, y "el juez no arregla nada" pasaría a
+ser una promesa en vez de un hecho.
+
+`index-syncer` es el otro caso y **no** es el mismo (`INC-026`): que escriba sólo en
+`indices/` es una regla de su prompt, no un permiso. Tiene `Bash`, `Write` y `Edit`
+porque corre `npm run indices:sync`, así que por el argumento del párrafo anterior eso es
+una promesa, no un hecho. Vale saber cuál de las dos cosas te está protegiendo: si el
+syncer escribe donde no debe, no hay nada que lo frene salvo el Architect Guard, que mira
+lo que escribe y no quién lo escribió.
 
 ## Reglas del proyecto (path-scoped — se cargan automáticamente)
 

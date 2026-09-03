@@ -109,7 +109,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-017` | S2 | `D-06` | Tres convenciones de ID para el mismo track: los comandos generan sin código de autor y `assignments-audit` lo exige. El bug ya ocurrió y se arregló el detector, no el generador | resuelto · una convención con dos formas y el interruptor decide; `parseTrackName` compartido, con test de las dos ramas |
 | `DUP-003` | S2 | `K-04` | `/sync-indices`, `index-syncer` e `indices-sync.js` hacen el mismo trabajo en tres capas y nada dice cuál usar cuándo | resuelto · la skill no nombraba **ni al script ni al subagente** y editaba dentro de los marcadores; ahora delega, y sin `Edit` en su frontmatter |
 | `HUE-027` | S3 | `R-01` | Nada distingue las 10 reglas mecanizadas de las 5 que son contrato social | resuelto · la partición real era **8/8**, y dos de las «sociales» sí estaban mecanizadas sin decirlo. `enforcement:` en el frontmatter, derivado de quién emite cada código |
-| `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | abierto |
+| `HUE-028` | S3 | `K-01` | El patrón de «skill con guardrail en su frontmatter» funciona y se usa una sola vez, en `/plan` | resuelto · no era de gusto: el validador miraba **un** directorio y toda la familia SDD escribe en `specs/**/<id>/`, un nombre que no existe hasta que el comando corre. Un flag `--recursive` lo destrabó; cableado en `/spec-new` y `/fix-new` |
+| `INC-025` | S2 | `K-02` | `/fix-new` enumera IDs en `specs/fixes/fix-*/` y crea el track en `specs/<id>/`: reutiliza IDs y produce lo que `assignments-audit.js` declara violación de naming | resuelto · encontrado al cablear `HUE-028`. Los dos comandos usan `specs/fixes/<id>/`, con fallback legacy en `/fix-close` igual que `/hotfix-close` |
 | `INC-014` | S3 | `R-10` | `visual-system.md` cita `src/styles/_view-transitions.scss`; la ruta real lleva `motion/` | resuelto · era `visual-patterns.md`; corregida, y `doc-links` verifica ahora toda ruta `src/` que la doc cita |
 | `INC-016` | S3 | `D-07` | `fix-close.md` manda registrar en `indices/DOMAIN-GOTCHAS.md`, que no existe | resuelto · redirigido a `context/learnings.md`, que es donde ya vive ese conocimiento; un índice nuevo toca cinco piezas y no se decide desde un comando |
 | `DEC-006` | S2 | `L-02` | El umbral de 80 chars no salta las plantillas de `context/`: se inyectan enteras, ~3.240 tokens por compactación en un proyecto sin contexto llenado | resuelto · el detector es `budget.sinLlenar`, que mide contenido real |
@@ -1368,6 +1369,91 @@ El test mira las dos formas: la fuente en este repo, los tres destinos en un pro
 generado, con el mínimo que corresponde a cada uno (tres acá; allá al menos Copilot, que
 es el único que se genera siempre — cursor y windsurf son opt-in). Provocado en el layout
 generado quitándole el aviso a `copilot-instructions.md`: rojo.
+
+**Estado:** resuelto
+
+---
+
+## HUE-028 · El guardrail en el frontmatter se usa una sola vez
+
+- **Tipo / severidad:** `HUE` · S3 · **Unidad:** `K-01` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+`validate-file-contains.js` es el único validador genérico del harness —recibe qué buscar
+por flags y no sabe nada del proyecto— y lo invoca **una** skill: `/plan`, desde su
+frontmatter. Diecisiete skills y comandos más crean artefactos y ninguno lo usa.
+
+**Lo que la medición corrigió**
+
+Se leía como una decisión de gusto («funciona, nadie lo adoptó»). No lo es: el validador
+recorría **un solo directorio**, así que el llamador tiene que poder NOMBRARLO en su
+frontmatter. Toda la familia SDD escribe en `specs/{specs,fixes,hotfixes}/<id>/`, y ese
+`<id>` no existe hasta que el comando corre. Medido sobre un track real:
+
+```
+apuntado a specs/                 no encuentra nada  → «Crealo antes de terminar»
+apuntado a specs/specs/0001-demo/ valida perfecto    → pero esa ruta no se puede
+                                                        escribir de antemano
+```
+
+Y el primer caso no es sólo inútil: manda a crear un archivo que ya está, que es el mismo
+consejo destructivo de `INC-002`. O sea que el único artefacto guardable del harness era
+el de `/plan`, por vivir en una carpeta plana.
+
+**Qué se hizo**
+
+Un flag `--recursive` (tope de 4 niveles, sin `node_modules` ni `.git` — esto corre en un
+hook de Stop, en el camino crítico de cada respuesta). Con recursión el reporte pasa a
+usar la ruta real y no `path.join(directory, basename)`, que informaría `specs/spec.md`
+por `specs/specs/0001-demo/spec.md` y mandaría a mirar un archivo inexistente.
+
+Cableado en `/spec-new` y `/fix-new`, que son los que CREAN el artefacto desde un template
+con encabezados fijos. Deliberadamente **sin** `--require-file`: los dos comandos deben
+parar a pedir datos al usuario cuando se los invoca sin argumento, y exigir el archivo ahí
+empujaría al agente a inventar el título que la propia regla del comando le prohíbe
+inventar. Sin archivo no hay nada que validar; con archivo, la estructura se juzga.
+
+Un test deriva los llamadores del filesystem y exige que quien apunte a `specs/` pase
+`--recursive`. Provocado quitándoselo a `/spec-new`: rojo.
+
+**Estado:** resuelto
+
+---
+
+## INC-025 · `/fix-new` crea el track donde nadie lo busca
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `K-02` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+El mismo comando dice las dos cosas: el paso 2 enumera los IDs existentes listando
+`specs/fixes/fix-*/`, y el paso 4 crea el track en `specs/<id>/fix.md`.
+
+**Por qué importa**
+
+Dos consecuencias, las dos concretas:
+
+- **Los IDs se reutilizan.** El `/fix-new` siguiente lista `specs/fixes/fix-*/`, no ve el
+  track recién creado, y vuelve a asignar `fix-001`.
+- **`assignments-audit.js` lo reporta como error.** Su código dice, literal, «tracks
+  sueltos en la raíz de `specs/` — no deberían existir tras la migración a estructura
+  anidada» y los acumula en `namingViolations`. O sea que un comando del harness produce
+  exactamente lo que otra pieza del harness declara violación.
+
+`/assign-claim` y `/hotfix` usan `specs/fixes/` y `specs/hotfixes/`; `/hotfix-close` ya
+trae un fallback «ruta legacy pre-migración». La migración se hizo y `/fix-new` y
+`/fix-close` quedaron afuera.
+
+**De dónde salió**
+
+De cablear `HUE-028`: para escribir el `--pattern` del guardrail había que saber dónde
+aterriza el archivo, y ahí se vio que el comando no lo sabía.
+
+**Qué se hizo**
+
+Los dos comandos usan `specs/fixes/<id>/fix.md`. `/fix-close` mantiene el fallback a la
+ruta vieja, igual que `/hotfix-close`, para no romper tracks ya abiertos.
 
 **Estado:** resuelto
 

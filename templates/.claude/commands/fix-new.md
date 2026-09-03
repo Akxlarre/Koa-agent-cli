@@ -2,6 +2,19 @@
 description: Crear un fix track SDD para una corrección post-implementación (bug, edge case, ajuste)
 argument-hint: "<descripción corta del fix>"
 allowed-tools: Read, Write, Bash, Glob
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory specs
+            --pattern "fix.md"
+            --recursive
+            --max-age 60
+            --contains "## Root Cause"
+            --contains "## ACs Afectados"
+            --contains "## Test de Regresión"
 ---
 
 # /fix-new — Crear un Fix Track SDD
@@ -44,7 +57,7 @@ test prueba la corrección.
    - Ejemplo: "myTasks KPI incorrecto" → `mytasks-kpi-incorrecto`
    - ID completo: `fix-NNN-<slug>` (ej: `fix-001-mytasks-kpi-incorrecto`)
 
-4. Crear `specs/<id>/fix.md`:
+4. Crear `specs/fixes/<id>/fix.md`:
    - Usar el template de abajo, rellenando título e ID
    - El campo `refs:` queda vacío para que el usuario lo complete
    - El campo `status:` siempre `in_progress` al crear
@@ -53,11 +66,11 @@ test prueba la corrección.
 
 6. Imprimir confirmación:
    ```
-   ✅ Fix track creado: specs/<id>/fix.md
+   ✅ Fix track creado: specs/fixes/<id>/fix.md
    ✅ specs/.active actualizado: <id>
    
    Próximo paso:
-     1. Edita specs/<id>/fix.md → completa Root Cause, ACs Afectados y Test de Regresión
+     1. Edita specs/fixes/<id>/fix.md → completa Root Cause, ACs Afectados y Test de Regresión
      2. Haz el cambio en el código (el spec-gate ya permite escrituras)
      3. Corre el test de regresión para verificar
      4. /fix-close cuando el test esté verde
@@ -99,3 +112,8 @@ test prueba la corrección.
 - Si hay una spec activa cuando corres `/fix-new`, el fix la reemplaza en `.active`. La spec
   sigue existiendo — puedes volver con `/spec-activate <id>` cuando termines el fix.
 - El Fix Gate no requiere `plan.md` ni `tasks.md`. Solo `fix.md`.
+- El track va en `specs/fixes/<id>/`, **no** en `specs/<id>/` (INC-025). Este comando
+  decia las dos cosas: enumeraba IDs en `specs/fixes/fix-*/` y creaba en `specs/<id>/`.
+  Un track suelto en la raiz de `specs/` es, para `assignments-audit.js`, una violacion
+  de naming declarada — y el `/fix-new` siguiente no ve el ID que acabas de usar, asi
+  que lo reutiliza.

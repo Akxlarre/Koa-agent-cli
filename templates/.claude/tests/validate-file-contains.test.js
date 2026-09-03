@@ -191,3 +191,140 @@ describe('INC-002 — «no existe» y «existe pero es viejo» son dos cosas', (
     assert.equal(run(root, sinEdad).exitCode, 0);
   });
 });
+
+// ─── HUE-028: por qué el patrón se usaba una sola vez ───────────────────────
+//
+// El hallazgo decía que «skill con guardrail en su frontmatter funciona y se usa
+// una sola vez, en /plan». La razón no era de gusto: sin recursión, el llamador
+// tiene que poder NOMBRAR el directorio en el frontmatter, y toda la familia SDD
+// escribe en `specs/{specs,fixes,hotfixes}/<id>/` — un nombre que no existe
+// hasta que el comando corre. El único artefacto guardable era el de /plan,
+// que vive en una carpeta plana.
+describe('HUE-028 — --recursive destraba los artefactos anidados', () => {
+  /** Un proyecto con un track SDD en su carpeta real, que nadie puede nombrar. */
+  function conTrack(rel, body) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-vfc-sdd-'));
+    created.push(root);
+    const full = path.join(root, rel);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, body);
+    return root;
+  }
+
+  const SPEC_OK = '# Spec\n## 2. User Stories\nx\n## 3. Acceptance Criteria (Gherkin)\ny\n## 4. Out of scope\nz\n';
+  const ARGS = ['-d', 'specs', '-p', 'spec.md', '--require-file',
+    '-c', '## 2. User Stories', '-c', '## 3. Acceptance Criteria', '-c', '## 4. Out of scope'];
+
+  test('sin --recursive no llega al archivo: ese era el techo', () => {
+    const root = conTrack('specs/specs/0001-demo/spec.md', SPEC_OK);
+    const r = run(root, ARGS);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /no se encontro ningun archivo/,
+      'y lo peor es el consejo: manda crear un spec que ya existe');
+  });
+
+  test('con --recursive lo encuentra y lo aprueba', () => {
+    const root = conTrack('specs/specs/0001-demo/spec.md', SPEC_OK);
+    assert.equal(run(root, [...ARGS, '--recursive']).exitCode, 0);
+  });
+
+  test('y sigue juzgando la estructura, que es el punto', () => {
+    const root = conTrack('specs/specs/0001-demo/spec.md', '# Spec\n## 2. User Stories\nx\n');
+    const r = run(root, [...ARGS, '--recursive']);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /## 4\. Out of scope/);
+  });
+
+  test('reporta la ruta REAL, no la que se pasó por flag', () => {
+    // Con recursión, `target.name` es solo el basename: informar
+    // `specs/spec.md` mandaría al agente a mirar un archivo que no existe.
+    const root = conTrack('specs/fixes/fix-001-demo/fix.md', '# Fix\n## Root Cause\nx\n');
+    const r = run(root, ['-d', 'specs', '-p', 'fix.md', '--recursive', '--require-file',
+      '-c', '## Test de Regresión']);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /specs[/\\]fixes[/\\]fix-001-demo[/\\]fix\.md/);
+  });
+
+  test('el mensaje de «no hay archivo» dice que también miró abajo', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-vfc-vacio-'));
+    created.push(root);
+    fs.mkdirSync(path.join(root, 'specs'), { recursive: true });
+    const r = run(root, [...ARGS, '--recursive']);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /subdirectorios/);
+  });
+
+  test('no se mete en node_modules ni en .git', () => {
+    // Esto corre en un hook de Stop, o sea en el camino crítico de cada
+    // respuesta. Un recorrido sin podar convierte el guardrail en una espera.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-vfc-nm-'));
+    created.push(root);
+    for (const d of ['specs/node_modules/paquete', 'specs/.git/objects']) {
+      fs.mkdirSync(path.join(root, d), { recursive: true });
+      fs.writeFileSync(path.join(root, d, 'spec.md'), SPEC_OK);
+    }
+    const r = run(root, [...ARGS, '--recursive']);
+    assert.equal(r.exitCode, 2, 'un spec dentro de node_modules no es un spec del proyecto');
+  });
+
+  test('la profundidad está topeada: 5 niveles ya no cuentan', () => {
+    const root = conTrack('specs/a/b/c/d/e/spec.md', SPEC_OK);
+    assert.equal(run(root, [...ARGS, '--recursive']).exitCode, 2);
+  });
+});
+
+// ─── Los comandos que declaran el guardrail lo declaran BIEN ────────────────
+describe('HUE-028 — el frontmatter que cablea el validador', () => {
+  const COMANDOS = path.resolve(__dirname, '..', 'commands');
+  const SKILLS = path.resolve(__dirname, '..', 'skills');
+
+  /** Todo archivo de skill o comando que invoque este validador. */
+  function llamadores() {
+    const out = [];
+    const dirs = [];
+    if (fs.existsSync(COMANDOS)) {
+      for (const f of fs.readdirSync(COMANDOS).filter((x) => x.endsWith('.md'))) {
+        dirs.push(path.join(COMANDOS, f));
+      }
+    }
+    if (fs.existsSync(SKILLS)) {
+      for (const d of fs.readdirSync(SKILLS)) {
+        const s = path.join(SKILLS, d, 'SKILL.md');
+        if (fs.existsSync(s)) dirs.push(s);
+      }
+    }
+    for (const f of dirs) {
+      const txt = fs.readFileSync(f, 'utf-8');
+      if (txt.includes('validate-file-contains.js')) out.push({ f, txt });
+    }
+    return out;
+  }
+
+  const TODOS = llamadores();
+
+  test('hay más de un llamador: el patrón dejó de usarse una sola vez', () => {
+    assert.ok(TODOS.length >= 3,
+      `solo ${TODOS.length} llamador(es); HUE-028 se cerró cableando /spec-new y /fix-new`);
+  });
+
+  for (const { f, txt } of TODOS) {
+    const nombre = path.basename(path.dirname(f)) === 'commands'
+      ? path.basename(f) : `${path.basename(path.dirname(f))}/SKILL.md`;
+
+    test(`${nombre} pasa --directory y al menos un --contains`, () => {
+      // Sin cualquiera de los dos el validador sale 0 sin mirar nada: mal
+      // configurado = no validar, para que un validador roto no frene al agente.
+      // Es la política correcta y por eso mismo el error es silencioso.
+      assert.match(txt, /--directory\s+\S+/, 'sin --directory no valida nada');
+      assert.match(txt, /--contains\s+"/, 'sin --contains tampoco');
+    });
+
+    test(`${nombre} usa --recursive si apunta a specs/`, () => {
+      // `specs/` nunca tiene el artefacto en su raíz: los tracks viven en
+      // specs/{specs,fixes,hotfixes}/<id>/. Apuntar ahí sin recursión produce
+      // el peor mensaje posible — «crealo» sobre un archivo que ya está.
+      if (!/--directory\s+specs\b/.test(txt)) return;
+      assert.match(txt, /--recursive/, `${nombre} apunta a specs/ sin --recursive`);
+    });
+  }
+});

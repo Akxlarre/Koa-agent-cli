@@ -12,8 +12,9 @@ allowed-tools: Read, Write, Bash, Glob
    - Si está vacío → error "No hay fix track activo. Nada que cerrar."
    - Si el ID NO empieza con `fix-` → error "El activo es una spec, no un fix. Usa /spec-verify para cerrarla."
 
-2. Leer `specs/<id>/fix.md`:
-   - Si no existe → error "fix.md no encontrado en specs/<id>/. El fix track está corrupto."
+2. Leer `specs/fixes/<id>/fix.md`:
+   - Si no existe, probar `specs/<id>/fix.md` (ruta legacy pre-migración, igual que `/hotfix-close`)
+   - Si tampoco existe → error "fix.md no encontrado en specs/fixes/<id>/. El fix track está corrupto."
 
 3. Verificar el test de regresión:
    - Leer la sección "Test de Regresión" del fix.md
@@ -54,7 +55,7 @@ allowed-tools: Read, Write, Bash, Glob
    ✅ Fix <id> cerrado.
    
    Resumen:
-     - specs/<id>/fix.md → status: done
+     - specs/fixes/<id>/fix.md → status: done
      - specs/.active → vacío
    
    El spec-gate volverá a bloquear escrituras en código de producto.

@@ -2,6 +2,19 @@
 description: Crear una nueva spec SDD (Spec-Driven Development) con scaffold completo
 argument-hint: "<título del feature>"
 allowed-tools: Read, Write, Bash, Glob
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory specs
+            --pattern "spec.md"
+            --recursive
+            --max-age 60
+            --contains "## 2. User Stories"
+            --contains "## 3. Acceptance Criteria"
+            --contains "## 4. Out of scope"
 ---
 
 # /spec-new — Crear nueva spec SDD

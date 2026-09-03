@@ -271,13 +271,16 @@ describe('El README no promete un producto distinto del que hay', () => {
   const cuenta = (d, f) => fs.readdirSync(path.join(RAIZ, d)).filter(f).length;
   const md = (f) => f.endsWith('.md');
 
+  // El badge de versión ya no es un número escrito a mano —así llegó a decir
+  // v6.9.1 con el blueprint en 7.2.0—: lo lee el registry de npm en vivo. Un
+  // badge que se actualiza solo no puede mentir, así que acá no hay nada que
+  // contrastar; lo que se verifica es que ESTÉ, más abajo.
   const AFIRMACIONES = [
-    ['badge del blueprint', /Blueprint-v([\d.]+)-/, () => pkg.version],
     ['subagentes', /# (\d+) subagents with their own/,
       () => String(cuenta('templates/.claude/agents', md))],
     ['reglas', /# (\d+) path-scoped rules/,
       () => String(cuenta('templates/.claude/rules', md))],
-    ['skills', /# (\d+) reusable agent skills/,
+    ['skills', /# (\d+) agent skills/,
       () => String(fs.readdirSync(path.join(RAIZ, 'templates/.claude/skills'))
         .filter((d) => fs.existsSync(path.join(RAIZ, 'templates/.claude/skills', d, 'SKILL.md'))).length)],
     ['índices', /# (\d+) living indexes/,
@@ -291,6 +294,77 @@ describe('El README no promete un producto distinto del que hay', () => {
       assert.equal(m[1], real(), `el README dice ${m[1]} y son ${real()}`);
     });
   }
+
+  // ── Los patrones que la investigación de READMEs 2026 da por estándar ────
+  //
+  // Medidos sobre la versión anterior, que había crecido por acumulación:
+  //
+  //   primer comando ejecutable   palabra 274   (el estándar: dentro de las 200)
+  //   tabla de contenidos         no había      (requerida arriba de 100 líneas)
+  //   descripción corta           130 chars     (el estándar: menos de 120)
+  //   badges                      5, uno vanity, y sin CI ni versión de npm
+  //
+  // La conclusión que más pesa de esa investigación no es de forma: un README no
+  // se juzga por lo cuidado que se escribió el día uno, sino por seguir siendo
+  // cierto el día doscientos. Por eso esto se verifica y no se revisa.
+
+  test('el primer comando ejecutable está arriba de todo', () => {
+    // El lector decide en la primera pantalla. Enterrar el comando bajo tres
+    // párrafos de propuesta de valor es la forma más común de perderlo.
+    const hasta = txt.slice(0, txt.indexOf(`npx ${pkg.name}`)).split(/\s+/).length;
+    assert.ok(hasta <= 200, `el primer comando aparece en la palabra ${hasta}`);
+  });
+
+  test('tiene tabla de contenidos: pasa las 100 líneas', () => {
+    if (txt.split('\n').length <= 100) return;
+    assert.match(txt, /^## Table of Contents/m);
+  });
+
+  test('todas las anclas de la ToC tienen destino', () => {
+    // Un link roto en la ToC es el primer clic que da el lector.
+    const slug = (h) => h.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim().replace(/ /g, '-');
+    const headings = [...txt.matchAll(/^## (.+)$/gm)].map((m) => slug(m[1]));
+    const anclas = [...txt.matchAll(/\]\(#([a-z0-9-]+)\)/g)].map((m) => m[1]);
+    assert.deepEqual(anclas.filter((a) => !headings.includes(a)), []);
+  });
+
+  test('ningún link relativo está roto', () => {
+    const links = [...new Set([...txt.matchAll(/\]\((\.\/[^)#]+)\)/g)].map((m) => m[1]))];
+    assert.ok(links.length >= 4, `solo ${links.length} links: ¿cambió el formato?`);
+    assert.deepEqual(links.filter((l) => !fs.existsSync(path.join(RAIZ, l))), []);
+  });
+
+  test('la descripción de npm es corta y es la misma que el tagline', () => {
+    // npm y GitHub muestran la descripción del package.json; el README muestra
+    // la suya. Que digan cosas distintas es la primera incoherencia que se ve.
+    assert.ok(pkg.description.length < 120, `${pkg.description.length} chars`);
+    assert.ok(txt.includes(pkg.description), 'el README no abre con la descripción de npm');
+  });
+
+  test('los badges dicen algo real', () => {
+    // Estado de build y versión publicada son verificables; una fila de badges
+    // decorativos es ruido que además envejece.
+    assert.match(txt, /actions\/workflows\/ci\.yml\/badge\.svg/, 'falta el badge de CI');
+    assert.match(txt, /img\.shields\.io\/npm\/v\//, 'falta el badge de versión de npm');
+  });
+
+  test('los `npm run` que cita existen de un lado o del otro', () => {
+    // El README habla de dos superficies: los scripts de ESTE repo y los que el
+    // scaffolder escribe en el proyecto generado. Un comando que no está en
+    // ninguna es una promesa que el lector no puede cumplir.
+    const propios = Object.keys(pkg.scripts);
+    const scaffolder = fs.readFileSync(path.join(RAIZ, 'lib', 'scaffolder.js'), 'utf-8');
+    const citados = [...new Set([...txt.matchAll(/npm run ([\w:]+)/g)].map((m) => m[1]))];
+    assert.ok(citados.length >= 5, `solo ${citados.length} comandos citados`);
+    const fantasmas = citados.filter((c) => !propios.includes(c) && !scaffolder.includes(`'${c}'`));
+    assert.deepEqual(fantasmas, []);
+  });
+
+  test('License es la última sección', () => {
+    // Standard Readme lo pide, y es donde el lector la busca.
+    const h2 = [...txt.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
+    assert.equal(h2[h2.length - 1], 'License');
+  });
 
   test('el Quick Start manda correr el paquete que existe', () => {
     // `npx <otro-nombre>` instala otro paquete, o ninguno.

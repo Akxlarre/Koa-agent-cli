@@ -1,8 +1,21 @@
 {
-  "name": "koa-agent-cli",
-  "version": "1.0.0",
+  "name": "create-koa-agent",
+  "version": "7.2.0",
   "description": "Scaffold Angular projects that are native to AI agents — agentic harness, real-time guardrails, and living indexes out of the box.",
   "main": "index.js",
+  "bin": {
+    "create-koa-agent": "./bin/index.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "npm run test:cli && npm run test:hooks && npm run test:guardrails && npm run test:provocacion",
     "test:cli": "node --test test/*.test.mjs",
@@ -30,13 +43,6 @@
     "chalk": "^5.6.2",
     "inquirer": "^13.3.0",
     "ora": "^9.3.0"
-  },
-  "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
-  "bin": {
-    "create-koa-agent": "./bin/index.js"
   },
   "devDependencies": {
     "typescript": "^5.9.0"

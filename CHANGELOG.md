@@ -6,6 +6,95 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [7.2.0] — 2026-09-03
+
+La versión de la auditoría. 91 hallazgos registrados y cerrados sobre las 102 unidades
+del harness y del generador, con una regla de método: **cada arreglo se midió antes y
+después, y cada mecanismo se puso delante de su propia violación.** Una regla que no
+dispara ante lo que prohíbe es decoración.
+
+También es la primera versión que se publica en npm, como `create-koa-agent`.
+
+### Lo que más importa si ya tenés un proyecto generado
+
+**Los chequeos ahora se prueban a sí mismos.** `npm run lint:arch:provocar` arma un
+sandbox por regla con el archivo mínimo que la viola y exige que el linter la nombre:
+**28 de 28**, con el baseline vacío. `npm run smoke:scripts` hace lo mismo con los
+scripts de `package.json` — les mete un defecto y exige que se den cuenta. Los dos
+nacieron de tres bugs reales que vivieron meses: un `tsc` que compilaba cero archivos y
+salía 0, un `node --test` sobre tests de Deno que fallaba siempre, y `ARCH-26` escrita,
+testeada y sin cablear.
+
+**Cada regla dice ahora si te frena o solo te pide.** Las 16 de `.claude/rules/` declaran
+`enforcement: mecanizada` (con los códigos que la respaldan: `ARCH-01`, `A11Y-03`…) o
+`enforcement: social`. Son **8 y 8**. Dos que se leían como acuerdos estaban mecanizadas
+sin decirlo, así que un agente bloqueado con `[ARCH-12]` no tenía cómo llegar a la regla
+que se lo explica.
+
+**`docs/CONTRATOS.md`**, nuevo y generado: los 21 artefactos compartidos del harness —qué
+pieza escribe cada uno, quién lo lee, cuándo se borra—. Antes eso vivía solo del lado del
+CLI, así que un agente trabajando en tu proyecto no tenía forma de enterarse de que
+`sync-check` borra el archivo del que depende `spec-diff-check`.
+
+**Un segundo juez.** `security-judge` audita escalada de privilegios, RLS evadible y fuga
+de datos — el fallo que pasa limpio por los checks deterministas. `/review` dispara por
+**riesgo**, no por conteo de archivos: 🟢 estilos y docs no corren nada, 🟡 lógica corre
+`code-judge`, 🔴 `supabase/migrations/`, auth o guards corren **los dos en paralelo y
+manda el peor veredicto**. Y a los jueces se los mide: `.claude/evals/` trae 7 fixtures
+con verdad de campo y `/eval-jueces` reporta recall y falsos positivos.
+
+### Correcciones que cambian comportamiento
+
+- **El Discovery Gate ya no se conforma con que el flag exista.** Exige una lectura de
+  `indices/`. Abrir `context/brief.md` levantaba un bloqueo cuyo texto dice, literal,
+  «lee los índices del proyecto».
+- **El estado por sesión sale del payload de stdin.** `CLAUDE_SESSION_ID` no existe: todo
+  vivía bajo la clave `'default'` en `$TMPDIR`, así que una lectura en un proyecto
+  levantaba el Gate de otro.
+- **`ARCH-09` mide el cuerpo de la clase, no el `@Component`.** Con template inline
+  contaba HTML y lo llamaba «clase demasiado grande». `section-hero` pasó de 1.170 a 198
+  líneas reales y `tabs` dejó de ser falso positivo.
+- **`/fix-new` crea el track en `specs/fixes/<id>/`**, no en `specs/<id>/`. Enumeraba los
+  IDs en un lado y creaba en otro: reutilizaba `fix-001` y producía lo que
+  `assignments-audit.js` declara violación de naming.
+- **`ARCH-07` no toca `src/styles/`.** La capa de motion del design system —view
+  transitions, overrides de PrimeNG— tiene `@keyframes` curados a propósito.
+- **El linter avisa cuándo NO pudo correr.** Sin el paquete `typescript` sale en 1 con el
+  mensaje de qué falta, en vez de morir con un `TypeError` o —peor— reportar 28 reglas
+  muertas que están vivas.
+
+### Para el que trabaja sobre este repositorio
+
+- **CI en GitHub Actions**, Node 20 y 22, corriendo las **cuatro** suites. Corría dos, y
+  las dos que faltaban son justamente las que estuvieron en rojo tres tandas sin que
+  nadie se enterara.
+- `npm test` encadena las cuatro: `test:cli`, `test:hooks`, `test:guardrails`,
+  `test:provocacion`. Más `test:integracion`, que corre `ng new` de verdad y le pasa el
+  linter encima al proyecto generado.
+- El paquete declara `files`: se publicaban 474 archivos y 2,9 MB, con los 38 de
+  `docs/auditoria/` adentro.
+- La versión del paquete y `BLUEPRINT_VERSION` se mueven juntas, con un test que lo
+  verifica. Estaban en `1.0.0` y `7.1.0`, sin relación declarada.
+
+### Migración
+
+Ninguna acción obligatoria. Un proyecto generado con 7.1.0 sigue funcionando.
+
+Para adoptar lo nuevo, volvé a correr el CLI en modo **Inject Only** sobre tu proyecto:
+respeta lo que ya escribiste (`context/`, `indices/` y tu código quedan intactos) y
+actualiza el harness. Después:
+
+```bash
+npm run contracts:doc        # genera docs/CONTRATOS.md desde el registro
+npm run lint:arch:provocar   # confirma que las 28 reglas disparan en TU proyecto
+npm run smoke:scripts        # confirma que tus scripts pueden fallar
+```
+
+Si tenés fix tracks abiertos en `specs/<id>/fix.md`, `/fix-close` sigue leyendo esa ruta
+como fallback; los nuevos van a `specs/fixes/<id>/`.
+
+---
+
 ## [7.1.0] — 2026-08-29
 
 Continúa donde quedó 6.9.0. Aquel cierre puso guardrails deterministas sobre RLS

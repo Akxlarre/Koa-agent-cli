@@ -6,7 +6,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?style=flat-square&logo=nodedotjs)](https://nodejs.org)
 [![Angular](https://img.shields.io/badge/Angular-v20%2B-dd0031?style=flat-square&logo=angular)](https://angular.dev)
-[![Blueprint](https://img.shields.io/badge/Blueprint-v6.9.1-6366f1?style=flat-square)](./CHANGELOG.md)
+[![Blueprint](https://img.shields.io/badge/Blueprint-v7.2.0-6366f1?style=flat-square)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](./CONTRIBUTING.md)
 
@@ -30,10 +30,7 @@ This harness was not designed on a whiteboard. It was **extracted from a product
 
 ## Quick Start
 
-> **Note:** Not yet published to npm. Until then, [run it from source](#running-from-source).
-
 ```bash
-# Once published:
 npx create-koa-agent my-app
 cd my-app
 ng serve
@@ -60,14 +57,15 @@ my-app/
 │   ├── CLAUDE.md          # Agent directive: stack, rules, workflow
 │   ├── hooks/             # Real-time guardrails (table below)
 │   │   └── validators/    # Generic, flag-driven structure validators
-│   ├── agents/            # 5 subagents with their own context windows
-│   ├── rules/             # 14 path-scoped architectural rules
-│   ├── skills/            # 8 reusable agent skills (/plan, /review, …)
+│   ├── agents/            # 6 subagents with their own context windows
+│   ├── rules/             # 16 path-scoped rules — 8 mechanized, 8 social
+│   ├── skills/            # 16 reusable agent skills (/plan, /review, …)
+│   ├── evals/             # Fixtures with ground truth, to measure the judges
 │   └── tests/             # Unit tests for the hooks themselves
 │
 ├── context/               # Semantic seed: session brief, domain glossary,
 │                          # constraints, decision log
-├── indices/               # 11 living indexes — the agent's memory
+├── indices/               # 15 living indexes — the agent's memory
 │   ├── COMPONENTS.md      # Every component in the project
 │   ├── FACADES.md         # Every facade + its exposed signals
 │   ├── DATABASE.md        # Tables, FKs, RLS policies
@@ -121,6 +119,35 @@ Two of these fire only when the agent is heading somewhere it shouldn't:
   is the agent's job; applying it against a real database is not.
 
 The hooks ship with their own unit tests (`npm run claude:test-hooks`) — the harness is code, and it's tested like code.
+
+### The checks that check themselves
+
+A check that exits 0 without looking at anything is **worse than not having it**: the
+missing one gets noticed, the decorative one gives you the feeling of being protected,
+and that feeling is why nobody looks again.
+
+Two commands ask the question no CI asks — not *do the checks pass*, but *can they fail*:
+
+```bash
+npm run lint:arch:provocar   # builds a sandbox per rule with the minimal file that
+                             # violates it, and demands the linter name it. 28 of 28.
+npm run smoke:scripts        # injects a real defect into your code and demands each
+                             # script notice. Restores it in a `finally`, always.
+```
+
+They exist because of three real bugs that lived for months in the codebase this harness
+was extracted from: a `tsc --noEmit -p tsconfig.json` that compiled **zero files** and
+exited 0 (the Angular CLI's root tsconfig is solution-style); a `node --test` pointed at
+Deno tests, which failed every single run and read like "there are broken tests"; and an
+architecture rule that was written, unit-tested, and **never wired to a caller** — it
+audited exactly nothing.
+
+Each rule also declares in its frontmatter whether a mechanism backs it
+(`enforcement: mecanizada  # ARCH-01, ARCH-02…`) or whether it's a project agreement
+nothing enforces (`enforcement: social`). It's **8 and 8**, and a test derives the truth
+from which code each mechanism actually emits — so the label can't lie. Believing
+something stops you when nothing does costs as much as being blocked by `[ARCH-12]` and
+having no way to reach the rule that explains it.
 
 ### Discovery Gate in action
 
@@ -204,6 +231,19 @@ returns a summary instead of dumping files into the main conversation:
 | `index-syncer` | Reconciles `indices/*.md` against the real code | fast |
 | `supabase-schema` | Real tables, FKs and RLS policies from the migrations | fast |
 | `code-judge` | Per-criterion verdict against the project's rubric | reasoning |
+| `security-judge` | Privilege escalation, bypassable RLS, data leakage — the failure that passes the deterministic checks | reasoning |
+
+`/review` triggers on **risk**, not on file count: 🟢 styles and docs run nothing,
+🟡 component logic, facades and services run `code-judge`, and 🔴 `supabase/migrations/`,
+auth or guards run **both judges in parallel — worst verdict wins**. A security
+`RECHAZADO` is not offset by an architectural `APROBADO`: well-layered code doesn't make
+an open policy safe. One line in an RLS policy is more dangerous than five SCSS files.
+
+**And the judges are measured.** `.claude/evals/` ships 7 fixtures with ground truth in
+their frontmatter — 4 vulnerable, 3 clean controls — and `/eval-jueces` reports recall,
+false positives and per-criterion precision. Run it after editing a judge's prompt,
+before trusting its verdict. You can't verify the quality of a summary; you *can* verify
+whether the judge detects what its rubric promises.
 
 `/review` invokes `code-judge` against a fixed rubric — the `ARCH-*` codes, the
 path-scoped rules, and `indices/ANTI-PATTERNS.md`. It runs on a stronger model than the
@@ -334,6 +374,9 @@ npm run claude:sync         # Ask the agent to sync the living indexes
 npm run claude:fix          # Run ng lint, auto-fix errors
 npm run claude:tdd          # Run tests, auto-fix failures until green
 npm run claude:test-hooks   # Unit-test the harness hooks themselves
+npm run lint:arch:provocar  # Does every rule FIRE against its own violation?
+npm run smoke:scripts       # Can every package.json script actually fail?
+npm run contracts:doc       # Regenerate docs/CONTRATOS.md from the registry
 npm run supabase:start      # Local Supabase (plus stop / reset / diff / types)
 ```
 

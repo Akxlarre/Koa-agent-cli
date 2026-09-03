@@ -204,3 +204,101 @@ describe('El mapa de funcionalidades no inventa números', () => {
     });
   }
 });
+
+// ─── El paquete que se publica ──────────────────────────────────────────────
+//
+// Dos números de versión convivieron sin relación declarada: `package.json` en
+// `1.0.0` y `BLUEPRINT_VERSION` en `7.1.0`. El segundo es el que el usuario ve
+// escrito en su `CLAUDE.md` y en su `blueprint.json`; el primero es el que npm
+// resuelve. Que uno avance y el otro no vuelve imposible saber qué blueprint
+// trae una instalación.
+//
+// Y `npm publish` sin campo `files` reparte todo lo que no esté gitignoreado:
+// medido antes de arreglarlo, 474 archivos y 2,9 MB, con los 38 de
+// `docs/auditoria/` adentro. Quien corre `npx create-koa-agent` se bajaba el
+// registro de la auditoría.
+describe('El paquete publicable', () => {
+  const pkg = require(path.join(RAIZ, 'package.json'));
+
+  test('el binario es el nombre del paquete: `npx create-koa-agent` funciona', () => {
+    // Si el paquete se llama distinto del comando, `npx <comando>` busca otro
+    // paquete —o ninguno— y el Quick Start del README no se puede seguir.
+    assert.ok(pkg.bin[pkg.name], `el paquete es ${pkg.name} y sus bin son ${Object.keys(pkg.bin)}`);
+  });
+
+  test('la versión del paquete y la del blueprint son la misma', () => {
+    const cfg = fs.readFileSync(path.join(RAIZ, 'lib', 'config.js'), 'utf-8');
+    const blueprint = /BLUEPRINT_VERSION\s*=\s*'([^']+)'/.exec(cfg)?.[1];
+    assert.equal(pkg.version, blueprint,
+      'se mueven juntas: el blueprint es lo que el usuario ve, la del paquete es lo que npm resuelve');
+  });
+
+  test('declara `files`: sin eso se publica el repositorio entero', () => {
+    assert.ok(Array.isArray(pkg.files) && pkg.files.length > 0);
+    for (const necesario of ['bin/', 'lib/', 'templates/']) {
+      assert.ok(pkg.files.includes(necesario), `falta ${necesario} en files`);
+    }
+  });
+
+  test('y no reparte la auditoría ni los tests del repo', () => {
+    // El campo es una whitelist, así que esto no puede fallar por olvido — pero
+    // sí si alguien agrega `docs/` o `test/` creyendo que hacen falta.
+    for (const fuera of ['docs/', 'test/', 'indices/', '.github/', 'docs/auditoria/']) {
+      assert.ok(!pkg.files.includes(fuera), `${fuera} no va al paquete`);
+    }
+  });
+
+  test('el CHANGELOG documenta la versión que se va a publicar', () => {
+    // Publicar una versión que el CHANGELOG no menciona deja al usuario sin
+    // forma de saber qué cambió — y es el paso que más fácil se saltea.
+    const log = fs.readFileSync(path.join(RAIZ, 'CHANGELOG.md'), 'utf-8');
+    assert.ok(log.includes(`[${pkg.version}]`),
+      `CHANGELOG.md no tiene entrada para ${pkg.version}`);
+  });
+});
+
+// ─── El README es la portada en npm ─────────────────────────────────────────
+//
+// Es lo que ve quien llega sin saber nada, y el documento que más caro cuesta
+// tener viejo: el badge decía v6.9.1 con el blueprint en 7.2.0, el árbol
+// prometía «14 rules» y «8 skills» cuando son 16 y 16, y el Quick Start seguía
+// diciendo «Not yet published to npm».
+describe('El README no promete un producto distinto del que hay', () => {
+  const README = path.join(RAIZ, 'README.md');
+  const txt = fs.readFileSync(README, 'utf-8');
+  const pkg = require(path.join(RAIZ, 'package.json'));
+
+  const cuenta = (d, f) => fs.readdirSync(path.join(RAIZ, d)).filter(f).length;
+  const md = (f) => f.endsWith('.md');
+
+  const AFIRMACIONES = [
+    ['badge del blueprint', /Blueprint-v([\d.]+)-/, () => pkg.version],
+    ['subagentes', /# (\d+) subagents with their own/,
+      () => String(cuenta('templates/.claude/agents', md))],
+    ['reglas', /# (\d+) path-scoped rules/,
+      () => String(cuenta('templates/.claude/rules', md))],
+    ['skills', /# (\d+) reusable agent skills/,
+      () => String(fs.readdirSync(path.join(RAIZ, 'templates/.claude/skills'))
+        .filter((d) => fs.existsSync(path.join(RAIZ, 'templates/.claude/skills', d, 'SKILL.md'))).length)],
+    ['índices', /# (\d+) living indexes/,
+      () => String(cuenta('templates/indices', md))],
+  ];
+
+  for (const [etiqueta, re, real] of AFIRMACIONES) {
+    test(`${etiqueta}: coincide con lo que hay`, () => {
+      const m = re.exec(txt);
+      assert.ok(m, `no se encontró la afirmación de ${etiqueta}: ¿cambió la redacción?`);
+      assert.equal(m[1], real(), `el README dice ${m[1]} y son ${real()}`);
+    });
+  }
+
+  test('el Quick Start manda correr el paquete que existe', () => {
+    // `npx <otro-nombre>` instala otro paquete, o ninguno.
+    assert.match(txt, new RegExp(`npx ${pkg.name}\\b`),
+      `el README no manda correr \`npx ${pkg.name}\``);
+  });
+
+  test('y no sigue diciendo que no está publicado', () => {
+    assert.ok(!/Not yet published/i.test(txt));
+  });
+});

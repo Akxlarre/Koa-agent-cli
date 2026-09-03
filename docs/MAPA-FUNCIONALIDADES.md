@@ -68,7 +68,7 @@ existe para convertir *guidelines* en *guardrails*.
 > Los booleanos de *desactivación* usan AND, los de *activación* usan OR.
 > Solo se leen claves de una allowlist — nunca se hace spread del objeto crudo.
 
-## 1.2 Los 8 módulos y su responsabilidad única
+## 1.2 Los 9 módulos y su responsabilidad única
 
 ```
 bin/index.js ─────────────── orquesta. Sin lógica de negocio.
@@ -81,11 +81,14 @@ bin/index.js ─────────────── orquesta. Sin lógica
    ├─▶ lib/scaffolder.js ─── SOLO filesystem: copiar, parchear, blueprint.json
    ├─▶ lib/generator.js ──── subcomando `generate feature`
    │        └─▶ lib/feature-templates.js ── 11 plantillas de código (strings puros)
+   ├─▶ lib/prompts.js ────── SOLO inquirer y los modos de TEST_MODE. Sin FS ni spawn.
    └─▶ lib/ui.js ─────────── SOLO chalk. Banner + próximos pasos.
 ```
 
 **Reglas de frontera** (`.claude/rules/cli-architecture.md`): scaffolder nunca ejecuta npm;
-installer nunca copia archivos; ui nunca toca el FS; preflight nunca instala nada.
+installer nunca copia archivos; ui nunca toca el FS; preflight nunca instala nada. Y
+`bin/index.js` tiene techo de ~150 líneas: `INC-011` sacó los prompts a `lib/prompts.js`
+(169 → 122) y un test lo sostiene, porque un techo que nadie mide se pasa solo.
 
 ## 1.3 El flujo de un Full Scaffold
 
@@ -215,16 +218,31 @@ AP-001→006 los bloquea el Architect Guard, AP-007→012 solo los ve `code-judg
 | `learnings.md` | Insights validados por el humano | `context-guardian.js` (avisa a los 14 días) |
 | `decisions/` | ADRs (`TEMPLATE.md` para copiar) | lectura bajo demanda |
 
-## 2.2 Capa 2 — Las 15 reglas path-scoped
+## 2.2 Capa 2 — Las 16 reglas path-scoped
 
 Se inyectan automáticamente **solo cuando el archivo editado coincide** con su frontmatter
 `paths:`. No cargan todas al inicio — eso es lo que las hace baratas.
+
+**Y no todas frenan igual.** Cada una lo declara en su frontmatter (`enforcement:`), y la
+partición medida es **8 y 8**:
+
+| | Qué significa |
+|---|---|
+| `mecanizada` | Un hook o el linter la bloquea. El frontmatter nombra los códigos (`ARCH-01`, `A11Y-03`…), así que quien sea bloqueado con uno puede llegar a la regla que lo explica |
+| `social` | **Nada la bloquea.** Es un acuerdo: si se rompe, no hay guardrail que avise |
+
+Saberlo importa en las dos direcciones (`HUE-027`): creer que algo te frena cuando no te
+frena nada cuesta tanto como no encontrar la explicación de lo que sí te frenó. Dos de
+las «sociales» estaban en realidad mecanizadas y no lo decían — `architecture.md`
+describía `ARCH-01`, `ARCH-02` y `ARCH-12` en prosa sin nombrarlos. Un test deriva la
+verdad de quién emite cada código, así que la etiqueta no puede mentir.
 
 | Al editar… | Reglas que se activan |
 |---|---|
 | `src/app/**/*.ts` + `.html` | `architecture`, `facades`, `swr-pattern`, `testing-tdd`, `state-management` |
 | `core/models/**`, `core/facades/**` | `models`, `facades` |
 | `shared/**`, `features/**` | `component-selection`, `screen-contract` |
+| `features/**`, `layout/**` (patrones) | `visual-patterns` |
 | `**/*.html`, `styles/**` | `visual-system`, `visual-tokens`, `ai-readability`, `a11y-spec` |
 | `features/**`, `layout/**` | `notifications`, `layout-blueprints` |
 | `supabase/**`, `core/services/**` | `database` |
@@ -373,17 +391,49 @@ naming, colisiones, refs colgantes y filas stale — sin escribir nada.
 | `smoke-scripts.mjs` | Lo mismo para los scripts de `package.json`: mete un defecto a propósito y exige que el script se dé cuenta. Restaura siempre en el `finally` | al cerrar sesión |
 | `verificar-specs.mjs` | Integridad de enlaces entre specs (las dos puntas existen) | `npm run lint:specs` |
 | `set-env.js` | Inyecta creds en `environment.prod.ts` desde el entorno; falla si faltan | CI/CD |
+| `contracts-doc.js` | Genera `docs/CONTRATOS.md` desde `hooks/lib/contracts.js`. Con `--check` falla si quedó viejo | `npm run contracts:doc` |
 
-> **El namespace de códigos está repartido en tres superficies**, sin registro único:
-> `architect.js` (ARCH-01…11, 15…19, 21…26 · A11Y-03 · SEC-RLS-01/02/03, sobre AST),
-> `scripts/lib/a11y-guardrails.js` (ARCH-20) y `.claude/hooks/pre-write-guard.js`
-> (ARCH-12, ARCH-13 · A11Y-01, A11Y-02 · LLM-01, LLM-02, por regex en cada escritura).
-> No hay hueco de numeración; la única regla documentada sin implementación es `ARCH-14`.
-> Ver `docs/auditoria/HALLAZGOS.md` → `INC-001`.
+> **El namespace de códigos está repartido en dos superficies.** Medido: el linter emite
+> **28** códigos sobre el AST (`ARCH-01…11`, `15…19`, `21…26`, más `A11Y-03`, `ICON-01`,
+> `NAV-01` y `SEC-RLS-01/02/03`); `pre-write-guard.js` emite **20** por regex en cada
+> escritura (`ARCH-12`, `ARCH-13`, `ARCH-27`, `ARCH-28`, `A11Y-01/02`, `LLM-01/02`,
+> `SEC-ENV-01`, `SQL-01`, y los que comparte con el linter). `lib/guard-rules.js` es el
+> registro del guard, y `doc-links.test.js` cruza los códigos emitidos contra los
+> documentados **en las dos direcciones** — la inversa es la que faltaba y por eso vivió
+> `ARCH-14`, documentado y emitido por nadie. Hoy no queda ninguno: al agregar la segunda
+> dirección apareció además `A11Y-04`, un fantasma que la auditoría no tenía
+> (`INC-001`, `HUE-026`).
 
 > `provocar-reglas.mjs` y `smoke-scripts.mjs` son la respuesta a
 > `docs/CHEQUEOS-QUE-NO-CHEQUEAN.md`: el problema de los chequeos verdes que nunca
 > podrían haber salido rojos. `ARCH-24` y `ARCH-26` estuvieron muertas hasta que esto existió.
+> Hoy la provocación cubre **28 de 28** reglas y el baseline quedó vacío.
+
+### Las cuatro suites, y por qué son cuatro
+
+Correr sólo las dos primeras es cómo el trinquete de presupuesto de reglas estuvo en rojo
+tres tandas sin que nadie lo viera (`HUE-033`). Las dos últimas necesitan resolver
+`typescript`, así que corren en el layout de un proyecto generado, no desde este repo:
+
+```
+cd templates/.claude/tests && node --test *.test.js   # contrato de los hooks
+npm test                                              # el generador
+node --test scripts/lib/*.test.mjs                    # guardrails del linter
+node scripts/provocar-reglas.mjs                      # provocación de reglas
+```
+
+### Lo que se verifica del harness sobre sí mismo
+
+Tres mecanismos que no miran el código del usuario sino al propio harness:
+
+| Mecanismo | Qué sostiene |
+|---|---|
+| `hooks/lib/contracts.js` → `docs/CONTRATOS.md` | Los **21 artefactos compartidos**: qué pieza escribe cada uno, quién lo lee, cuándo se borra. Agregar un consumidor sin declararlo rompe el test. La copia viaja al proyecto generado, que antes no tenía cómo enterarse de que `sync-check` borra el archivo del que depende `spec-diff-check` (`ACO-013`) |
+| `hook-wiring.test.js` | Que el sistema **ejecute** lo que la suite prueba: hook en disco sin cablear, entrada muerta en `settings.json`, validador referenciado desde un frontmatter que no existe. Es `ARCH-26` aplicado a los hooks en vez de al linter (`HUE-025`) |
+| `agent-contracts.test.js` | Lo verificable de un subagente: el formato que promete, sus permisos, y que la prosa del harness no afirme garantías que el frontmatter no da (`HUE-023`, `INC-026`) |
+
+**Y hay una frontera declarada**: la calidad del resumen de un subagente no la verifica
+nada, ni la va a verificar. Lo que sí se sostiene es todo lo demás que se afirma de él.
 
 ## 2.6 Capa 6 — Runtime del proyecto generado
 

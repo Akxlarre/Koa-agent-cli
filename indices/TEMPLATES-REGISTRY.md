@@ -105,7 +105,7 @@
 | `sync-check.js` | Stop | Compara mtime de fuentes vs índices al cerrar sesión | session-writes.json |
 | `context-guardian.js` | Stop | Audita si `context/learnings.md` lleva >14d sin crecer. (La frescura del brief se auditó ya en SessionStart) | — |
 | `context-enrichment-guard.js` | — (**OPT-IN**, no cableado) | Day 0 Context Guard: bloquea escribir código si `context/domain.md` o `indices/DATABASE.md` siguen vacíos. No viene activo porque bloquearía un proyecto recién generado | `context/domain.md` |
-| `validators/validate-file-contains.js` | Invocado por skills | Validador genérico: `--directory`, `--pattern`, `--contains`, `--max-age`, `--require-file`. Lo usa `/plan` desde su frontmatter | — |
+| `validators/validate-file-contains.js` | Invocado desde frontmatter | Validador genérico: `--directory`, `--pattern`, `--contains`, `--max-age`, `--require-file`, `--recursive`. Lo usan `/plan`, `/spec-new` y `/fix-new`. `--recursive` (HUE-028) es lo que lo hace utilizable con los tracks SDD, que viven en `specs/**/<id>/` — un nombre que no existe hasta que el comando corre | — |
 | `post-edit.js` (scripts/) | PostToolUse (Edit/Write) | Corre Prettier automáticamente tras cada escritura | — |
 
 ## Skills en templates/.claude/skills/
@@ -166,7 +166,11 @@
 
 ## Contratos entre piezas
 
-Dos contratos se pueden romper sin que nada avise hasta que falla en producción:
+**La fuente es `templates/.claude/hooks/lib/contracts.js`**, que declara los 21 artefactos
+compartidos —qué pieza escribe cada uno, quién lo lee, cuándo se borra— y que
+`contracts.test.js` contrasta contra el filesystem. `docs/CONTRATOS.md` es la copia que
+viaja al proyecto generado y se genera con `npm run contracts:doc` (`ACO-013`). Lo de
+abajo es un resumen para orientarse; si difiere, **gana el registro**.
 
 **Task-spec** — lo comparten cinco piezas: la skill `/plan`, el hook de su frontmatter,
 `spec-reflection.js`, `prompt-context.js` y `compact-recovery.js`.
@@ -176,7 +180,83 @@ Dos contratos se pueden romper sin que nada avise hasta que falla en producción
 - Encabezados `##` exactos: `Objetivo`, `Artefactos afectados`, `Reglas que aplican`,
   `Pasos de ejecucion`, `Criterio de done`
 
-**Discovery flag** — `$TMPDIR/koa-discovery-{sessionId}.flag`. Lo escriben
-`discovery-tracker.js` y `session-start.js`; lo leen el Discovery Gate de
-`pre-write-guard.js` y `compact-recovery.js`. Cada línea debe seguir conteniendo
-`indices/NOMBRE.md`: `compact-recovery.js` parsea eso para decidir qué re-inyectar.
+**Discovery flag** — `.claude/temp/session/{sessionId}/discovery.flag`. Vivía en `$TMPDIR`
+bajo la clave `'default'` porque `CLAUDE_SESSION_ID` **no existe** (`HUE-002`): una lectura
+en un proyecto levantaba el Gate de otro. El `sessionId` sale hoy del payload de stdin,
+vía `lib/session.js`.
+
+Lo escriben `discovery-tracker.js` y `session-start.js`; lo leen el Discovery Gate de
+`pre-write-guard.js` y `compact-recovery.js`. **Los tres cortan la línea distinto**
+(`INC-006`) y conviene saberlo antes de tocar el formato:
+
+| Pieza | Qué hace con la línea |
+|---|---|
+| `discovery-tracker.js` | La escribe ante `indices/` **y** ante `context/` |
+| `pre-write-guard.js` | Exige una que contenga `indices/`. Leer sólo `context/` **no** abre el Gate |
+| `compact-recovery.js` | Parsea `indices/NOMBRE.md` para re-inyectar sólo los índices ya leídos |
+
+**Salida del linter** — `architect.js` escribe `[CÓDIGO]` entre corchetes cuando esa regla
+reportó algo, y **no** lo escribe cuando no reportó nada: por eso el resumen «Reglas
+validadas» lista los códigos pelados. De ahí cuelga `provocar-reglas.mjs` (`ACO-009`).
+
+**Nombres de los scripts de `package.json`** — `COMPROBACIONES`, en
+`boilerplate/scripts/lib/smoke-scripts.js`, indexa por nombre exacto, y esos nombres los
+escribe `lib/scaffolder.js` del otro lado de la dualidad. `test/smoke-comprobaciones.test.mjs`
+es el único lugar donde los dos contextos se miran (`ACO-010`).
+
+## Núcleo compartido — `templates/.claude/hooks/lib/`
+
+CommonJS, sin estado, importado por los hooks. Cada módulo tiene su `.test.js` en
+`.claude/tests/`.
+
+| Módulo | Qué posee |
+|---|---|
+| `payload.js` | Leer el stdin del hook. Único punto donde se parsea la entrada (`ACO-012`) |
+| `session.js` | De dónde sale el `sessionId` y dónde vive el estado por sesión y por hilo (`HUE-002`, `DUP-004`) |
+| `paths.js` | Qué ruta pertenece a qué índice — incluidas las migraciones `supabase/migrations/**.sql` |
+| `indices.js` | Qué está declarado en un índice: `declarados()`, `normalizar()`, `registrado()` |
+| `contracts.js` | Los 21 artefactos compartidos. Fuente de `docs/CONTRATOS.md` |
+| `guard-rules.js` | Las reglas que emite `pre-write-guard`: qué detecta cada una, su doc y su fixture |
+| `lessons.js` | El formato de `LESSONS_LEARNED.md`. Sus dos productores viven en árboles distintos |
+| `budget.js` | Presupuesto de contexto de lo que se inyecta |
+| `blueprint.js` | Lectura del `blueprint.json` del proyecto |
+
+## Guardrails del proyecto generado — `templates/boilerplate/scripts/`
+
+Tres entradas y una capa de lógica pura. Los `.test.mjs` de `scripts/lib/` corren con
+`npm run lint:arch:test`; necesitan resolver `typescript`, así que corren en el layout de
+un proyecto generado, no desde este repo.
+
+| Entrada | Pregunta que responde |
+|---|---|
+| `architect.js` | ¿el código cumple las 28 reglas? (`npm run lint:arch`) |
+| `provocar-reglas.mjs` | ¿cada regla **dispara** ante su propia violación? (`lint:arch:provocar`) |
+| `smoke-scripts.mjs` | ¿cada script de `package.json` **puede fallar**? (`smoke:scripts`) |
+| `indices-sync.js`, `assignments-sync.js`, `assignments-audit.js`, `verificar-specs.mjs`, `check-bento-classes.js` | Sincronización y auditoría de índices, asignaciones y specs |
+
+`scripts/lib/` es la lógica pura que esas entradas orquestan —un módulo por familia de
+reglas (`a11y-guardrails`, `class-discipline`, `contrast-check`, `nav-integrity`,
+`sql-schema`, `theme-tokens`, `bento-fill-rows`, `icon-registry`, `spec-links`), más
+`rule-wiring` (¿toda regla registrada está cableada?), `provocacion` (fixtures y
+colateral), `smoke-scripts` (clasificación y veredictos), `rules-budget` (trinquete de
+tamaño de las reglas) y `typescript-guard` (los dos modos de fallar de `require('typescript')`).
+
+## Suite de contrato de los hooks — `templates/.claude/tests/`
+
+`node --test .claude/tests/*.test.js`, también como `npm run claude:test-hooks`. **Todo
+hook nuevo lleva su archivo de test**: `compact-recovery.js` estuvo con un error de
+sintaxis durante varias versiones, fallando en silencio en cada compactación, porque
+ningún test lo ejecutaba.
+
+Un test por hook y por módulo de `lib/`, más los transversales, que son los que fijan
+propiedades del harness entero en vez de una pieza:
+
+| Test transversal | Qué fija |
+|---|---|
+| `hook-wiring.test.js` | Que el sistema **ejecute** lo que la suite prueba: hooks cableados, entradas vivas, validadores que existen (`HUE-025`) |
+| `agent-contracts.test.js` | Lo verificable de un subagente: formato declarado, permisos, y que la prosa del harness no afirme garantías que el frontmatter no da (`HUE-023`, `INC-026`) |
+| `rules-enforcement.test.js` | Qué regla bloquea y cuál sólo pide, derivado de quién emite cada código (`HUE-027`, `HUE-029`) |
+| `indices-authority.test.js` | Quién puede escribir en `indices/` |
+| `contracts.test.js` | Los 21 artefactos declarados contra el filesystem |
+| `doc-links.test.js` | Regla emitida ↔ regla documentada, en las dos direcciones (`HUE-026`) |
+| `budget.test.js` | El presupuesto de contexto de lo que se inyecta |

@@ -179,6 +179,13 @@ describe('El mapa de funcionalidades no inventa números', () => {
     ['códigos del guard', /emite \*\*(\d+)\*\* por regex/,
       () => require('../templates/.claude/hooks/lib/guard-rules.js').ids().length],
     ['hooks de evento', /\((\d+) hooks, \d+ eventos\)/, hooksDeEvento],
+    ['subagentes', /Los (\d+) subagentes/,
+      () => cuenta('templates/.claude/agents', (f) => f.endsWith('.md'))],
+    ['skills', /### Las (\d+) skills/,
+      () => fs.readdirSync(path.join(RAIZ, 'templates/.claude/skills'))
+        .filter((d) => fs.existsSync(path.join(RAIZ, 'templates/.claude/skills', d, 'SKILL.md'))).length],
+    ['commands', /(\d+) commands ·/,
+      () => cuenta('templates/.claude/commands', (f) => f.endsWith('.md'))],
   ];
 
   test('el mapa existe y da números', () => {

@@ -40,6 +40,36 @@ const baseline = fs.existsSync(rutaBaseline)
   ? JSON.parse(fs.readFileSync(rutaBaseline, 'utf8')).sinFixture ?? []
   : [];
 
+// ── ¿El linter puede correr, antes de preguntar si sus reglas disparan? ─────
+//
+// INC-027. `architect.js` distingue con cuidado «no pude correr» de «tu código
+// está mal»: sin el paquete `typescript` sale en 1 diciendo exactamente eso, y
+// esa distinción es HUE-018. La provocación la tiraba a la basura — leía «exit
+// distinto de cero y ningún código nombrado» como «la regla no dispara», y
+// reportaba **las 28 mudas**.
+//
+// Falla ruidoso, así que no es un falso verde. Pero manda a arreglar 28 reglas
+// cuando lo que falta es un paquete: el mismo daño de INC-002, una alarma
+// correcta con el consejo equivocado. Y ahora corre en CI, donde quien lee el
+// log no es quien lo escribió.
+//
+// Un sandbox vacío no viola nada: en un linter sano sale 0. Si sale distinto y
+// no nombra ninguna regla, el que no arrancó es el linter.
+{
+  const vacio = fs.mkdtempSync(path.join(os.tmpdir(), 'provocar-salud-'));
+  const r = spawnSync(process.execPath, [architect], { cwd: vacio, encoding: 'utf8' });
+  fs.rmSync(vacio, { recursive: true, force: true });
+  const salida = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+
+  if (r.status !== 0 && codigosNombrados(salida).length === 0) {
+    console.error(`${c.rojo}✖ El linter no puede correr, así que no hay nada que provocar.${c.reset}`);
+    console.error(`${c.gris}   Esto NO significa que las reglas estén muertas: significa que`);
+    console.error(`   \`architect.js\` no llegó a auditar. Lo que dijo:${c.reset}\n`);
+    console.error(salida.trim());
+    process.exit(1);
+  }
+}
+
 console.log(`\n${c.cyan}🎯 Provocación de reglas — ¿cada una puede fallar?${c.reset}\n`);
 
 /**

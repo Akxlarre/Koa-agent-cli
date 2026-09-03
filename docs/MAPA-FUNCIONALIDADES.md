@@ -187,7 +187,7 @@ Lo que recibe el proyecto generado. Seis capas que se refuerzan entre sí.
 ┌─ CAPA 3 · GUARDRAILS (18 hooks, 9 eventos) ───────────────────────┐
 │  El único mecanismo que puede DECIR QUE NO. exit 2 = bloqueado.    │
 └────────────────────────────────────────────────────────────────────┘
-┌─ CAPA 4 · PROCEDIMIENTO (15 skills · 11 commands · 5 subagentes) ─┐
+┌─ CAPA 4 · PROCEDIMIENTO (16 skills · 12 commands · 6 subagentes) ─┐
 │  Cómo se hace cada cosa, y a quién se delega para no gastar contexto│
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CAPA 5 · VERIFICACIÓN DETERMINISTA (scripts/) ───────────────────┐
@@ -331,7 +331,7 @@ Inspirado en HarnessCompass (arXiv:2608.01918). Dos familias:
 
 ## 2.4 Capa 4 — Skills, comandos y subagentes
 
-### Los 5 subagentes (ventana de contexto propia)
+### Los 6 subagentes (ventana de contexto propia)
 
 | Subagente | Para qué existe | Modelo | Tools |
 |---|---|---|---|
@@ -340,12 +340,25 @@ Inspirado en HarnessCompass (arXiv:2608.01918). Dos familias:
 | `index-syncer` | Reconcilia `indices/*.md` con el código real (arregla lo que `sync-check` solo detecta) | haiku | Bash, Read, Edit, Write, Grep, Glob |
 | `supabase-schema` | Reconstruye el esquema real leyendo las migraciones en orden | haiku | Read, Grep, Glob, Bash |
 | `code-judge` | Veredicto de **diseño** contra la rúbrica — lo que ningún regex ve | **opus** | Read, Grep, Glob |
+| `security-judge` | Escalada de privilegios, RLS evadible, fuga de datos — el fallo que pasa limpio por los checks `SEC-RLS` | **opus** | Read, Grep, Glob |
 
-Dos decisiones deliberadas: el juez usa un modelo **más capaz** que el que genera el código
-(un evaluador que razona igual que el generador no ve sus errores), y `code-judge` **no tiene
-`Bash`** — con `Bash` podría escribir con `>` y "el juez no arregla nada" pasaría de hecho a promesa.
+Los dos jueces usan a propósito un modelo **más capaz** que el que genera el código: un
+evaluador que razona igual que el generador no ve sus errores. Y ninguno tiene `Bash` —
+con `Bash` podrían escribir con `>` y "el juez no arregla nada" pasaría de hecho a promesa.
 
-### Las 15 skills
+`/review` dispara por **riesgo**, no por conteo de archivos: 🟢 solo estilos o docs no corre
+ninguno; 🟡 lógica de componente, facade o servicio corre `code-judge`; 🔴 `supabase/migrations/`,
+auth o guards corre **los dos en paralelo, y manda el peor veredicto**. Un `RECHAZADO` de
+seguridad no lo compensa un `APROBADO` de arquitectura: que las capas estén bien no hace
+segura una policy abierta. Un diff 🔴 corre los dos aunque toque un solo archivo.
+
+**Y a los jueces se los mide.** `.claude/evals/` trae 7 fixtures con la verdad de campo en
+su frontmatter —4 vulnerables, 3 controles limpios— y la skill `/eval-jueces` reporta recall,
+falsos positivos y precisión de criterio. Es la mitad de `HUE-023` que sí se puede mecanizar:
+la calidad de un resumen no es verificable, pero **si el juez detecta lo que su rúbrica
+promete** sí lo es. Corre después de tocar el prompt de un juez, antes de confiar en él.
+
+### Las 16 skills
 
 | Grupo | Skills | Rol |
 |---|---|---|

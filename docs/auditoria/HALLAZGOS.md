@@ -94,6 +94,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | resuelto · las dos declaradas y mecanizadas: `comprobacionesHuerfanas()` contra los scripts que emite el scaffolder (test del lado A, único lugar donde los dos lados se ven), y el defecto declara su regla y la verifica contra `architect.js` |
 | `HUE-020` | **S1** | `G-02` | `parseJsonc` se come lo que siga a `//` dentro de un string: un `tsconfig.json` con `$schema` deja el proyecto sin path aliases y sin compilar | resuelto · `stripJsonComments` recorre respetando strings; el parche de `tsconfig` pasó a requerido |
 | `HUE-022` | **S1** | `G-10` | Los 9 parches son condicionales: si `ng new` cambia de forma no fallan, no hacen nada. Ningún test de integración corre `ng new` | resuelto · `patch()` con `requerido` (los tres archivos sin los que no hay proyecto paran el CLI) + `npm run test:integracion`, que corre `ng new` de verdad |
+| `INC-027` | S2 | `S-05` | La provocación reporta «28 reglas mudas» cuando el que no arrancó es el linter: tira la distinción que `HUE-018` construyó | resuelto · encontrado al poner las cuatro suites en CI. Corre el linter en un sandbox vacío primero: si sale distinto de 0 sin nombrar ninguna regla, el problema es el linter |
 | `HUE-034` | S2 | `S-02` | La tercera «deuda del método» que el pase declaró nunca se pagó: el camino de fallo de `lint-arch-wrapper` seguía verificado por lectura | resuelto · encontrado al revisar `PASE-GENERAL.md`. Es lo que `npm run lint:arch` invoca de verdad, y el **segundo** productor de un archivo cuyo otro productor reescribe una región entera |
 | `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | resuelto · medido, son **dos ejes en estados opuestos**: evasión ya estaba bien (79 asserts de bloqueo contra 68 de paso), ejecución no tenía ningún mecanismo. `hook-wiring.test.js` cubre el segundo en sus tres direcciones |
 | `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | resuelto · no hacía falta `npm install`, solo **un paquete**: se instala el `typescript` que el propio proyecto declara y el linter corre sobre la salida real de `ng new` |
@@ -1620,6 +1621,53 @@ Su primera versión resolvía `lessons.js` contra una sola profundidad y fallaba
 layout generado — `INC-024` otra vez, cometido por mí mientras cerraba `INC-024`. Resuelve
 contra los dos, y **falla** si no encuentra el módulo en ninguno: «no lo encontré» y
 «conviven bien» no pueden dar el mismo verde.
+
+**Estado:** resuelto
+
+---
+
+## INC-027 · La provocación culpa a las reglas cuando el que falla es el linter
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `S-05` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+`architect.js` distingue con cuidado «no pude correr» de «tu código está mal». Sin el
+paquete `typescript` sale en **1** con un mensaje que dice exactamente qué falta y cómo
+resolverlo — esa distinción es `HUE-018`, y se construyó a propósito.
+
+`provocar-reglas.mjs` la tiraba a la basura. Lee «exit distinto de cero y ningún código
+nombrado» como «la regla no dispara», así que sin `typescript` reporta:
+
+```
+🔇 ARCH-01 — NO dispara: la regla está registrada y no detecta nada
+🔇 ARCH-04 — NO dispara: la regla está registrada y no detecta nada
+   … las 28
+```
+
+**Por qué importa**
+
+Falla ruidoso —exit 1—, así que no es un falso verde. El daño es el consejo: manda a
+arreglar 28 reglas cuando lo que falta es **un paquete**. Es el mismo daño de `INC-002`,
+una alarma correcta apuntando al lugar equivocado, y cuesta más ahora que esto corre en
+CI, donde quien lee el log no es quien lo escribió.
+
+**De dónde salió**
+
+De poner las cuatro suites en el CI. Corriendo `provocar-reglas.mjs` desde la raíz del
+repo —donde `typescript` no estaba— el resultado fueron 28 reglas mudas, y llevó un rato
+entender que el problema no era ninguna de ellas.
+
+**Qué se hizo**
+
+Antes de provocar nada, se corre el linter en un **sandbox vacío**. Un sandbox vacío no
+viola ninguna regla: en un linter sano sale 0. Si sale distinto y no nombra ningún código,
+el que no arrancó es el linter, y se aborta reproduciendo su mensaje en vez de inventar un
+veredicto sobre las reglas.
+
+Verificado en las dos direcciones: con `typescript` presente, 28/28 y verde; escondiéndolo
+del `node_modules`, sale en 1 con el texto del propio linter («necesita el paquete
+`typescript` y no está instalado»).
 
 **Estado:** resuelto
 

@@ -78,6 +78,7 @@ llenar tu contexto principal de output que solo necesitas una vez.
 | `index-syncer` | Reconciliar `indices/*.md` con el código real | rápido |
 | `supabase-schema` | Esquema real de la BD a partir de las migraciones | rápido |
 | `code-judge` | Veredicto de diseño contra la rúbrica (lo invoca `/review`) | razonador |
+| `security-judge` | Escalada de privilegios, RLS evadible y fuga de datos (lo invoca `/review` en diffs de BD/auth) | razonador |
 
 El juez usa a propósito un modelo más capaz que el que genera el código: un
 evaluador que razona igual que el generador no detecta los errores del generador.
@@ -90,6 +91,7 @@ evaluador que razona igual que el generador no detecta los errores del generador
 | Terminaste de escribir y quieres validar | `arch-auditor` — devuelve violaciones accionables, no output de compilador |
 | Vas a escribir un Repository, una query o una migración | `supabase-schema` — el esquema real sale de las migraciones, no de tu memoria |
 | Vas a commitear algo no trivial | `/review` → `code-judge` — juzga el diseño, que es lo que el regex no ve |
+| Tocaste `supabase/migrations/`, auth o guards | `/review` → **+ `security-judge`** — los checks `SEC-RLS` ven la policy ausente; este ve la presente y equivocada |
 | Cerraste la tarea y tocaste `src/app/` | `index-syncer` — reconcilia `indices/` con el código real |
 
 ### Cuándo NO delegar
@@ -112,12 +114,16 @@ arreglo es tuyo. Si uno te devuelve algo que contradice lo que ves en el filesys
 no te exime: el Discovery Gate y el Architect Guard se aplican igual a lo que escribas
 después de consultar.
 
-**Uno** tiene los permisos acotados de verdad: `code-judge` no tiene `Write`, `Edit`
-**ni `Bash`** — recibe el diff como archivo (`.claude/temp/review-diff.patch`, que deja
-`/review`). Con `Bash` podría escribir usando `>`, y "el juez no arregla nada" pasaría a
-ser una promesa en vez de un hecho.
+**Dos** tienen los permisos acotados de verdad: ni `code-judge` ni `security-judge`
+tienen `Write`, `Edit` **ni `Bash`** — reciben el diff como archivo
+(`.claude/temp/review-diff.patch`, que deja `/review`). Con `Bash` podrían escribir
+usando `>`, y "el juez no arregla nada" pasaría a ser una promesa en vez de un hecho.
 
-`index-syncer` es el otro caso y **no** es el mismo (`INC-026`): que escriba sólo en
+Cuando el diff toca la BD corren **los dos en paralelo, y manda el peor veredicto**. Un
+`RECHAZADO` de seguridad no lo compensa un `APROBADO` de arquitectura: que las capas
+estén bien no hace segura una policy abierta.
+
+`index-syncer` es el caso que **no** es el mismo (`INC-026`): que escriba sólo en
 `indices/` es una regla de su prompt, no un permiso. Tiene `Bash`, `Write` y `Edit`
 porque corre `npm run indices:sync`, así que por el argumento del párrafo anterior eso es
 una promesa, no un hecho. Vale saber cuál de las dos cosas te está protegiendo: si el

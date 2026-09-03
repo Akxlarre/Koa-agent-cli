@@ -226,6 +226,63 @@ describe('GATE-B1 — lógica ejecutable colada en superficie de guía', () => {
     ));
     assert.equal(r.exitCode, 0);
   });
+
+  // ── HUE-013: el código CITADO no es lógica colada ────────────────────────
+  //
+  // El hallazgo llamaba a esto «riesgo latente». Medido contra el hook, no lo
+  // era: escribir una regla que DOCUMENTE un hook era imposible. Tres formas de
+  // nombrar el mismo `require('fs')`, tres bloqueos — hasta la mención inline.
+  //
+  // En un proyecto generado eso significa no poder explicar el harness dentro
+  // del harness, que es exactamente lo que hace, del lado del CLI, la regla
+  // `templates-contract.md`. Zafaba por accidente de sintaxis: escribe
+  // `require()` sin comillas, y el patrón pedía `require('`.
+  const REGLA = '/project/.claude/rules/hooks-contract.md';
+
+  test('una regla puede documentar un hook si el código va en una cerca ```', () => {
+    const r = runHook(makeInput(REGLA,
+      '# Contrato de los hooks\n\nUn hook mínimo se ve así:\n\n'
+      + "```js\nconst fs = require('fs');\nif (algoMal) process.exit(2);\n```\n\n"
+      + 'Nunca los conviertas a ESM.\n'
+    ));
+    assert.equal(r.exitCode, 0, r.stderr);
+  });
+
+  test('y también si sólo lo menciona inline entre backticks', () => {
+    // El caso que la propuesta original del hallazgo —excluir sólo las cercas—
+    // habría dejado bloqueado.
+    const r = runHook(makeInput(REGLA,
+      "Los hooks usan `require('fs')` y salen con `process.exit(2)`. No los toques.\n"
+    ));
+    assert.equal(r.exitCode, 0, r.stderr);
+  });
+
+  test('el mismo código SUELTO en la prosa sigue bloqueado', () => {
+    // La diferencia entre citar y colar son tres backticks, y es toda la
+    // diferencia: acá nadie está documentando nada.
+    const r = runHook(makeInput(REGLA,
+      "# Contrato de los hooks\n\nconst fs = require('fs');\nif (algoMal) process.exit(2);\n"
+    ));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('GATE-B1'));
+  });
+
+  test('un archivo de guía con SHEBANG sigue bloqueado, esté citado o no', () => {
+    // Nadie necesita la primera línea de un hook para explicar cómo funciona.
+    // Su presencia dice «esto es un programa», no «esto es una cita», y es lo
+    // que queda cerrado del hueco que la exclusión de cercas abre.
+    const r = runHook(makeInput(REGLA,
+      '# Hook de ejemplo\n\n```js\n#!/usr/bin/env node\nconsole.log("hola");\n```\n'
+    ));
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('GATE-B1'));
+  });
+
+  test('el mensaje dice cómo documentar sin disparar', () => {
+    const r = runHook(makeInput(REGLA, "const fs = require('fs');\n"));
+    assert.match(r.stderr, /cerca ```js|entre backticks/,
+      'bloquear sin decir la salida deja al agente adivinando');
+  });
 });
 
 // ─── GATE-B2: consejo sin mecanismo en script de capacidad ─────────────────

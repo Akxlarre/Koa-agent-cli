@@ -140,26 +140,55 @@ describe('HUE-029 — en los adapters las reglas son prosa, y ahora lo dicen', (
   //
   // Es el mismo daño que HUE-027 pero peor de grado: no es una regla que no
   // frena, es un archivo entero que no frena, presentándose como si frenara.
-  const ADAPTERS = path.resolve(TEMPLATES, 'adapters');
+  // Los adapters viven en DOS layouts distintos y este test viaja a los dos.
+  //
+  // En este repo son la fuente: `templates/adapters/{github,cursor,windsurf}`.
+  // En un proyecto generado no existe esa carpeta —`copyTemplates` la excluye a
+  // propósito— y los archivos aterrizan en su destino final: `.github/`,
+  // `.cursor/rules/`, `.windsurf/rules/`. Mirar sólo la primera forma hacía que
+  // este test fallara con «solo 0 archivos de adapter» en TODO proyecto
+  // generado, o sea que `npm run claude:test-hooks` salía en rojo recién
+  // scaffoldeado. Un test que sólo pasa donde se escribió es el mismo modo de
+  // fallar que la auditoría persigue, cometido acá.
+  // `TEMPLATES` es `templates/` en este repo y la RAÍZ del proyecto en uno
+  // generado: la constante de arriba se llama así porque el layout es el mismo
+  // un nivel más arriba de `.claude/`. Acá importa la diferencia, así que la
+  // raíz se nombra por lo que es en cada caso.
+  const FUENTE = path.resolve(TEMPLATES, 'adapters');
+  const esFuente = fs.existsSync(FUENTE);
+  const PROYECTO = TEMPLATES;
 
-  function archivosDeAdapters(dir = ADAPTERS, out = []) {
+  const RAICES = esFuente
+    ? [FUENTE]
+    : [path.join(PROYECTO, '.github'), path.join(PROYECTO, '.cursor'),
+      path.join(PROYECTO, '.windsurf')];
+
+  function archivosDeAdapters(dir, out = []) {
     if (!fs.existsSync(dir)) return out;
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) archivosDeAdapters(full, out);
-      else if (/\.(md|mdc)$/.test(e.name)) out.push(full);
+      // En `.github/` viven también workflows y plantillas de PR, que no son
+      // adapters: sólo cuenta lo que instruye a un AI tool.
+      else if (/\.(md|mdc)$/.test(e.name) && /instructions|rules|project|workflow|architecture/.test(e.name)) {
+        out.push(full);
+      }
     }
     return out;
   }
 
-  const TODOS = archivosDeAdapters();
+  const TODOS = RAICES.flatMap((r) => archivosDeAdapters(r));
 
   test('hay adapters que revisar', () => {
-    assert.ok(TODOS.length >= 3, `solo ${TODOS.length} archivos de adapter`);
+    // Tres en la fuente; en un proyecto generado, al menos el de Copilot, que
+    // es el único que se genera siempre (cursor y windsurf son opt-in).
+    const minimo = esFuente ? 3 : 1;
+    assert.ok(TODOS.length >= minimo,
+      `solo ${TODOS.length} archivos de adapter (esperaba ${minimo}+ en ${esFuente ? 'la fuente' : 'el proyecto generado'})`);
   });
 
   for (const f of TODOS) {
-    const rel = path.relative(TEMPLATES, f);
+    const rel = path.relative(esFuente ? TEMPLATES : PROYECTO, f);
 
     test(`${rel} avisa que ahí nada bloquea`, () => {
       const txt = fs.readFileSync(f, 'utf-8');

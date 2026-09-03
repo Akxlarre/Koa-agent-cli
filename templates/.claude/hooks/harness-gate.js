@@ -297,13 +297,47 @@ payload.read().then((entrada) => {
     // B1. PLACEMENT GUARD — código ejecutable colado en un archivo de guía
     // ═══════════════════════════════════════════════════════════════════════
     if (isGuidanceSurface) {
-      const EXEC_CODE_RE = /(#!\/usr\/bin\/env node|\bprocess\.exit\s*\(|\brequire\s*\(\s*['"]|\bmodule\.exports\b|\bfs\.readFileSync\s*\(|\bfs\.writeFileSync\s*\()/;
-      if (EXEC_CODE_RE.test(newContent)) {
+      // HUE-013: el código CITADO no es lógica colada.
+      //
+      // El hallazgo decía que esto «bloquearía una regla que documenta un hook»
+      // y lo llamaba riesgo latente. Medido contra el hook, no es latente: hoy
+      // es imposible escribir esa regla. Cuatro escrituras, una por forma:
+      //
+      //   BLOQUEA  el código en una cerca ```js
+      //   BLOQUEA  el mismo código suelto en la prosa
+      //   BLOQUEA  sólo mencionarlo inline: «los hooks usan `require('fs')`»
+      //     pasa   una regla sin nada de código (control)
+      //
+      // O sea que en un proyecto generado no se puede documentar el harness
+      // dentro del harness — que es justo lo que hace, de este lado, la regla
+      // `templates-contract.md`. Zafa por accidente de sintaxis: escribe
+      // `require()` sin comillas adentro, y el patrón pide `require('`.
+      //
+      // La propuesta del hallazgo era excluir las cercas markdown. No alcanza:
+      // el tercer caso es un span inline. Se excluyen las dos formas de citar.
+      //
+      // Queda un hueco y es deliberado: un chequeo de verdad, escrito entero
+      // dentro de una cerca ```js, ahora pasa. Se acepta porque el daño de las
+      // dos direcciones no es comparable — ese archivo no lo ejecuta nadie, y
+      // en cambio no poder explicar un mecanismo donde el agente va a leerlo
+      // ataca la tesis del repositorio entero. Lo que sigue cerrado es un
+      // archivo de guía con SHEBANG: nadie necesita la primera línea de un
+      // hook para explicar cómo funciona, y su presencia dice «esto es un
+      // programa», no «esto es una cita».
+      const sinCodigoCitado = newContent
+        .replace(/^```[\s\S]*?^```/gm, '')   // cercas
+        .replace(/`[^`\n]*`/g, '');          // spans inline
+      const EXEC_CODE_RE = /(\bprocess\.exit\s*\(|\brequire\s*\(\s*['"]|\bmodule\.exports\b|\bfs\.readFileSync\s*\(|\bfs\.writeFileSync\s*\()/;
+      const SHEBANG_RE = /#!\/usr\/bin\/env node/;
+
+      if (SHEBANG_RE.test(newContent) || EXEC_CODE_RE.test(sinCodigoCitado)) {
         violations.push(
           '[GATE-B1] Este archivo de guía contiene lógica ejecutable real (require/process.exit/fs.*).\n' +
           '     Las superficies de guía (.claude/rules/, context/learnings.md, ANTI-PATTERNS.md, CLAUDE.md)\n' +
           '     son prosa que el agente lee — no código que corre. Si necesitas un chequeo determinista,\n' +
-          '     créalo como script real en scripts/ (o .claude/scripts/) y referencia el resultado desde aquí.'
+          '     créalo como script real en scripts/ (o .claude/scripts/) y referencia el resultado desde aquí.\n' +
+          '     Si sólo estás DOCUMENTANDO cómo funciona un hook, poné el código en una cerca ```js\n' +
+          '     o entre backticks: ahí es cita y no dispara.'
         );
       }
     }

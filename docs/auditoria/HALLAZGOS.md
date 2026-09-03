@@ -67,7 +67,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-004` | S2 | `H-00` | El orden de los hooks dentro de cada evento es semántico en 3 casos y no está declarado | resuelto · las dependencias de orden declaradas y testeadas; una de las tres se disolvió con `ACO-001` en vez de documentarse |
 | `INC-004` | S3 | `H-00` | `TEMPLATES-REGISTRY.md` dice 16 hooks cableados; son 17 | resuelto · 19 archivos, 17 cableados (el 18º comando es `post-edit.js`, que vive en `.claude/scripts/`) |
 | `HUE-009` | S3 | `H-00` | Ningún test verifica que los comandos cableados apunten a archivos existentes | resuelto · `settings.test.js`: ruta, sintaxis, evento y los dos matchers con semántica |
-| `HUE-013` | S3 | `H-05` | `GATE-B1` bloquearía una regla que documenta un hook; latente, no activo hoy | abierto |
+| `HUE-013` | S3 | `H-05` | `GATE-B1` bloquearía una regla que documenta un hook; latente, no activo hoy | resuelto · **no era latente**: medido, las tres formas de nombrar `require('fs')` bloqueaban, hasta la mención inline. Se excluye el código citado (cercas y spans); el shebang sigue cerrado |
 | `ACO-005` | S3 | `H-01` | `<!-- DETAIL:BEGIN -->` y `**last_updated:**` son contratos de 2-3 piezas sin declarar | resuelto · los dos declarados en `contracts.js` y publicados en `docs/CONTRATOS.md` |
 | `ACO-006` | S3 | `H-02` | `koa-prompt-ctx-{sessionId}.json` no declarado | resuelto · el estado pasó a `budget-<clave>.json`, declarado en `contracts.js` |
 | `ACO-007` | S3 | `H-04` | `koa-breaker-*.json` y los 11 `koa-ctx-*.flag` no declarados | resuelto · `breaker.json` y `ctx-<categoria>.json` declarados; un test lee las claves que los hooks escriben de verdad |
@@ -80,7 +80,8 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-007` | S2 | `H-14` | `hotfix-autoclose` dice cerrar «al terminar la sesión»; `Stop` corre al final de cada respuesta | resuelto · `/hotfix-close` explícito + el hook como red en `SessionEnd` |
 | `HUE-017` | S3 | `H-13` | `compact-recovery` no tiene tope de tamaño: los 4 archivos de `context/` se inyectan enteros | resuelto · `MAX_INDEX_CHARS` + `budget.recortar` + corte en `DETAIL:BEGIN`; el test exige que el aviso diga que recortó |
 | `HUE-014` | S3 | `H-08` | El matching contra el índice es por substring: un nombre contenido en cualquier parte del `.md` pasa como registrado | resuelto · medido **6 de 6** componentes inventados pasando como registrados (`x` incluido); `lib/indices.js` pregunta si hay una **fila** que los declare → 1 de 6, y esa una es real |
-| `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | abierto |
+| `INC-006` | S3 | `H-09` | El docblock de `discovery-tracker` describe solo `indices/`; también escribe el flag ante `context/` | resuelto · el docblock estaba viejo en **dos** direcciones, y había un test con el nombre viejo afirmando lo contrario que `pre-write-guard.test.js`. Los tres consumidores ahora están escritos donde se escribe la línea |
+| `INC-024` | S2 | `T-03` | El test de `HUE-029` busca los adapters en `templates/adapters/`, que **no existe en un proyecto generado**: `npm run claude:test-hooks` salía en rojo recién scaffoldeado | resuelto · lo introduje yo en `c734d0c` y lo encontró correr las suites en el layout generado. Mira las dos formas: la fuente acá, `.github/` `.cursor/` `.windsurf/` allá |
 | `ACO-008` | S3 | `H-12` | `LESSONS_LEARNED.md` es un contrato de round-trip con dos productores, sin declarar | resuelto · declarado, y el round-trip vive en `lib/lessons.js` — un solo dueño del formato (`HUE-016`, `DUP-002`) |
 | `DEC-004` | **S1** | `S-05` | El auditor de reglas cubre 4 de 28 (14%); las 24 sin fixture incluyen las tres de seguridad RLS y las dos que motivaron escribir el script | resuelto · 4/28 → 18/28 → **28/28**. El baseline quedó vacío: no hay ninguna regla que no se haya puesto delante de su propia violación |
 | `INC-009` | S2 | `S-05` | `SEC-RLS-01/02/03` no están en el baseline: `lint:arch:provocar` sale en 1 en cualquier proyecto recién generado | resuelto · las tres RLS tienen fixture; la corrida sale en 0 |
@@ -1257,12 +1258,118 @@ funcionamiento de los hooks dentro de un archivo de reglas.
 Verificado que **ninguna** regla actual del template ni de este repo lo dispara hoy, así
 que es riesgo latente y no un problema activo — por eso `S3`.
 
-**Propuesta**
+**Lo que la medición corrigió: no es latente**
 
-Excluir el contenido dentro de bloques de código markdown (``` ```` ```) del chequeo: ahí
-el código es cita, no lógica.
+«Ninguna regla actual lo dispara» es cierto y es la pregunta equivocada. La pregunta es
+si se puede escribir esa regla, y no se puede. Cuatro escrituras contra el hook, una por
+forma de nombrar el mismo `require('fs')`:
 
-**Estado:** abierto
+```
+BLOQUEA  el código en una cerca ```js
+BLOQUEA  el mismo código suelto en la prosa
+BLOQUEA  sólo mencionarlo inline: «los hooks usan `require('fs')`»
+  pasa   una regla sin nada de código (control)
+```
+
+O sea que en un proyecto generado no se puede documentar el harness dentro del harness.
+La regla que hace exactamente eso, de este lado, es `.claude/rules/templates-contract.md`
+— y zafa por accidente de sintaxis: escribe `require()` sin comillas adentro, y el patrón
+pide `require('`. Un carácter separaba «riesgo latente» de «regla imposible de escribir».
+
+**Qué se hizo, y qué no**
+
+La propuesta era excluir las cercas markdown. No alcanza: el tercer caso es un span
+inline. Se excluyen las dos formas de citar, y el chequeo corre sobre la prosa restante.
+
+Queda un hueco deliberado: un chequeo de verdad, escrito entero dentro de una cerca
+```js, ahora pasa. Se acepta porque el daño de las dos direcciones no es comparable —ese
+archivo no lo ejecuta nadie, y no poder explicar un mecanismo donde el agente va a leerlo
+ataca la tesis del repositorio entero. Lo que queda cerrado es el archivo de guía con
+**shebang**, citado o no: nadie necesita la primera línea de un hook para explicar cómo
+funciona, y su presencia dice «esto es un programa», no «esto es una cita».
+
+El mensaje del gate ahora dice cómo documentar sin disparar. Bloquear sin decir la salida
+deja al agente adivinando, que es la fricción que `CAR` mide.
+
+**Estado:** resuelto
+
+---
+
+## INC-006 · El docblock de `discovery-tracker` describe sólo `indices/`
+
+- **Tipo / severidad:** `INC` · S3 · **Unidad:** `H-09` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+Decía «rastrea cuando Claude lee archivos de `indices/`» y que con eso «el Discovery Gate
+ya no bloquea escrituras». El código matchea `indices/` **y** `context/`.
+
+**Lo que la medición corrigió**
+
+Las dos mitades estaban viejas, y en direcciones opuestas: escribe ante `context/`
+también, y desde `HUE-001` el Gate ya **no** se conforma con que el flag exista — exige
+una línea que nombre un índice. O sea que la frase que sobra-describe lo que escribe
+sub-describe lo que abre.
+
+Y hay un tercer artefacto que ninguno de los dos: en `discovery-tracker.test.js` vivía un
+test llamado **«leer `context/` también lo levanta»**, cuyo mensaje de assert decía «leer
+el brief satisface el Discovery Gate». Dejó de ser cierto con `HUE-001` y siguió en
+verde, porque lo único que comprobaba es que el archivo existiera. Enfrente, en
+`pre-write-guard.test.js`, hay otro test llamado «CERRADO: leer sólo `context/` ya no
+levanta el Gate». **Dos tests de la misma suite afirmando lo contrario sobre la misma
+conducta**, los dos en verde. Es el patrón del test que se queda con el nombre viejo y
+defiende la conducta vieja con la autoridad de estar pasando.
+
+**Qué se hizo**
+
+El docblock dice ahora qué escribe y qué hace con eso **cada uno** de los tres
+consumidores —el Gate exige `indices/`, `compact-recovery` parsea `indices/NOMBRE.md`,
+`session-start` escribe en el mismo flag—, y deja anotado que `context/` se registra y
+hoy no abre nada: si mañana lo abriera, que sea una decisión y no una consecuencia del
+`includes`. El test quedó renombrado y ahora fija las dos mitades: la línea se escribe, y
+no nombra ningún índice.
+
+**Estado:** resuelto
+
+---
+
+## INC-024 · El test de `HUE-029` no existe en un proyecto generado
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `T-03` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+`rules-enforcement.test.js` busca los adapters en `templates/adapters/`. Esa carpeta no
+existe en un proyecto generado: `copyTemplates` la excluye a propósito y `copyAiAdapters`
+reparte los archivos a su destino final —`.github/copilot-instructions.md`,
+`.cursor/rules/`, `.windsurf/rules/`. El test viaja al proyecto igual, encuentra cero
+archivos, y su propia guarda («hay adapters que revisar») lo hace fallar.
+
+**Por qué importa**
+
+`npm run claude:test-hooks` sale en rojo en un proyecto **recién scaffoldeado**, sin que
+el usuario haya tocado nada. Es la primera impresión del harness, y lo que comunica es
+que está roto.
+
+**De dónde salió**
+
+Lo introduje yo, en `c734d0c`, cerrando `HUE-029`. Verifiqué las cuatro suites en los dos
+layouts esa vez y no lo vi porque el sandbox del layout generado que armé no copiaba los
+adapters a ningún lado — el mismo tipo de artefacto de copia incompleta que ya había
+mordido antes. El guion del sandbox ahora replica `copyAiAdapters`, que es de donde salen
+las rutas reales.
+
+Un test que sólo pasa donde se escribió es el modo de fallar que esta auditoría persigue,
+cometido dentro de la auditoría.
+
+**Qué se hizo**
+
+El test mira las dos formas: la fuente en este repo, los tres destinos en un proyecto
+generado, con el mínimo que corresponde a cada uno (tres acá; allá al menos Copilot, que
+es el único que se genera siempre — cursor y windsurf son opt-in). Provocado en el layout
+generado quitándole el aviso a `copilot-instructions.md`: rojo.
+
+**Estado:** resuelto
 
 ---
 

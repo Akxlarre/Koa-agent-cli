@@ -76,9 +76,19 @@ describe('QUÉ LEVANTA EL FLAG', () => {
     assert.match(leerFlag(), /READ \| indices\/COMPONENTS\.md/);
   });
 
-  test('leer context/ también lo levanta (HUE-001: el Gate no distingue)', () => {
+  test('leer context/ también escribe una línea — pero no abre el Gate (INC-006)', () => {
+    // Este test se llamaba «leer context/ también lo levanta» y afirmaba, en su
+    // mensaje, que «leer el brief satisface el Discovery Gate». Dejó de ser
+    // cierto con HUE-001: el Gate pasó a exigir una línea con `indices/` y este
+    // test siguió en verde, porque lo único que comprobaba es que el archivo
+    // existiera. Un test que se queda con el nombre viejo defiende la conducta
+    // vieja, y lo hace con la autoridad de estar en verde.
+    //
+    // Lo que es cierto y hay que fijar son las dos mitades:
     correr('context/brief.md');
-    assert.equal(sesionesConFlag().length, 1, 'leer el brief satisface el Discovery Gate');
+    assert.equal(sesionesConFlag().length, 1, 'la lectura se registra: es información real');
+    assert.doesNotMatch(leerFlag(), /indices\//,
+      'y no nombra ningún índice, que es lo que el Gate exige para abrirse');
   });
 
   test('acumula una línea por lectura', () => {

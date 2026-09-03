@@ -27,6 +27,19 @@ Cualquier cambio aquí afecta a TODOS los proyectos Angular generados futuros, n
 Los hooks en `templates/.claude/hooks/` tienen dependencias entre sí.
 Antes de modificar uno, verifica qué otros dependen de él.
 
+**La fuente son los datos, no esta tabla.** Los 21 artefactos compartidos —qué pieza
+escribe cada uno, quién lo lee, cuándo se borra y quién lo comparte— viven declarados en
+`templates/.claude/hooks/lib/contracts.js`, y `contracts.test.js` los contrasta
+contra el filesystem: agregar un consumidor sin declararlo rompe el test.
+
+De ahí sale también `templates/docs/CONTRATOS.md`, que es la copia que **viaja al proyecto
+generado** (`npm run contracts:doc`). Eso era `ACO-013`: la declaración vivía solo de este
+lado, y un agente trabajando en un proyecto generado no tenía forma de enterarse de que
+`sync-check` borraba el archivo del que depende `spec-diff-check`.
+
+Lo de abajo es un resumen para orientarse rápido al editar `templates/`. Si difiere del
+registro, **gana el registro**.
+
 | Hook | Depende de |
 |---|---|
 | `pre-write-guard.js` (Discovery Gate) | flag creado por `discovery-tracker.js` |
@@ -53,25 +66,40 @@ Antes de modificar uno, verifica qué otros dependen de él.
 Si cambias el naming o un encabezado en `/plan`, cambia los cuatro consumidores a la vez.
 
 **Contrato del discovery flag**: `discovery-tracker.js` y `session-start.js` escriben
-ambos en `$TMPDIR/koa-discovery-{sessionId}.flag`, y `pre-write-guard.js` (Gate) y
+ambos en `.claude/temp/session/{sessionId}/discovery.flag`, y `pre-write-guard.js` (Gate) y
 `compact-recovery.js` lo leen. El formato de línea debe seguir conteniendo
 `indices/NOMBRE.md`: `compact-recovery.js` parsea justamente eso para decidir qué
 índices re-inyectar.
+
+> Vivía en `$TMPDIR` bajo la clave `'default'` porque `CLAUDE_SESSION_ID` **no existe**
+> (`HUE-002`): una lectura en un proyecto levantaba el Gate de otro. El `sessionId` sale
+> hoy del payload de stdin, vía `lib/session.js`.
 
 ## Los hooks tienen tests — corrígelos ahí
 
 `templates/.claude/tests/*.test.js` son tests de contrato de los hooks
 (`node --test`). Todo hook nuevo lleva su archivo de test.
 
-Corre la suite antes de dar por buena cualquier edición en `hooks/`:
-
-```bash
-cd templates/.claude/tests && node --test *.test.js
-```
-
 Esto no es opcional: `compact-recovery.js` estuvo con un error de sintaxis durante
 varias versiones — fallaba en silencio en cada compactación — precisamente porque
 ningún test lo ejecutaba nunca.
+
+**Son cuatro suites, no una** (`HUE-033`: el trinquete de presupuesto de reglas estuvo
+en rojo tres tandas porque la verificación solo corría las dos primeras):
+
+```bash
+# 1. hooks del payload
+cd templates/.claude/tests && node --test *.test.js
+
+# 2. el CLI
+npm test
+
+# 3 y 4. guardrails del linter y provocación de reglas.
+# Necesitan resolver `typescript`, así que corren en el layout de un proyecto
+# generado (o cualquier árbol con node_modules), no desde este repo:
+node --test scripts/lib/*.test.mjs
+node scripts/provocar-reglas.mjs
+```
 
 ## CommonJS obligatorio en templates/.claude/hooks/
 

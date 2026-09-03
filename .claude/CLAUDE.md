@@ -42,6 +42,7 @@ lib/
 ├── preflight.js      # checkCommand, preflight() — verifica Node/npm/git/docker
 ├── installer.js      # createAngularProject, installDependencies — npm y npx ops
 ├── scaffolder.js     # copyTemplates, injectBoilerplate, writeBlueprintJson
+├── prompts.js        # askWhatToBuild, esFullScaffold — solo inquirer
 └── ui.js             # printBanner, printSuccess — solo chalk, sin FS
 ```
 

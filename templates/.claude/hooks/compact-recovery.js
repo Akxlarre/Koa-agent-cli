@@ -18,33 +18,66 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const cwd = process.cwd();
-const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+const payload = require('./lib/payload.js');
+const session = require('./lib/session.js');
+const budget = require('./lib/budget.js');
+
+// Lee su payload por stdin como el resto: de ahi sale el `session_id` que los
+// cuatro hooks del discovery flag deben compartir. Con un id distinto,
+// compact-recovery no encontraria lo que discovery-tracker escribio.
+payload.read().then((PAYLOAD) => {
+  // La dedup de budget.js significa «ya lo dije y vos todavia lo tenes». Tras una
+  // compactacion la segunda mitad es falsa, asi que se olvida: los hooks que
+  // dedupican vuelven a emitir en la proxima oportunidad.
+  budget.olvidar(PAYLOAD);
+  reinyectar(PAYLOAD, PAYLOAD.cwd);
+});
+
+function reinyectar(PAYLOAD, cwd) {
 const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
 
-// Índices siempre inyectados (base de todo proyecto)
+// El mismo techo por indice que session-start. Sin el, HUE-017: los indices
+// entraban enteros y los cuatro context/*.md en crudo.
+const MAX_INDEX_CHARS = 2500;
+
+// Índices siempre inyectados (base de todo proyecto). Estos tres SÍ son una
+// decisión, no un mapa: son los que valen aunque el agente no los haya abierto.
 const CORE_INDICES = new Set(['COMPONENTS', 'SERVICES', 'FACADES']);
 
-// Mapa completo de índices disponibles
-const ALL_INDEX_FILES = {
-  COMPONENTS: 'indices/COMPONENTS.md',
-  SERVICES: 'indices/SERVICES.md',
-  FACADES: 'indices/FACADES.md',
-  MODELS: 'indices/MODELS.md',
-  DATABASE: 'indices/DATABASE.md',
-  DIRECTIVES: 'indices/DIRECTIVES.md',
-  STYLES: 'indices/STYLES.md',
-  PIPES: 'indices/PIPES.md',
-  'ANTI-PATTERNS': 'indices/ANTI-PATTERNS.md',
-  STORES: 'indices/STORES.md',
-};
+/**
+ * Los índices del proyecto, leídos del disco (HUE-003, HUE-030).
+ *
+ * Antes esto era un objeto literal con diez entradas escritas a mano. El
+ * template trae quince: GUARDS, LAYOUTS, ROUTES, USAGE-MAP y UTILS se agregaron
+ * después y nadie volvió acá. El agente podía leer `indices/ROUTES.md` antes de
+ * la compactación, el flag lo registraba, y el índice no volvía nunca — sin un
+ * solo error. LAYOUTS era el más visible: el propio Discovery Gate lo ofrece en
+ * su lista de archivos que levantan el bloqueo.
+ *
+ * Un mapa a mano de algo que ya está en el filesystem se vuelve a desincronizar.
+ * Este se deriva: agregar `indices/NUEVO.md` alcanza, acá no hay nada que tocar.
+ */
+function indicesEnDisco(raiz) {
+  try {
+    return fs.readdirSync(path.join(raiz, 'indices'))
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => f.replace(/\.md$/, ''))
+      .sort((a, b) => {
+        const ca = CORE_INDICES.has(a) ? 0 : 1;
+        const cb = CORE_INDICES.has(b) ? 0 : 1;
+        return ca - cb || a.localeCompare(b);
+      })
+      .map((nombre) => [nombre, `indices/${nombre}.md`]);
+  } catch {
+    return []; // sin carpeta indices/ no hay nada que re-inyectar
+  }
+}
 
 // ─── Leer discovery flag: qué índices leyó el agente antes del compact ───────
 const touchedIndexNames = new Set(CORE_INDICES);
 try {
-  const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-  if (fs.existsSync(flagPath)) {
-    const flagContent = fs.readFileSync(flagPath, 'utf-8');
+  const flagContent = session.readText(PAYLOAD, 'discovery.flag');
+  if (flagContent) {
     for (const line of flagContent.split('\n')) {
       const match = line.match(/indices\/([\w-]+)\.md/i);
       if (match) touchedIndexNames.add(match[1].toUpperCase());
@@ -62,18 +95,18 @@ output += '(Quick Reference — sin ejemplos de codigo para ahorrar tokens).\n\n
 
 let injectedCount = 0;
 
-for (const [name, relativePath] of Object.entries(ALL_INDEX_FILES)) {
-  if (!touchedIndexNames.has(name)) continue;
+for (const [name, relativePath] of indicesEnDisco(cwd)) {
+  if (!touchedIndexNames.has(name.toUpperCase())) continue;
 
   const fullPath = path.join(cwd, relativePath);
   if (!fs.existsSync(fullPath)) continue;
 
-  let content = fs.readFileSync(fullPath, 'utf-8').trim();
+  // HUE-017: no habia tope. Se corta en DETAIL:BEGIN y se aplica el mismo
+  // techo por indice que usa session-start, para que una compactacion no
+  // devuelva mas contexto del que el runtime acaba de liberar.
+  const content = budget.recortar(fs.readFileSync(fullPath, 'utf-8').trim(),
+    { maxChars: MAX_INDEX_CHARS });
   if (!content) continue;
-
-  // Cortar en DETAIL:BEGIN — inyectar solo la Quick Reference
-  const cutoff = content.indexOf(DETAIL_MARKER);
-  if (cutoff > -1) content = content.slice(0, cutoff).trim();
 
   output += `--- ${relativePath} ---\n`;
   output += content + '\n\n';
@@ -105,19 +138,19 @@ for (const cf of CONTEXT_FILES) {
   if (!fs.existsSync(fullPath)) continue;
 
   const raw = fs.readFileSync(fullPath, 'utf-8').trim();
-  // Saltar archivos que son solo plantilla (sin contenido real).
-  // Se eliminan comentarios HTML antes de medir: las plantillas de context/
-  // son casi enteramente <!-- instrucciones -->, asi que sin contenido real
-  // el resultado queda por debajo del umbral.
-  const stripped = raw.replace(/<!--[\s\S]*?-->/g, '').trim();
-  if (stripped.length < 80) continue;
+  // DEC-006: el filtro anterior solo quitaba comentarios HTML, y las plantillas
+  // de context/ pasaban igual porque su andamiaje markdown —encabezados y
+  // blockquotes de instrucciones— ya supera los 80 chars por si solo. Medido:
+  // brief 456, domain 760, constraints 327, learnings 457. budget.isPlaceholder
+  // quita tambien ese andamiaje; las cuatro caen a 0-66.
+  if (budget.isPlaceholder(raw)) continue;
 
   if (!contextAdded) {
     output += '\n─── Contexto del proyecto (context/) ───\n\n';
     contextAdded = true;
   }
   output += '--- ' + cf.label + ' ---\n';
-  output += raw + '\n\n';
+  output += budget.recortar(raw, { maxChars: MAX_INDEX_CHARS, cutAt: null }) + '\n\n';
 }
 
 if (contextAdded) {
@@ -153,3 +186,4 @@ try {
 } catch { /* fail-open */ }
 
 process.stdout.write(output);
+} // fin de reinyectar()

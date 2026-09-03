@@ -28,17 +28,41 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Install CLI dependencies
+      - name: Install dependencies
         run: npm ci
 
-      # Las dos suites corren por separado a propósito: si algo se pone rojo,
-      # el nombre del step ya dice si falló el generador (Contexto A) o el
-      # payload que reciben los proyectos generados (Contexto B).
-      - name: CLI tests (bin/ + lib/)
+      # ── Son CUATRO suites, no dos (HUE-033) ─────────────────────────────
+      #
+      # Este workflow nació corriendo las dos primeras, con un comentario que
+      # decía «las dos suites corren por separado a propósito». Son cuatro, y
+      # las dos que faltaban son justamente las que estuvieron en rojo tres
+      # tandas seguidas sin que nadie se enterara: el trinquete de presupuesto
+      # de reglas vive en `test:guardrails`, y `test:provocacion` es lo único
+      # que comprueba que las 28 reglas del linter puedan fallar.
+      #
+      # Un CI que corre la mitad de la verificación es el mismo patrón que este
+      # repositorio persigue: verde sin haber mirado todo lo que dice mirar.
+      #
+      # Corren por separado a propósito: si algo se pone rojo, el nombre del
+      # step ya dice qué se rompió sin abrir el log.
+
+      - name: 1 · CLI tests (bin/ + lib/)
         run: npm run test:cli
 
       # Los hooks de templates/ no tienen dependencias — corren sin install.
       # Esta es la suite que documenta templates-contract.md como obligatoria:
       # compact-recovery.js estuvo roto varias versiones porque nadie la corría.
-      - name: Hook contract tests (templates/)
+      - name: 2 · Hook contract tests (templates/.claude/)
         run: npm run test:hooks
+
+      # Las dos de abajo prueban el payload, que parsea con la API de
+      # TypeScript. `architect.js` resuelve `require('typescript')` desde SU
+      # ubicación y no desde el cwd, así que alcanza con el node_modules del
+      # repo — por eso `typescript` es devDependency aunque el CLI no compile.
+      - name: 3 · Guardrail tests (linter del proyecto generado)
+        run: npm run test:guardrails
+
+      # La pregunta que ningún CI hace: no si las reglas pasan, sino si pueden
+      # fallar. Arma un sandbox por regla con el archivo mínimo que la viola.
+      - name: 4 · Provocación — ¿cada regla dispara ante su violación?
+        run: npm run test:provocacion

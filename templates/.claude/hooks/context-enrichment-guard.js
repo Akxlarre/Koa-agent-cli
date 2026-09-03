@@ -14,6 +14,18 @@
  * plantillas vacías por diseño. Wireado por defecto, este hook bloquearía TODA escritura de
  * código desde el minuto cero, antes de que el usuario alcance a llenar nada.
  *
+ * DEC-008 — ese motivo era FALSO hasta ahora, y por eso la decisión de dejarlo
+ * apagado se tomó para evitar un comportamiento que el hook no tenía. Su detector
+ * buscaba tres marcadores, y el único que las plantillas traían de verdad
+ * —`{{PROJECT_NAME}}`— lo reemplaza `injectVars` al generar; el umbral de 50
+ * chars lo pasaba cualquier plantilla con su propio andamiaje markdown. En un
+ * proyecto recién generado —el escenario exacto para el que se escribió— no
+ * bloqueaba nada.
+ *
+ * Ahora la detección es `budget.sinLlenar`, y el motivo de arriba es cierto: si
+ * se cablea, bloquea desde el minuto cero. Sigue siendo opt-in, pero ahora es
+ * una decisión sobre un comportamiento real.
+ *
  * Actívalo cuando quieras esa disciplina (recomendado en proyectos con dominio complejo),
  * agregando a `.claude/settings.json` bajo PreToolUse / matcher "Edit|Write|MultiEdit":
  *
@@ -22,34 +34,39 @@
 
 const fs = require('fs');
 const path = require('path');
+const payload = require('./lib/payload.js');
+const paths = require('./lib/paths.js');
+const budget = require('./lib/budget.js');
 
-let data = '';
-process.stdin.on('data', chunk => (data += chunk));
-process.stdin.on('end', () => {
+payload.read().then((PAYLOAD) => {
   try {
-    const input = JSON.parse(data);
-    const filePath = input.tool_input?.file_path || input.tool_input?.path || '';
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    const filePath = PAYLOAD.filePath;
 
-    // Solo activamos este verificador si intentamos escribir código fuente
-    const isSourceCode =
-      (normalizedPath.includes('src/app/') && !normalizedPath.endsWith('.spec.ts')) ||
-      normalizedPath.includes('supabase/migrations/');
-
-    if (isSourceCode) {
+    // La misma pregunta que hace el Discovery Gate, con el mismo nombre: si esto
+    // exige haber descubierto, exige también tener un dominio escrito.
+    if (paths.needsDiscovery(filePath, PAYLOAD.cwd)) {
       // Ubicaciones del contexto crítico, según la convención Koa:
       //   context/domain.md   → Lenguaje Ubicuo / entidades del negocio
       //   indices/DATABASE.md → modelo de datos emparejado
-      const workspaceRoot = process.cwd();
+      const workspaceRoot = PAYLOAD.cwd;
       const SURFACES = [
         { path: path.join(workspaceRoot, 'context', 'domain.md'), label: 'context/domain.md (Lenguaje Ubicuo)' },
         { path: path.join(workspaceRoot, 'indices', 'DATABASE.md'), label: 'indices/DATABASE.md (modelo de datos)' },
       ];
 
-      // Marcadores que delatan un archivo todavía sin rellenar por el humano.
-      const PLACEHOLDER_MARKERS = ['[TODO]', '{{PROJECT_NAME}}', '<!-- template -->'];
-      const MIN_MEANINGFUL_LENGTH = 50;
-
+      // DEC-008 / DEC-006 — el detector no disparaba en un proyecto recién
+      // generado, que es EXACTAMENTE el caso para el que este hook existe.
+      //
+      // Buscaba tres marcadores y `{{PROJECT_NAME}}` era el único que las
+      // plantillas traen de verdad — y `injectVars` lo reemplaza al generar, así
+      // que el marcador no llega vivo a ningún proyecto. Y el umbral de 50 chars
+      // medía el archivo entero: el andamiaje markdown de las plantillas
+      // (encabezados, blockquotes de instrucciones, tablas vacías) ya pasa de 50
+      // sin una sola palabra escrita por una persona.
+      //
+      // `budget.isPlaceholder` mide CONTENIDO REAL: quita comentarios HTML,
+      // encabezados, blockquotes y bullets vacíos. Medido sobre templates/: las
+      // cuatro plantillas de context/ caen a 0-66 chars.
       const missingFiles = [];
 
       for (const surface of SURFACES) {
@@ -57,11 +74,9 @@ process.stdin.on('end', () => {
           missingFiles.push(`${surface.label} — falta el archivo`);
           continue;
         }
-        const content = fs.readFileSync(surface.path, 'utf8').trim();
-        if (content.length < MIN_MEANINGFUL_LENGTH) {
-          missingFiles.push(`${surface.label} — está vacío`);
-        } else if (PLACEHOLDER_MARKERS.some(marker => content.includes(marker))) {
-          missingFiles.push(`${surface.label} — sigue siendo el template sin rellenar`);
+        const content = fs.readFileSync(surface.path, 'utf8');
+        if (budget.sinLlenar(content)) {
+          missingFiles.push(`${surface.label} — sigue siendo la plantilla sin rellenar`);
         }
       }
 

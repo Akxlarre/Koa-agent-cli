@@ -15,15 +15,32 @@
  * última ejecución. Cache en .claude/temp/indices-cache.json (ya en .gitignore).
  *
  * Uso: npm run indices:sync
+ *
+ * ── Quien manda sobre los indices (DUP-003) ─────────────────────────────────
+ *
+ * Tres piezas los sincronizan, y hasta este comentario ninguna decia cual usar
+ * cuando:
+ *
+ *   este script          LA AUTORIDAD. Lo que deduce del AST manda, y se
+ *                        reescribe entero entre los marcadores AUTO-GENERATED
+ *   index-syncer         el UNICO que escribe indices/: corre este script y
+ *                        completa a mano lo que el no puede deducir
+ *                        (ANTI-PATTERNS, LAYOUTS, borrados, el juicio)
+ *   /sync-indices        la puerta que invoca el humano. Delega y no edita
+ *
+ * Editar DENTRO de los marcadores es trabajo que se pierde en la proxima
+ * corrida (HUE-007). Lo de afuera no se toca nunca.
  */
 
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
+import { cargarTypescript } from './lib/typescript-guard.mjs';
 import { parseMigrations, renderDatabaseMd } from './lib/sql-schema.js';
 
-const require = createRequire(import.meta.url);
-const ts = require('typescript');
+// HUE-018: el require pelado moria con un stack trace de Node cuando el
+// paquete no estaba, y con un TypeError en medio del AST con TypeScript 7.
+// El guard distingue los dos casos y dice que hacer en cada uno.
+const ts = cargarTypescript({ quienLlama: '`npm run indices:sync`' });
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const green  = (s) => `\x1b[32m${s}\x1b[0m`;

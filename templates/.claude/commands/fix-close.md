@@ -12,8 +12,9 @@ allowed-tools: Read, Write, Bash, Glob
    - Si está vacío → error "No hay fix track activo. Nada que cerrar."
    - Si el ID NO empieza con `fix-` → error "El activo es una spec, no un fix. Usa /spec-verify para cerrarla."
 
-2. Leer `specs/<id>/fix.md`:
-   - Si no existe → error "fix.md no encontrado en specs/<id>/. El fix track está corrupto."
+2. Leer `specs/fixes/<id>/fix.md`:
+   - Si no existe, probar `specs/<id>/fix.md` (ruta legacy pre-migración, igual que `/hotfix-close`)
+   - Si tampoco existe → error "fix.md no encontrado en specs/fixes/<id>/. El fix track está corrupto."
 
 3. Verificar el test de regresión:
    - Leer la sección "Test de Regresión" del fix.md
@@ -39,16 +40,22 @@ allowed-tools: Read, Write, Bash, Glob
 
 5.6. Si el "Root Cause" de este fix reveló un gotcha de **dominio/esquema/RLS/regla de
    negocio no obvia** (no visual — eso es `indices/ANTI-PATTERNS.md`) que alguien sin
-   contexto de este fix volvería a pisar, agrega una entrada `DG-NNN` a
-   `indices/DOMAIN-GOTCHAS.md` (ver convención al final de ese archivo). Si el fix fue
-   puramente visual/UI o no dejó ningún hallazgo reutilizable, sáltalo.
+   contexto de este fix volvería a pisar, agrégalo a `context/learnings.md`, que es
+   donde vive el conocimiento de negocio y entorno que el código no expresa. Si el fix
+   fue puramente visual/UI o no dejó ningún hallazgo reutilizable, sáltalo.
+
+   Escríbelo como **principio + criterio de aplicabilidad en el mismo párrafo**, no como
+   la crónica del fix: el `harness-gate` bloquea una lección que cita un track ID sin
+   decir cuándo aplica (`GATE-A1`). "En fix-042 el saldo salía negativo" no sirve;
+   "cuando una cuenta tiene movimientos en dos monedas, el saldo se calcula sobre la
+   moneda base — la conversión va después (visto en fix-042)" sí.
 
 6. Imprimir confirmación:
    ```
    ✅ Fix <id> cerrado.
    
    Resumen:
-     - specs/<id>/fix.md → status: done
+     - specs/fixes/<id>/fix.md → status: done
      - specs/.active → vacío
    
    El spec-gate volverá a bloquear escrituras en código de producto.

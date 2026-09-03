@@ -31,6 +31,9 @@ bazel-out/
 # generados ya lo ignoraba; este repo no, y por eso aparecía como cambio suelto
 # en cada commit.
 .claude/temp/
+# El patron de arriba lleva barra, asi que queda anclado a la raiz. Los tests de
+# hooks crean estado bajo su propio cwd, que puede estar anidado.
+**/.claude/temp/
 
 
 # Workshop — espacio de trabajo privado (planes, research, ADRs, visión)

@@ -2,6 +2,7 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume|clear|fork",
         "hooks": [
           {
             "type": "command",
@@ -100,13 +101,29 @@
         ]
       }
     ],
-    "Stop": [
+    "SessionEnd": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "node .claude/hooks/sdd/hotfix-autoclose.js"
-          },
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/subagent-cleanup.js"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node .claude/hooks/spec-reflection.js"

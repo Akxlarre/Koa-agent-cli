@@ -35,14 +35,33 @@ function makeProject({ indices = {}, brief, spec } = {}) {
   return root;
 }
 
+/** Como runHook pero eligiendo el origen del SessionStart. */
+function runHookConOrigen(root, source) {
+  const sessionId = `ss-src-${Date.now()}-${counter++}`;
+  const r = spawnSync('node', [HOOK], {
+    cwd: root, encoding: 'utf8',
+    input: JSON.stringify({
+      hook_event_name: 'SessionStart', source, session_id: sessionId, cwd: root,
+    }),
+  });
+  return { exitCode: r.status, sessionId };
+}
+
 function runHook(root) {
+  // Tanda 3: el session_id va en el PAYLOAD, no en una env var, y el flag vive
+  // dentro del proyecto — la misma ubicacion que leen pre-write-guard y
+  // compact-recovery (HUE-002).
   const sessionId = `ss-test-${Date.now()}-${counter++}`;
-  const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-  flags.push(flagPath);
+  const flagPath = path.join(root, '.claude', 'temp', 'session', sessionId, 'discovery.flag');
   const r = spawnSync('node', [HOOK], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: sessionId },
+    input: JSON.stringify({
+      hook_event_name: 'SessionStart',
+      source: 'startup',
+      session_id: sessionId,
+      cwd: root,
+    }),
   });
   return {
     exitCode: r.status,
@@ -176,5 +195,44 @@ describe('SESSION START — fail-open', () => {
     const r = runHook(root);
     assert.equal(r.exitCode, 0);
     assert.equal(r.stderr, '');
+  });
+});
+
+describe('ACO-001 / INC-020 — la limpieza de ciclo sesion vive aca', () => {
+  const writesPath = (root) => path.join(root, '.claude', 'temp', 'session-writes.json');
+
+  function conWrites(root) {
+    fs.mkdirSync(path.dirname(writesPath(root)), { recursive: true });
+    fs.writeFileSync(writesPath(root), JSON.stringify(['src/app/x.ts']));
+  }
+
+  test('con origen "startup" borra session-writes.json', () => {
+    const root = makeProject();
+    conWrites(root);
+    runHookConOrigen(root, 'startup');
+    assert.equal(fs.existsSync(writesPath(root)), false,
+      'un arranque real empieza de cero');
+  });
+
+  for (const source of ['resume', 'compact', 'fork', 'clear']) {
+    test(`con origen "${source}" NO lo borra — la sesion sigue viva`, () => {
+      const root = makeProject();
+      conWrites(root);
+      runHookConOrigen(root, source);
+      assert.ok(fs.existsSync(writesPath(root)),
+        'SessionStart corre en los cinco origenes: borrar aca perderia el trabajo en curso');
+    });
+  }
+
+  test('sin campo source tampoco borra — solo "startup" es destructivo', () => {
+    // runHook manda source:'startup', asi que aca se arma el payload a mano.
+    const root = makeProject();
+    conWrites(root);
+    spawnSync('node', [HOOK], {
+      cwd: root, encoding: 'utf8',
+      input: JSON.stringify({ hook_event_name: 'SessionStart', session_id: 's', cwd: root }),
+    });
+    assert.ok(fs.existsSync(writesPath(root)),
+      'ante la duda no se borra: el costo de no limpiar es acumular, el de limpiar es perder');
   });
 });

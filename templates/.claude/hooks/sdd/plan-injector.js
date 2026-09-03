@@ -9,10 +9,22 @@
  * Se ejecuta DESPUES de spec-gate.js. Si el gate no bloqueo, este inyecta.
  *
  * Exit code 0 siempre (este hook nunca bloquea; solo enriquece contexto).
+ *
+ * CAR-001 (S1) — habia tope por seccion pero NINGUNA dedup: cada Edit pagaba el
+ * contrato entero otra vez. Medido, diez ediciones con la misma spec activa
+ * daban 246.220 chars identicos byte por byte. Ahora pasa por lib/budget.js, que
+ * dedupica por CONTENIDO: si la spec cambia se vuelve a emitir, porque es
+ * informacion nueva; si no cambio, no.
+ *
+ * La dedup vive en ambito de HILO (ADR-003 §1) y compact-recovery la olvida al
+ * compactar, que es cuando el agente realmente perdio el contrato.
  */
 
 const fs = require('fs');
 const path = require('path');
+const payload = require('./../lib/payload.js');
+const paths = require('./../lib/paths.js');
+const budget = require('./../lib/budget.js');
 
 const MAX_SECTION_CHARS = 8000;
 
@@ -25,37 +37,19 @@ function readCapped(filePath, label) {
   return '\n\n----- ' + label + ' (' + path.basename(filePath) + ') -----\n' + content;
 }
 
-let data = '';
-process.stdin.on('data', chunk => (data += chunk));
-process.stdin.on('end', () => {
+payload.read().then((input) => {
   try {
-    const input = JSON.parse(data);
-    const filePath = input.tool_input?.file_path || input.tool_input?.path || '';
+    const filePath = input.filePath;
     if (!filePath) return process.exit(0);
 
-    const cwd = process.cwd();
+    const cwd = input.cwd;
     const specsDir = path.join(cwd, 'specs');
     if (!fs.existsSync(specsDir)) return process.exit(0);
 
-    const rel = path.relative(cwd, filePath).replace(/\\/g, '/');
-
-    const exemptPathPrefixes = [
-      'specs/', '.claude/', 'docs/', 'indices/', 'scripts/',
-      'node_modules/', '.git/', 'dist/', 'build/', 'coverage/',
-    ];
-    if (exemptPathPrefixes.some(p => rel.startsWith(p))) return process.exit(0);
-
-    const exemptExtensions = ['.md', '.json', '.yaml', '.yml', '.toml', '.lock'];
-    if (exemptExtensions.includes(path.extname(filePath).toLowerCase())) return process.exit(0);
-
-    const isProductCode =
-      rel.startsWith('src/') ||
-      rel.startsWith('app/') ||
-      rel.startsWith('lib/') ||
-      rel.startsWith('supabase/migrations/') ||
-      /^packages\/[^/]+\/src\//.test(rel);
-
-    if (!isProductCode) return process.exit(0);
+    // La misma respuesta que da spec-gate. Antes cada uno llevaba su lista de
+    // exentos y divergian: src/guia.mdx pasaba el gate y aun asi recibia el
+    // contrato entero. Ver lib/paths.js.
+    if (!paths.isProductCode(filePath, cwd)) return process.exit(0);
 
     const activeFile = path.join(specsDir, '.active');
     if (!fs.existsSync(activeFile)) return process.exit(0);
@@ -108,13 +102,16 @@ process.stdin.on('end', () => {
         '4. Al cerrar la spec corre /spec-verify para validar AC contra evidencia.\n';
     }
 
-    const output = JSON.stringify({
+    // CAR-001: si es lo mismo que ya se dijo en este hilo, no se repite.
+    const aEmitir = budget.inject(input, 'plan-sdd', context, { cutAt: null });
+    if (!aEmitir) return process.exit(0);
+
+    process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
-        additionalContext: context,
+        additionalContext: aEmitir,
       },
-    });
-    process.stdout.write(output);
+    }));
     process.exit(0);
   } catch (e) {
     process.exit(0);

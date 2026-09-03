@@ -1,5 +1,5 @@
 ---
-description: Crear un hotfix track SDD para correcciones donde el "cómo" es obvio y no cambia contratos públicos. Se cierra automáticamente al terminar la sesión.
+description: Crear un hotfix track SDD para correcciones donde el "cómo" es obvio y no cambia contratos públicos. Se cierra con /hotfix-close.
 argument-hint: "<descripción corta del problema>"
 allowed-tools: Read, Write, Bash, Glob
 ---
@@ -27,7 +27,7 @@ Un hotfix aplica cuando **TODAS** estas condiciones se cumplen:
 **Diferencias clave respecto a `/fix-new`:**
 - Sin `Test de Regresión` obligatorio
 - Sin `Root Cause` detallado
-- **Auto-close**: el track se cierra solo al terminar la sesión
+- **Cierre liviano**: `/hotfix-close`, sin verificación de test de regresión (y si te olvidás, `SessionEnd` lo recoge)
 - Vive en `specs/hotfixes/` (separado, con sistema de aprendizaje futuro)
 
 ## Procedimiento
@@ -58,7 +58,7 @@ Un hotfix aplica cuando **TODAS** estas condiciones se cumplen:
    ✅ Hotfix track creado: specs/hotfixes/<id>/hotfix.md
    ✅ specs/.active actualizado: <id>
 
-   Este track se cierra automáticamente al terminar la sesión.
+   Al terminar, cerralo con /hotfix-close.
    Ya puedes editar el código — el spec-gate permite escrituras.
    ```
 
@@ -87,5 +87,7 @@ Un hotfix aplica cuando **TODAS** estas condiciones se cumplen:
 - Puede tocar múltiples archivos siempre que los cambios sean mecánicos, no decisiones de diseño.
 - Los IDs son secuenciales dentro de `hotfixes/` y NO se reutilizan.
 - `specs/.active` solo puede tener un ID a la vez. `/hotfix` reemplaza cualquier activo previo.
-- El autoclose script limpia `.active` al cierre de sesión y marca `status: done`.
+- El cierre normal es `/hotfix-close`. `sdd/hotfix-autoclose.js` es la red: corre en
+  `SessionEnd` y recoge el track que quedó abierto. Vivía en `Stop` —el final de cada
+  respuesta, no de la sesión— y por eso cerraba el hotfix en el primer turno (INC-007).
 - Si durante la implementación aparece complejidad inesperada → cerrarlo y abrir `/fix-new` o `/spec-new`.

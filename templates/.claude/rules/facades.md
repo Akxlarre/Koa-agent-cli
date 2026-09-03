@@ -1,4 +1,5 @@
 ---
+enforcement: social
 paths:
   - "src/app/core/facades/**/*.ts"
   - "src/app/core/services/**/*.ts"

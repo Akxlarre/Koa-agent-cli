@@ -48,6 +48,28 @@ Claude recibe un prompt del humano
         └─ PostCompact → compact-recovery.js → re-inyecta índices
 ```
 
+## Orden que importa
+
+El orden de los hooks dentro de un evento **no es cosmético en todos los casos**, y
+reordenar `settings.json` no rompe ningún build: rompe el harness en silencio. Estas
+son las dependencias reales, y `settings.test.js` las verifica.
+
+| Dependencia | Qué se rompe al invertirla |
+|---|---|
+| `sdd/spec-gate.js` **antes** que `sdd/plan-injector.js` (PreToolUse) | El injector inyectaría el contrato SDD sobre una escritura que el gate iba a bloquear: contexto pagado por un `Edit` que no va a ocurrir |
+| `write-tracker.js` **antes** que `post-edit.js` (PostToolUse) | `post-edit` corre prettier y puede tardar; el tracker registra la escritura primero |
+
+Y una dependencia **entre** eventos, que `settings.json` no puede expresar:
+
+| Dependencia | Por qué |
+|---|---|
+| `discovery-tracker.js` (PostToolUse `Read`) antes de cualquier `Edit` | El Discovery Gate lee el flag que ese hook escribe. Si el `Read` del índice y el `Edit` ocurren en el mismo turno, el orden lo decide el runtime, no el harness — por eso `session-start` siembra el flag al arrancar en vez de confiar en que el agente lea primero |
+
+Una dependencia que la auditoría encontró y que **ya no existe**: `sync-check` iba después
+de `spec-reflection` porque borraba `session-writes.json`. Desde que dejó de borrarlo
+(`ACO-001`) el orden entre esos dos da igual. Un contrato que deja de ser necesario se
+saca, no se hereda.
+
 ## Hooks Activos
 
 ### 0. Session Start (`session-start.js`) y Prompt Context (`prompt-context.js`)
@@ -119,7 +141,9 @@ objetivo equivocado.
 |------|--------|---------|
 | `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escribir código de producto sin una spec activa con su plan. **Fail-open**: sin carpeta `specs/` no bloquea nada. |
 | `sdd/plan-injector.js` | PreToolUse (Edit/Write) | Inyecta la spec y el plan activos como contexto en cada edición. |
-| `sdd/hotfix-autoclose.js` | Stop | Cierra los tracks `hotfix-*` al terminar la sesión. |
+| `lib/guard-rules.js` | — | No es un hook: es el registro de las reglas que emite `pre-write-guard`. Cada una con su ID, su doc y el fixture que la provoca. |
+| `subagent-cleanup.js` | SubagentStop | Borra el estado de hilo del subagente que termina (dedup, anti-bucle, breaker). El estado de sesión —discovery flag, `session-writes.json`— sobrevive. |
+| `sdd/hotfix-autoclose.js` | SessionEnd | Red de seguridad: cierra el track `hotfix-*` que quedó abierto. El cierre normal es `/hotfix-close`. |
 | `context-enrichment-guard.js` | — (**OPT-IN**) | Day 0 Context Guard: impide escribir código mientras `context/domain.md` e `indices/DATABASE.md` sigan vacíos. **No viene cableado**: un proyecto recién generado los trae como plantilla, así que activarlo por defecto bloquearía todo desde el minuto cero. |
 
 **Contexto inyectado por tipo de archivo (Context Injection):**
@@ -130,15 +154,15 @@ tenga las rules y skills presentes **sin tener que leerlas manualmente**.
 
 | Archivo editado | Rules inyectadas | Skills referenciadas |
 |----------------|-----------------|---------------------|
-| `features/*.component.ts` | architecture.md (Smart), visual-system.md (tokens, bento, GSAP) | angular-component, design-system, angular-signals |
-| `shared/*.component.ts` | architecture.md (Dumb: solo input/output), visual-system.md (cards, radios) | angular-component, design-system |
-| `layout/*.component.ts` | architecture.md (Layout), visual-system.md (dark mode) | — |
+| `features/*.component.ts` | architecture.md (Smart), visual-tokens.md, visual-patterns.md (bento, GSAP) | angular-component, design-system, angular-signals |
+| `shared/*.component.ts` | architecture.md (Dumb: solo input/output), visual-tokens.md | angular-component, design-system |
+| `layout/*.component.ts` | architecture.md (Layout), visual-tokens.md (dark mode), visual-patterns.md | — |
 | `core/services/*.facade.ts` | architecture.md (Facade pattern, toSignal) | angular-signals |
 | `core/services/*.service.ts` | architecture.md (Core service, no UI injection) | angular-signals |
 | `core/directives/*.ts` | architecture.md (directivas) | angular-component |
 | `supabase/migrations/*.sql` | database.md (naming, RLS, idempotencia) | supabase-data-model |
-| `*.html` (templates) | architecture.md (@if/@for), visual-system.md (tokens, bento), ai-readability.md (data-llm-*) | angular-primeng |
-| `*.scss` / `*.css` | visual-system.md (tokens, layouts, motion) | design-system |
+| `*.html` (templates) | architecture.md (@if/@for), visual-tokens.md, ai-readability.md (data-llm-*) | angular-primeng |
+| `*.scss` / `*.css` | visual-tokens.md (tokens, temas) | design-system |
 
 ### 2. Discovery Tracker (`discovery-tracker.js`)
 - **Evento**: PostToolUse
@@ -180,7 +204,12 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
 - **Función**: Cuando Claude Code compacta la conversación, re-inyecta el contexto
   que el agente estaba usando. Tres decisiones de diseño:
   - **Selectiva** — solo los índices que el agente había leído (más los 3 core),
-    según el flag de discovery. No los 11.
+    según el flag de discovery. No los 15.
+  - **Sin lista propia** — los índices candidatos salen de `indices/` en el disco.
+    Antes eran un mapa a mano de diez entradas contra los quince del template, y
+    `GUARDS`, `LAYOUTS`, `ROUTES`, `USAGE-MAP` y `UTILS` no volvían nunca aunque el
+    agente los hubiera leído (`HUE-003`). Si agregas `indices/NUEVO.md`, se re-inyecta
+    solo: no hay nada que actualizar acá.
   - **Parcial** — corta cada índice en `<!-- DETAIL:BEGIN -->`: vuelve la Quick
     Reference, no los ejemplos de código.
   - **Solo lo pendiente** — del task-spec activo re-inyecta únicamente las casillas
@@ -263,10 +292,20 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
 
   | Chequeo | Superficie | Qué bloquea |
   |---|---|---|
-  | GATE-A1 | Guía | Cita un track (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin ningún criterio de aplicabilidad cerca — receta memorizada en vez de regla reusable |
+  | GATE-A1 | Guía | Cita un track (`fix-NNN`/`spec-NNN`/`hotfix-NNN`/`task-NNN`) sin ningún criterio de aplicabilidad **en el mismo párrafo** — receta memorizada en vez de regla reusable |
   | GATE-A2 | Guía | Snippet de despacho por keyword-matching literal (`if ("token" in text)`) — ni siquiera como prosa/pseudo-código |
   | GATE-B1 | Guía | Lógica ejecutable real (`require`/`process.exit`/`fs.*`) colada en un archivo que debería ser solo prosa |
   | GATE-B2 | Capacidad | `console.log`/`console.warn` con tono de consejo y sin ningún `process.exit(2)` que lo respalde — guía disfrazada de script |
+  | GATE-C1 | Capacidad declarada | Tocar `tools:`, `hooks:`, `model:` o `permission-mode:` en `.claude/agents/`, `.claude/skills/` o `.claude/commands/`. El texto de esos archivos es del agente; esas claves deciden qué puede hacer y las cambia el humano (`HUE-031`) |
+  | GATE-D1 | Cualquier archivo con marcadores | Escribir DENTRO de una región `AUTO-GENERATED`. No falla ahora: desaparece en la próxima corrida del generador, sin rastro (`HUE-007`) |
+
+  `GATE-A1` es un chequeo **léxico**, y su alcance es el párrafo a propósito: antes
+  miraba el archivo entero, y como «cuando» y «nunca» son de las palabras más comunes
+  de la prosa técnica en español, una sola lección bien escrita arriba de
+  `learnings.md` absolvía a todas las recetas agregadas después (`DEC-002`). El
+  guardrail se apagaba solo, y el disparador era usarlo bien una vez. No pretende
+  distinguir un principio de una receta —un regex no puede—: pretende que el criterio
+  esté escrito **donde está el track**.
 
   La intuición: una lección que sobrevive a una sesión debe quedar escrita como un
   **principio + criterio de cuándo aplica**, nunca como la respuesta memorizada a un
@@ -305,7 +344,7 @@ de markup no auditarían nada.
 | ARCH-18 | Alias prohibidos dentro del propio `@theme` |
 | ARCH-21 | Clase `.bento-*` definida sin aprobar en `scripts/lib/bento-classes.allowlist.json`. Freno contra el sprawl del grid — ver el árbol de decisión en `indices/STYLES.md` |
 | ARCH-22 | Una clase del DS con el nombre de una utilidad "pelada" de Tailwind. Tailwind genera SU regla homónima en `@layer utilities` y **se suma** a la tuya en vez de reemplazarla |
-| ARCH-23 | Celda hija de un grid `.bento-grid--fill-screen*` que ocupa 2 filas (`.bento-hero`/`.bento-feature`/`.bento-tall` o `data-row-span="2"`). Desborda el `grid-template-rows` explícito: las filas implícitas se superponen sin lanzar ningún error — ver el patrón App-like en `.claude/rules/visual-system.md` |
+| ARCH-23 | Celda hija de un grid `.bento-grid--fill-screen*` que ocupa 2 filas (`.bento-hero`/`.bento-feature`/`.bento-tall` o `data-row-span="2"`). Desborda el `grid-template-rows` explícito: las filas implícitas se superponen sin lanzar ningún error — ver el patrón App-like en `.claude/rules/visual-patterns.md` |
 | ARCH-25 | Par texto/fondo por debajo de WCAG AA, **en cualquiera de los dos temas**. Compone los fondos semi-transparentes antes de medir. Ratcheado con `scripts/lib/contrast.baseline.json` |
 | ARCH-26 | Token del `@theme` con el nombre de un valor de escala nativa. `--color-base` genera `text-base` como utilidad de **color**, que le gana a la de tamaño: es el bug que dejó los inputs del login en 1.15:1, invisibles en producción |
 

@@ -10,11 +10,15 @@
  * que scripts/indices-sync.js para indices/*.md). El resto de ASSIGNMENTS.md
  * (Pendientes, Convenciones, notas) no se toca.
  *
+ * Interruptor: sin `specs/AUTHORS.md` la capa está apagada y esto sale en 0 sin
+ * tocar nada (INC-010, DUP-001). Ver scripts/lib/assignments-switch.js.
+ *
  * Uso: npm run assignments:sync
  */
 
 import fs from 'fs';
 import path from 'path';
+import { capaEncendida, avisoApagada } from './lib/assignments-switch.js';
 
 const ROOT = process.cwd();
 const SPECS_DIR = path.join(ROOT, 'specs');
@@ -75,15 +79,33 @@ function parseAssignment(fileName) {
   };
 }
 
+/**
+ * Un ASSIGNMENTS.md sin marcadores no es «algo roto en los datos»: es un tablero
+ * que todavía no está preparado para que un script escriba en él. Se dice cómo
+ * arreglarlo en vez de tirar un stack trace (DUP-001).
+ *
+ * INC-022 — la plantilla canónica de `sdd/templates/ASSIGNMENTS.md` no traía
+ * NINGÚN marcador `AUTO-GENERATED`, así que el único camino de escritura de la
+ * capa fallaba también en un proyecto que hubiera hecho todo bien. La plantilla
+ * ya los trae; esto es para los tableros creados antes.
+ */
 function replaceGeneratedSection(md, sectionHeader, newBody) {
   const headerIdx = md.indexOf(sectionHeader);
   if (headerIdx === -1) {
-    throw new Error(`No se encontró la sección "${sectionHeader}" en ASSIGNMENTS.md`);
+    throw new Error(
+      `Falta la sección "${sectionHeader}" en specs/ASSIGNMENTS.md.\n` +
+      '  Compará tu tablero con .claude/skills/sdd/templates/ASSIGNMENTS.md.');
   }
   const beginIdx = md.indexOf('<!-- AUTO-GENERATED:BEGIN -->', headerIdx);
   const endIdx = md.indexOf('<!-- AUTO-GENERATED:END -->', beginIdx);
   if (beginIdx === -1 || endIdx === -1) {
-    throw new Error(`No se encontraron marcadores AUTO-GENERATED para "${sectionHeader}"`);
+    throw new Error(
+      `La sección "${sectionHeader}" no tiene marcadores AUTO-GENERATED.\n` +
+      '  Este script solo reescribe lo que está entre ellos — el resto del tablero es tuyo.\n' +
+      '  Envolvé la tabla de esa sección así:\n' +
+      '      <!-- AUTO-GENERATED:BEGIN -->\n' +
+      '      | ID | … |\n' +
+      '      <!-- AUTO-GENERATED:END -->');
   }
   const before = md.slice(0, beginIdx + '<!-- AUTO-GENERATED:BEGIN -->'.length);
   const after = md.slice(endIdx);
@@ -91,8 +113,17 @@ function replaceGeneratedSection(md, sectionHeader, newBody) {
 }
 
 function main() {
+  // Interruptor: apagada → mensaje y exit 0. Este script ESCRIBE, así que la
+  // distinción importa el doble: no tiene que tocar nada en un proyecto que no
+  // usa la capa, ni fingir que todo está bien si la capa está a medias.
+  if (!capaEncendida(SPECS_DIR)) {
+    console.log(avisoApagada('assignments-sync'));
+    process.exit(0);
+  }
+
   if (!fs.existsSync(ASSIGNMENTS_MD) || !fs.existsSync(ASSIGNMENTS_DIR)) {
-    console.error('No se encontró specs/ASSIGNMENTS.md o specs/assignments/.');
+    console.error('specs/AUTHORS.md existe pero falta specs/ASSIGNMENTS.md o specs/assignments/.');
+    console.error('  La capa está encendida y le falta su tablero: un script que escribe no sigue sobre datos incompletos.');
     process.exit(1);
   }
 
@@ -174,4 +205,11 @@ function main() {
   console.log(dim('\nspecs/ASSIGNMENTS.md actualizado (solo las secciones AUTO-GENERATED).\n'));
 }
 
-main();
+try {
+  main();
+} catch (e) {
+  // Fail LOUD pero legible: este script escribe archivos, así que no sigue sobre
+  // datos rotos — y tampoco vuelca un stack trace encima de la persona.
+  console.error(`\x1b[31massignments-sync: ${e.message}\x1b[0m`);
+  process.exit(1);
+}

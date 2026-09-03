@@ -1,12 +1,28 @@
 {
-  "name": "koa-agent-cli",
-  "version": "1.0.0",
-  "description": "Scaffold Angular projects that are native to AI agents — agentic harness, real-time guardrails, and living indexes out of the box.",
+  "name": "create-koa-agent",
+  "version": "7.2.0",
+  "description": "Scaffold Angular projects with an agentic harness that enforces its own rules.",
   "main": "index.js",
+  "bin": {
+    "create-koa-agent": "./bin/index.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "npm run test:cli && npm run test:hooks",
+    "test": "npm run test:cli && npm run test:hooks && npm run test:guardrails && npm run test:provocacion",
     "test:cli": "node --test test/*.test.mjs",
-    "test:hooks": "node --test templates/.claude/tests/*.test.js"
+    "test:hooks": "node --test templates/.claude/tests/*.test.js",
+    "test:guardrails": "cd templates/boilerplate && node --test scripts/lib/*.test.mjs",
+    "test:provocacion": "cd templates/boilerplate && node scripts/provocar-reglas.mjs",
+    "test:integracion": "node --test test/integracion/*.test.mjs"
   },
   "keywords": [
     "angular",
@@ -28,11 +44,7 @@
     "inquirer": "^13.3.0",
     "ora": "^9.3.0"
   },
-  "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
-  "bin": {
-    "create-koa-agent": "./bin/index.js"
+  "devDependencies": {
+    "typescript": "^5.9.0"
   }
 }

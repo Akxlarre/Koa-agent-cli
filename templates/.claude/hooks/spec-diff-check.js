@@ -14,20 +14,29 @@
  * Exit codes:
  *   0 = permitir el commit
  *   2 = bloquear el commit con mensaje de qué falta actualizar
+ *
+ * DEC-001 (S1) — la entrada llegaba de `process.env.TOOL_INPUT`, que NO existe:
+ * no está entre las variables que Claude Code expone a los hooks. Con el comando
+ * siempre vacío, la guarda de abajo cortaba en la primera línea y este chequeo no
+ * podía fallar nunca. La lógica estaba bien; estaba desconectada de su entrada.
+ * Ahora lee stdin, que es el contrato documentado, vía lib/payload.js.
  */
 
 const fs = require('fs');
 const path = require('path');
+const payload = require('./lib/payload.js');
+const indices = require('./lib/indices.js');
 
-// Solo aplica a comandos git commit
-const toolInput = process.env.TOOL_INPUT || '{}';
-let cmd = '';
-try { cmd = JSON.parse(toolInput).command || ''; } catch { /* ignore */ }
+payload.read().then((input) => {
+  // Solo aplica a comandos git commit
+  const cmd = input.command;
+  if (!cmd.includes('git') || !cmd.includes('commit')) {
+    process.exit(0);
+  }
+  revisarIndices();
+});
 
-if (!cmd.includes('git') || !cmd.includes('commit')) {
-  process.exit(0);
-}
-
+function revisarIndices() {
 const sessionWritesPath = path.join(process.cwd(), '.claude', 'temp', 'session-writes.json');
 if (!fs.existsSync(sessionWritesPath)) process.exit(0);
 
@@ -61,7 +70,13 @@ for (const writtenPath of sessionWrites) {
   const componentName = match[1]; // e.g. "kpi-card"
   const selectorName = `app-${componentName}`;
 
-  if (!componentsIndex.includes(selectorName) && !componentsIndex.includes(componentName)) {
+  // HUE-014: esto era `componentsIndex.includes(nombre)` sobre el archivo
+  // ENTERO. Medido contra el COMPONENTS.md que reparte el blueprint, con
+  // componentes inventados: 6 de 6 pasaban como registrados —`card` matchea
+  // dentro de `app-kpi-card`, `tabla` esta en la prosa, y `x` es una sola
+  // letra—. Para cualquier nombre corto o comun el guardrail no podia fallar.
+  // `indices.registrado` pregunta si hay una FILA que lo declare: 1 de 6.
+  if (!indices.registrado(componentsIndex, selectorName, componentName)) {
     missing.push(`  - <${selectorName}> no está en indices/COMPONENTS.md`);
   }
 }
@@ -74,7 +89,8 @@ for (const writtenPath of sessionWrites) {
   const fileName = path.basename(norm, '.facade.ts'); // e.g. "auth"
   const facadeName = fileName.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('') + 'Facade';
 
-  if (!facadesIndex.includes(facadeName) && !servicesIndex.includes(facadeName)) {
+  if (!indices.registrado(facadesIndex, facadeName)
+      && !indices.registrado(servicesIndex, facadeName)) {
     missing.push(`  - ${facadeName} no está en indices/FACADES.md`);
   }
 }
@@ -93,3 +109,4 @@ if (missing.length > 0) {
 }
 
 process.exit(0);
+} // fin de revisarIndices()

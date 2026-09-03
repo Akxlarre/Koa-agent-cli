@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # LLM-01, LLM-02
 paths:
   - "src/app/**/*.html"
   - "src/app/features/**/*.ts"

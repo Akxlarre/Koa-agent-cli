@@ -26,11 +26,43 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const payload = require('./lib/payload.js');
+const session = require('./lib/session.js');
 
-const cwd = process.cwd();
-const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
 const DETAIL_MARKER = '<!-- DETAIL:BEGIN -->';
+
+// SessionStart tambien recibe su payload por stdin: de ahi salen `session_id`
+// —la misma clave que usan los otros tres hooks del discovery flag— y `source`,
+// que distingue un arranque real de un resume/compact/fork (INC-020).
+payload.read().then((PAYLOAD) => {
+  limpiarSiEsUnArranqueReal(PAYLOAD);
+  arrancar(PAYLOAD, PAYLOAD.cwd);
+});
+
+/**
+ * La limpieza de todo lo de ciclo `sesión` vive acá, y SOLO con origen
+ * `startup` (ADR-002 §1, INC-020).
+ *
+ * Dos cosas se borran:
+ *   - session-writes.json, que sync-check borraba en cada `Stop` creyendo que
+ *     era el fin de la sesión, dejando sin datos a spec-diff-check y a
+ *     spec-reflection desde el primer cierre (ACO-001).
+ *   - el estado de sesiones viejas, por antigüedad, para que .claude/temp/ no
+ *     crezca sin límite.
+ *
+ * En `resume`, `compact`, `fork` y `clear` no se borra nada: la sesión sigue
+ * viva y el trabajo en curso también.
+ */
+function limpiarSiEsUnArranqueReal(PAYLOAD) {
+  try {
+    if (PAYLOAD.source !== 'startup') return;
+    fs.rmSync(path.join(PAYLOAD.cwd, '.claude', 'temp', 'session-writes.json'),
+      { force: true });
+    session.cleanup(PAYLOAD, { source: 'startup' });
+  } catch { /* fail-open — arrancar nunca falla por no poder limpiar */ }
+}
+
+function arrancar(PAYLOAD, cwd) {
 
 // Presupuesto de tokens: esto se inyecta en CADA sesión, así que se mantiene
 // deliberadamente corto. Los índices completos se leen bajo demanda.
@@ -114,12 +146,11 @@ try {
 // Si le dimos los índices, bloquearlo por "no leyó los índices" sería mentira.
 if (injectedIndices.length > 0) {
   try {
-    const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
     const stamp = new Date().toISOString();
-    const entry = injectedIndices
-      .map(n => `${stamp} | SESSION-START | indices/${n}.md\n`)
-      .join('');
-    fs.appendFileSync(flagPath, entry);
+    for (const n of injectedIndices) {
+      session.appendState(PAYLOAD, 'discovery.flag',
+        `${stamp} | SESSION-START | indices/${n}.md`);
+    }
   } catch { /* fail-open — el Gate simplemente seguirá activo */ }
 }
 
@@ -146,3 +177,4 @@ out += '════════════════════════
 
 process.stdout.write(out);
 process.exit(0);
+} // fin de arrancar()

@@ -16,7 +16,8 @@
  *   6. Prohibido *ngIf, *ngFor, [ngClass], [ngStyle] en templates.
  *
  * Reglas activas (Regex sobre estilos .scss):
- *   7. Prohibido @keyframes en archivos SCSS dentro de src/app/.
+ *   7. Prohibido @keyframes en SCSS de componente (src/app/). src/styles/ —la capa
+ *      de motion curada del DS— queda fuera a propósito.
  *
  * Regla activa (Regex sobre .ts y .html):
  *   8. Prohibido colores Tailwind hardcodeados (text-red-500, bg-blue-200, etc.).
@@ -35,10 +36,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
+import { cargarTypescript } from './lib/typescript-guard.mjs';
 
-// TypeScript es una dependencia de Angular. Usamos createRequire para importar
-// el paquete CJS de TypeScript desde un contexto ESM de forma segura.
 import { parseThemeTokens, findDeadTokenClasses, findForbiddenThemeAliases } from './lib/theme-tokens.js';
 import { kebabToPascal, collectUsedIcons, parseRegisteredIcons } from './lib/icon-registry.js';
 import { findIconOnlyButtonsWithoutLabel } from './lib/a11y-guardrails.js';
@@ -54,8 +53,10 @@ import {
 } from './lib/class-discipline.js';
 import { parsearTemas, verificarPares } from './lib/contrast-check.js';
 
-const require = createRequire(import.meta.url);
-const ts = require('typescript');
+// HUE-018: el require pelado moria con un stack trace de Node cuando el
+// paquete no estaba, y con un TypeError en medio del AST con TypeScript 7.
+// El guard distingue los dos casos y dice que hacer en cada uno.
+const ts = cargarTypescript({ quienLlama: '`npm run lint:arch`' });
 
 // ─── Colores de consola ───────────────────────────────────────────────────────
 const red    = '\x1b[31m%s\x1b[0m';
@@ -67,13 +68,25 @@ console.log(yellow, '🔍 Iniciando Auditoría Arquitectónica (AST Mode v2.0)..
 console.log('');
 
 // ─── Stack flags (lee blueprint.json para saltar reglas según configuración) ──
-let STACK = { angular: true, tailwind: true, primeng: true, gsap: true, supabase: true };
+//
+// HUE-005: antes era `{ ...STACK, ...bp.stack }`, que acepta cualquier cosa. Un
+// `{ supabase: null }` o `{ supabase: 0 }` apagaba SEC-RLS-01/02/03 en silencio,
+// y un `{ supabase: "false" }` las dejaba activas pese a la intención contraria.
+//
+// La lista de claves es la misma que declara .claude/hooks/lib/blueprint.js —
+// este archivo vive en otro árbol y no puede importarla, así que un test
+// verifica que las dos no diverjan.
+const STACK_KEYS = ['angular', 'tailwind', 'primeng', 'gsap', 'supabase'];
+const STACK = { angular: true, tailwind: true, primeng: true, gsap: true, supabase: true };
 try {
     const blueprintPath = path.join(process.cwd(), 'blueprint.json');
     if (fs.existsSync(blueprintPath)) {
         const bp = JSON.parse(fs.readFileSync(blueprintPath, 'utf-8'));
-        if (bp.stack && typeof bp.stack === 'object') {
-            STACK = { ...STACK, ...bp.stack };
+        const crudo = bp && bp.stack;
+        if (crudo && typeof crudo === 'object' && !Array.isArray(crudo)) {
+            for (const k of STACK_KEYS) {
+                if (typeof crudo[k] === 'boolean') STACK[k] = crudo[k];
+            }
         }
     }
 } catch { /* fail-open: usar defaults */ }
@@ -81,12 +94,12 @@ try {
 const RULES = {
     'ARCH-11': {
         name: 'Dead token classes',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'La clase no existe en @theme (src/tailwind.css) — Tailwind no genera CSS para ella. Usa un token real o agrégalo al @theme.',
     },
     'ARCH-18': {
         name: 'Forbidden bare aliases in @theme',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Un alias "pelado" en @theme colisiona con utilidades nativas de Tailwind. Renombra el token.',
     },
     'ARCH-21': {
@@ -96,47 +109,47 @@ const RULES = {
     },
     'ARCH-22': {
         name: 'DS class collides with bare Tailwind utility',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Renombra la clase del design system: Tailwind genera su propia regla homónima en @layer utilities y se SUMA a la tuya (no la reemplaza).',
     },
     'ARCH-15': {
         name: 'Ad-hoc pill/badge',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Usa el componente de badge del proyecto en vez de recomponer rounded-full + micro-texto + px- a mano.',
     },
     'ARCH-16': {
         name: 'Size utilities over btn-*',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'No pises el tamaño de un .btn-* con px-/py-/text-*/rounded-*. Si hace falta otra medida, es una variante del DS.',
     },
     'ARCH-17': {
         name: 'Arbitrary font size',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Reemplaza text-[NNpx] por un token de la escala tipográfica.',
     },
     'ARCH-19': {
         name: 'Ad-hoc typography cluster',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Usa .micro-label / .item-title / .section-eyebrow / .kpi-value en vez de recomponer el cluster de utilities.',
     },
     'ARCH-24': {
         name: 'Ad-hoc input cluster',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Usa .field-input (y .field-label) en vez de recomponer el cluster de borde + fondo + padding + radio sobre un campo.',
     },
     'ARCH-23': {
         name: 'Fill-screen bento cell spanning 2 rows',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-patterns.md',
         fix: 'En un grid App-like toda celda hija ocupa UNA fila: usa .bento-banner y anida adentro (KPIs como grid/flex dentro del banner). .bento-hero/.bento-feature/.bento-tall ocupan 2 filas y desbordan el template explícito.',
     },
     'ARCH-25': {
         name: 'Contrast below WCAG AA',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Ajusta el token de texto o el de fondo hasta 4.5:1 (3.0:1 si el texto es grande). Que un token exista en los dos temas no significa que se pueda leer.',
     },
     'ARCH-26': {
         name: 'Theme token collides with a native Tailwind utility',
-        doc: '.claude/rules/visual-system.md',
+        doc: '.claude/rules/visual-tokens.md',
         fix: 'Renombra el token: un --color-X donde X es un valor de una escala nativa (base, sm, lg, xl…) genera una utilidad de COLOR que le gana a la nativa. `--color-base` hacía que `text-base` pintara texto del color del fondo.',
     },
     'NAV-01': {
@@ -185,9 +198,9 @@ const RULES = {
         fix: 'Usa Control Flow nativo (Angular 17+): @if/@for y bindings directos.',
     },
     'ARCH-07': {
-        name: 'No @keyframes in app styles',
+        name: 'No @keyframes in component styles',
         doc: 'docs/TECH-STACK-RULES.md#arch-07',
-        fix: 'Usa GsapAnimationsService para animaciones. GSAP es obligatorio en este proyecto.',
+        fix: 'Usa GsapAnimationsService para animaciones de UI. La capa de motion curada del DS vive en src/styles/ y esta regla no la mira.',
     },
     'ARCH-08': {
         name: 'No hardcoded Tailwind colors',
@@ -330,6 +343,26 @@ function walkAst(node, visitor) {
     ts.forEachChild(node, child => walkAst(child, visitor));
 }
 
+/**
+ * ── Contrato de salida: `[CÓDIGO]` entre corchetes (ACO-009) ────────────────
+ *
+ * Los corchetes de acá abajo no son decoración tipográfica: son la señal de la
+ * que cuelga `scripts/provocar-reglas.mjs`, que arma un sandbox con una
+ * violación y exige que la salida NOMBRE la regla. Su lector es
+ * `disparo()`/`codigosNombrados()` en `scripts/lib/provocacion.js`.
+ *
+ * El contrato tiene dos mitades y las dos importan:
+ *
+ *   · el linter escribe `[CÓDIGO]` cuando esa regla reportó algo;
+ *   · y NO lo escribe cuando no reportó nada — por eso el resumen «📋 Reglas
+ *     validadas» del final lista los códigos pelados. Ponerle corchetes ahí
+ *     haría que toda regla se leyera como disparada y la provocación pasaría a
+ *     dar verde con reglas muertas adentro.
+ *
+ * Si esto cambia, cambia con `provocacion.js`. El chequeo de colateral de la
+ * provocación lo hace fallar si se rompe, pero el aviso vive acá porque acá es
+ * donde se rompe.
+ */
 function reportError(ruleId, filePath, message, solutionOverride) {
     const relativePath = path.relative(process.cwd(), filePath);
     const rule = RULES[ruleId];
@@ -362,6 +395,22 @@ function getLineSpan(sourceFile, node) {
     const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line;
     const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line;
     return { startLine: start + 1, endLine: end + 1, lines: (end - start) + 1 };
+}
+
+/**
+ * Las líneas del CUERPO de una clase: del primer miembro al último (INC-008).
+ *
+ * `getLineSpan` sobre un ClassDeclaration incluye los decoradores, porque en el
+ * AST de TypeScript son parte del nodo. En un componente Angular con template
+ * inline eso es casi todo el archivo, y medir HTML no dice nada sobre si la
+ * clase es demasiado compleja. Una clase sin miembros mide 0.
+ */
+function getBodyLineSpan(sourceFile, node) {
+    const miembros = node.members;
+    if (!miembros || miembros.length === 0) return 0;
+    const primero = sourceFile.getLineAndCharacterOfPosition(miembros[0].getStart(sourceFile)).line;
+    const ultimo = sourceFile.getLineAndCharacterOfPosition(miembros[miembros.length - 1].getEnd()).line;
+    return (ultimo - primero) + 1;
 }
 
 function analyzeTypeScript(filePath) {
@@ -481,15 +530,37 @@ function analyzeTypeScript(filePath) {
     }
 
     // ── ARCH-09 (WARNING): shared/**/*.component.ts con clase >200 líneas ────
+    //
+    // INC-008: esto medía el span del ClassDeclaration, y en TypeScript los
+    // decoradores son parte del nodo. En un componente Angular con template
+    // inline —que es como escribe TODO este boilerplate— eso significa que
+    // ARCH-09 contaba el markup y lo reportaba como «clase demasiado grande».
+    // Medido sobre el propio boilerplate:
+    //
+    //   section-hero  1.170 «líneas de clase» → 910 son el @Component, 258 la clase
+    //   tabs            298 «líneas de clase» → 248 son el @Component,  48 la clase
+    //
+    // Una clase de 48 líneas denunciada por tener 298. La regla no medía lo que
+    // su nombre y su fix («divide el componente, extrae lógica a servicios»)
+    // dicen medir: medía cuánto HTML tiene el archivo.
+    //
+    // Ahora mide el CUERPO. El total sigue en el mensaje porque un template
+    // inline enorme es una señal real — pero es otra señal, y decirla con las
+    // palabras de esta no ayudaba a nadie a arreglar nada.
     if (isComponent && isInShared) {
         walkAst(sourceFile, node => {
             if (!ts.isClassDeclaration(node)) return;
-            const span = getLineSpan(sourceFile, node);
-            if (span.lines > 200) {
+            const total = getLineSpan(sourceFile, node).lines;
+            const cuerpo = getBodyLineSpan(sourceFile, node);
+            if (cuerpo > 200) {
+                const decorador = total - cuerpo;
                 reportWarning(
                     'ARCH-09',
                     filePath,
-                    `Clase demasiado grande (${span.lines} líneas). Límite recomendado: 200.`,
+                    `Clase demasiado grande (${cuerpo} líneas de cuerpo). Límite recomendado: 200.`
+                    + (decorador > cuerpo
+                        ? ` (El archivo tiene ${total} líneas de declaración: ${decorador} son el @Component —template y estilos inline—, que no cuentan para este límite.)`
+                        : ''),
                 );
             }
         });
@@ -621,10 +692,20 @@ function analyzeStyles(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
 
     // ── Regla 7: @keyframes prohibido (skip si stack.gsap === false) ─────────
+    //
+    // El alcance es `src/app/**`, porque es donde el scanner entra: `src/styles/`
+    // queda fuera A PROPÓSITO. Ahí vive la capa de motion curada del design
+    // system —`_animations.scss`, las view transitions (que GSAP no puede hacer)
+    // y los overrides de PrimeNG—: siete `@keyframes` que el blueprint reparte
+    // y que esta regla no debe tocar.
+    //
+    // El nombre decía «app styles» y el mensaje «archivo de estilos», que se leen
+    // como «todos». El hook `pre-write-guard` siempre dijo «estilos de componente»
+    // y siempre acotó a `src/app/`: era esta punta la que prometía de más.
     if (STACK.gsap && /@keyframes\s/.test(content)) {
         reportError(
             'ARCH-07', filePath,
-            '@keyframes detectado en archivo de estilos',
+            '@keyframes detectado en un estilo de componente',
         );
     }
 }
@@ -887,6 +968,8 @@ if (errors > 0) {
     console.log(yellow, '📋 Reglas validadas:');
     for (const [ruleId, meta] of Object.entries(RULES)) {
         const doc = meta.doc ? ` — ${meta.doc}` : '';
+        // Sin corchetes, a propósito: ver el contrato de salida en reportError.
+        // `[${ruleId}]` acá le diría a la provocación que las 28 dispararon.
         console.log(`   ${ruleId} — ${meta.name}${doc}`);
     }
     console.log('');

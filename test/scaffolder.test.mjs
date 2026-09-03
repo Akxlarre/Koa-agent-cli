@@ -142,7 +142,7 @@ test('preserva los campos que escribe Wikiflow', () => {
         stack: { angular: true, tailwind: true, primeng: true, gsap: true, supabase: true, ngrxSignals: false, e2e: false, cursor: false, windsurf: false },
     }));
 
-    writeBlueprintJson(target, 'proyecto', false, FULL_STACK);
+    writeBlueprintJson(target, false, FULL_STACK);
     const bp = readBp(target);
 
     assert.equal(bp.tier, 'agency');
@@ -159,7 +159,7 @@ test('en inject-only NO reescribe el stack — no instaló nada', () => {
         stack: { angular: true, tailwind: true, primeng: false, gsap: true, supabase: false, ngrxSignals: true, e2e: false, cursor: false, windsurf: false },
     }));
 
-    writeBlueprintJson(target, 'proyecto', false, FULL_STACK);
+    writeBlueprintJson(target, false, FULL_STACK);
     const bp = readBp(target);
 
     assert.equal(bp.stack.gsap, true);
@@ -176,7 +176,7 @@ test('en full-scaffold el stack SÍ lo escribe el CLI — refleja lo instalado',
         stack: { angular: true, tailwind: true, primeng: false, gsap: false, supabase: false, ngrxSignals: false, e2e: false, cursor: false, windsurf: false },
     }));
 
-    writeBlueprintJson(target, 'proyecto', true, FULL_STACK);
+    writeBlueprintJson(target, true, FULL_STACK);
     const bp = readBp(target);
 
     assert.equal(bp.stack.gsap, true);
@@ -192,7 +192,7 @@ test('escribe scaffoldMode y elimina el mode legacy', () => {
         stack: { angular: true },
     }));
 
-    writeBlueprintJson(target, 'proyecto', true, FULL_STACK);
+    writeBlueprintJson(target, true, FULL_STACK);
     const bp = readBp(target);
 
     assert.equal(bp.scaffoldMode, 'full-scaffold');
@@ -201,7 +201,7 @@ test('escribe scaffoldMode y elimina el mode legacy', () => {
 
 test('managedPaths no declara indices/** — ahí escribe Wikiflow', () => {
     const target = mkdtemp();
-    writeBlueprintJson(target, 'proyecto', true, FULL_STACK);
+    writeBlueprintJson(target, true, FULL_STACK);
     const bp = readBp(target);
 
     assert.ok(!bp.managedPaths.includes('indices/**'));
@@ -213,7 +213,7 @@ test('un blueprint corrupto no aborta el scaffold', () => {
     const target = mkdtemp();
     write(target, 'blueprint.json', '{ esto no es json');
 
-    writeBlueprintJson(target, 'proyecto', true, FULL_STACK);
+    writeBlueprintJson(target, true, FULL_STACK);
     const bp = readBp(target);
 
     // Ilegible ⇒ no hay nada que preservar: se reescribe entero y sigue siendo válido.

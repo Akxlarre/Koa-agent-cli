@@ -259,7 +259,7 @@ runtime. No ampliarlo para silenciar hallazgos legítimos del design system.
 
 ### 5 — Contrato app-like (solo si la página usa fill-screen)
 
-Ver `.claude/rules/visual-system.md` § _Patrón App-like_. Correr **a 1280×800**:
+Ver `.claude/rules/visual-patterns.md` § _Patrón App-like_. Correr **a 1280×800**:
 
 ```
 browser_evaluate({ function: `() => {
@@ -282,7 +282,7 @@ browser_evaluate({ function: `() => {
 ```
 
 **Falla si:** `documentScrolls === true` en desktop (el documento no debe scrollear),
-o `inlineContainViolation > 0` (el canon vive en `.bento-fill`, **prohibido** inline — ver `visual-system.md`).
+o `inlineContainViolation > 0` (el canon vive en `.bento-fill`, **prohibido** inline — ver `visual-patterns.md`).
 
 Luego verificar el **switch por contenedor, no por viewport**: si la página tiene drawer/panel
 lateral, abrirlo y confirmar que las columnas **se apilan** aunque el viewport siga en lg
@@ -343,7 +343,7 @@ Duplicarlos en el navegador gasta ciclos y da falsos negativos (solo ve el DOM m
 | Check | Dueño |
 |---|---|
 | Colores hardcodeados / tokens inválidos | ARCH-18 + `theme-tokens.js` |
-| Íconos sin registrar en `provideIcons()` | ARCH-14 + `icon-registry.js` |
+| Íconos sin registrar en `provideIcons()` | ICON-01 + `icon-registry.js` |
 | Emojis, `*ngIf`, `@Input()`, Supabase en UI | Architect Guard (hook) |
 | Esquema SQL vs `indices/DATABASE.md` | `sql-schema.js` |
 

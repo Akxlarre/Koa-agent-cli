@@ -17,12 +17,25 @@
  * Exit codes:
  *   0 = ok / nada que reportar
  *   2 = avisar al agente (stderr) sobre contexto desactualizado
+ *
+ * CAR-002 — este hook avisaba en TODAS las respuestas, indefinidamente. Su
+ * condicion es el mtime de learnings.md, que no cambia por haber avisado, y
+ * `Stop` corre por respuesta. El diagnostico ya estaba escrito en la casa:
+ * spec-reflection, otro hook de Stop, tiene anti-bucle explicito y su docblock
+ * explica por que. Este no lo aplico.
+ *
+ * Ahora pasa por budget.avisar(), cuyo default es no repetir (ADR-002 §2).
  */
 
 const fs = require('fs');
 const path = require('path');
+const payload = require('./lib/payload.js');
+const budget = require('./lib/budget.js');
 
-const cwd = process.cwd();
+payload.read().then(vigilar);
+
+function vigilar(PAYLOAD) {
+const cwd = PAYLOAD.cwd;
 const warnings = [];
 
 // ─── Check: learnings.md sin actualizar ───────────────────────────────────
@@ -45,9 +58,20 @@ if (warnings.length === 0) {
   process.exit(0);
 }
 
+// La condicion de este aviso es el mtime de learnings.md, que NO cambia por
+// haber avisado. Sin esto, `Stop` —que corre por respuesta— lo repite en cada
+// una hasta que la persona toque el archivo. `avisar` no repite por defecto, y
+// el dia que learnings.md cambie de fecha el texto cambia con el, asi que la
+// dedup por contenido lo deja pasar solo (CAR-002 / ADR-002 §2).
+const mensaje = budget.avisar(PAYLOAD, 'learnings-viejo', warnings.join('\n\n'));
+if (mensaje === null) {
+  process.exit(0);
+}
+
 process.stderr.write(
   '\u2500\u2500\u2500 Context Guardian \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
-  warnings.join('\n\n') + '\n' +
+  mensaje + '\n' +
   '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'
 );
 process.exit(2);
+} // fin de vigilar()

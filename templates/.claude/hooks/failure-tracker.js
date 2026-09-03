@@ -7,10 +7,25 @@
  *
  * Input (stdin): JSON with tool_name, tool_input, error details
  * Output (stdout): JSON message acknowledging the failure was recorded
+ *
+ * El FORMATO del archivo vive en lib/lessons.js, no acá. Dos motivos, los dos
+ * medidos:
+ *
+ *   HUE-016  un error con `|` partia la fila, y la firma —que es la clave del
+ *            dedup— volvia truncada al re-parsear. Cinco fallas identicas
+ *            producian cinco filas en vez de una con contador 5, y con
+ *            MAX_ENTRIES = 20 la rotacion desalojaba lecciones buenas.
+ *
+ *   DUP-002  este hook reescribia el archivo ENTERO desde su modelo de tabla, y
+ *            `lint-arch-wrapper` escribe secciones en prosa en el mismo archivo.
+ *            Verificado: una seccion del wrapper desaparecia con la primera
+ *            falla de cualquier otra tool. La tabla vive ahora entre marcadores
+ *            AUTO-GENERATED y lo de afuera se preserva.
  */
 
 const fs = require('fs');
 const path = require('path');
+const lessons = require('./lib/lessons.js');
 
 const MAX_ENTRIES = 20;
 const LESSONS_FILE = path.join(process.cwd(), '.claude', 'temp', 'LESSONS_LEARNED.md');
@@ -47,8 +62,11 @@ process.stdin.on('end', () => {
     let entries = [];
     if (fs.existsSync(LESSONS_FILE)) {
       existingContent = fs.readFileSync(LESSONS_FILE, 'utf-8');
-      entries = parseEntries(existingContent);
+      entries = lessons.parse(existingContent);
     }
+    // Todo lo que no es la tabla —las secciones de lint-arch-wrapper, notas a
+    // mano— vuelve tal cual al reescribir (DUP-002).
+    const resto = lessons.fueraDeLaRegion(existingContent);
 
     // Dedup: skip if same signature already exists
     const isDuplicate = entries.some((e) => e.signature === signature);
@@ -83,8 +101,7 @@ process.stdin.on('end', () => {
     }
 
     // Write back
-    const output = renderLessons(entries);
-    fs.writeFileSync(LESSONS_FILE, output, 'utf-8');
+    fs.writeFileSync(LESSONS_FILE, lessons.render(entries, resto), 'utf-8');
 
     // Emit feedback to Claude context
     const msg = isDuplicate
@@ -97,40 +114,3 @@ process.stdin.on('end', () => {
     process.exit(0);
   }
 });
-
-function parseEntries(content) {
-  const entries = [];
-  const lines = content.split('\n');
-  let current = null;
-
-  for (const line of lines) {
-    const match = line.match(
-      /^\|\s*`?(\d{4}-\d{2}-\d{2})`?\s*\|\s*`?(.+?)`?\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*`?(.+?)`?\s*\|\s*(.+?)\s*\|/
-    );
-    if (match) {
-      entries.push({
-        date: match[1].trim(),
-        tool: match[2].trim(),
-        error: match[3].trim(),
-        occurrences: parseInt(match[4], 10) || 1,
-        signature: match[5].trim(),
-        context: match[6].trim(),
-        lastSeen: match[1].trim(),
-      });
-    }
-  }
-  return entries;
-}
-
-function renderLessons(entries) {
-  let md = '# Lessons Learned (Auto-generated)\n\n';
-  md += '> Max 20 entries. Oldest are rotated out. Duplicates increment count.\n\n';
-  md += '| Date | Tool | Error | Count | Signature | Context |\n';
-  md += '|------|------|-------|-------|-----------|---------|\n';
-
-  for (const e of entries) {
-    md += `| ${e.lastSeen || e.date} | \`${e.tool}\` | ${e.error} | ${e.occurrences} | \`${e.signature}\` | ${e.context} |\n`;
-  }
-
-  return md;
-}

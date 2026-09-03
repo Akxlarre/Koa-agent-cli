@@ -104,7 +104,7 @@ Usuario → <SmartComponent>
 - [ ] `architecture.md` — Patrón Facade, OnPush, Signals
 - [ ] `facades.md` — Branch-scoped si aplica
 - [ ] `models.md` — DTO vs UI separados
-- [ ] `visual-system.md` — Tokens, bento grid, sin colores hardcodeados
+- [ ] `visual-tokens.md` / `visual-patterns.md` — Tokens, bento grid, sin colores hardcodeados
 - [ ] `swr-pattern.md` — Si el Facade cachea entre navegaciones
 - [ ] `notifications.md` — Si dispara toasts o notificaciones
 - [ ] `testing-tdd.md` — .spec.ts obligatorios para facades y utils

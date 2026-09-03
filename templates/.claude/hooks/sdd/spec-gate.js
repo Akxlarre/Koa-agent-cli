@@ -14,20 +14,24 @@
  * Exit codes:
  *   0 = permitir
  *   2 = bloquear (stderr se envia a Claude como feedback)
+ *
+ * Lee stdin por `lib/payload.js`, que trae el cap SEC-04: este hook y
+ * `context-enrichment-guard` eran los dos ultimos que acumulaban stdin sin tope
+ * (HUE-010). Y la pregunta «¿esto es codigo de produccion?» sale de
+ * `lib/paths.js`, la misma que usa plan-injector (INC-005).
  */
 
 const fs = require('fs');
 const path = require('path');
+const payload = require('../lib/payload.js');
+const paths = require('../lib/paths.js');
 
-let data = '';
-process.stdin.on('data', chunk => (data += chunk));
-process.stdin.on('end', () => {
+payload.read().then((PAYLOAD) => {
   try {
-    const input = JSON.parse(data);
-    const filePath = input.tool_input?.file_path || input.tool_input?.path || '';
+    const filePath = PAYLOAD.filePath;
     if (!filePath) return process.exit(0);
 
-    const cwd = process.cwd();
+    const cwd = PAYLOAD.cwd;
     const specsDir = path.join(cwd, 'specs');
 
     // GATE 1 - Proyecto sin SDD -> permitir
@@ -36,40 +40,17 @@ process.stdin.on('end', () => {
     }
 
     // GATE 2 - Archivo exento -> permitir
-    const rel = path.relative(cwd, filePath).replace(/\\/g, '/');
-
-    const exemptPathPrefixes = [
-      'specs/', '.claude/', 'docs/', 'indices/', 'scripts/',
-      'supabase/seed', 'tests/',
-      'node_modules/', '.git/',
-      'dist/', 'build/', 'coverage/', '.next/', '.angular/',
-    ];
-    if (exemptPathPrefixes.some(p => rel.startsWith(p))) {
-      return process.exit(0);
-    }
-
-    const exemptExtensions = ['.md', '.mdx', '.json', '.yaml', '.yml', '.toml', '.lock', '.gitignore', '.npmrc', '.env', '.editorconfig'];
-    const exemptBasenames = ['Dockerfile', 'Makefile', 'LICENSE', 'README'];
-    const ext = path.extname(filePath).toLowerCase();
-    const base = path.basename(filePath);
-    if (exemptExtensions.includes(ext) || exemptBasenames.includes(base)) {
-      return process.exit(0);
-    }
-
-    if (rel.endsWith('.spec.ts') || rel.endsWith('.spec.js') ||
-        rel.endsWith('.test.ts') || rel.endsWith('.test.js') ||
-        rel.endsWith('.test.tsx') || rel.endsWith('.test.jsx')) {
-      return process.exit(0);
-    }
-
-    const isProductCode =
-      rel.startsWith('src/') ||
-      rel.startsWith('app/') ||
-      rel.startsWith('lib/') ||
-      rel.startsWith('supabase/migrations/') ||
-      /^packages\/[^/]+\/src\//.test(rel);
-
-    if (!isProductCode) {
+    //
+    // INC-005: esta lista vivia acá y otra distinta en plan-injector, y por eso
+    // divergieron. Medido antes de unificarlas: `src/guia.mdx` pasaba este gate
+    // («no es producto») y aun asi recibia el contrato SDD entero del injector
+    // («si es producto»). Y ninguna de las dos servia para los dotfiles:
+    // `path.extname('.npmrc')` devuelve '', asi que `.env` y `.npmrc` figuraban
+    // como exentos y el gate los bloqueaba igual (DEC-007).
+    //
+    // La pregunta tiene ahora un nombre y un test: lib/paths.js.
+    const rel = paths.rel(filePath, cwd);
+    if (!paths.isProductCode(filePath, cwd)) {
       return process.exit(0);
     }
 

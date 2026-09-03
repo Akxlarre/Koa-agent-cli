@@ -48,16 +48,52 @@ Changes to `templates/` affect **all future scaffolds**. Changes to `lib/` affec
 ### CLI modules
 
 ```
-bin/index.js      Entry point — flags, prompts, orchestration only (~130 lines)
+bin/index.js      Entry point — orchestration only (≤150 lines, and there's a test)
 lib/config.js     Stack resolution + input validation
 lib/runner.js     Async spawn wrapper (npm/npx)
 lib/preflight.js  System requirements check
 lib/installer.js  Angular project creation + npm installs
 lib/scaffolder.js Template copy + file patching
+lib/prompts.js    Inquirer prompts + TEST_MODE (no FS, no spawn)
+lib/generator.js  `generate feature` subcommand
 lib/ui.js         Terminal output only (no FS, no spawn)
 ```
 
 The rule: each module does one thing. `scaffolder.js` never runs npm. `installer.js` never copies files. If you find yourself breaking this, the code belongs in a different module.
+
+---
+
+## Tests
+
+```bash
+npm test               # fast — no network, seconds
+npm run test:integracion   # runs `ng new` for real: needs network, ~1 min
+```
+
+The fast suite covers module contracts against a project shaped the way we *believe*
+`ng new` shapes it. The integration suite generates a real Angular project and runs
+the scaffolder on it — that's the one that notices when Angular changes that shape.
+Run it before publishing.
+
+It also runs `architect.js` **inside** the generated project: the boilerplate has to
+pass its own linter with 0 errors and 0 warnings, a deliberately broken feature has to
+fail it, and both `scripts/lib/*.test.mjs` and `provocar-reglas.mjs` have to run there.
+Those last two are skipped in this repo — they need `typescript` to resolve, and the
+CLI doesn't depend on it. The integration suite installs the exact `typescript` version
+the generated `package.json` declares, so if Angular moves to a version that breaks the
+linter, this is what tells you.
+
+The payload has its own suites, and they are not run by `npm test`:
+
+```bash
+cd templates/.claude/tests && node --test *.test.js   # the harness hooks
+```
+
+Patches to `tsconfig.json`, `angular.json` and `package.json` are **required**: if the
+file isn't there, the CLI stops instead of quietly producing a project that doesn't
+compile. Adding a patch for a file that may legitimately be absent? Use
+`patch(file, { requerido: false, que: '…' }, fn)` — it prints a line rather than
+saying nothing.
 
 ---
 

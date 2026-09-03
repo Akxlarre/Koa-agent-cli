@@ -1,0 +1,4 @@
+{
+  "type": "module",
+  "//": "post-edit.js es ESM. Sin esta declaración Node lo reparsea con un warning (MODULE_TYPELESS_PACKAGE_JSON) en CADA edición, porque este hook corre en PostToolUse. En el repo del CLI el warning no aparecía —el package.json raíz ya declara \"module\"— y por eso el test lo daba por limpio: en un proyecto Angular generado, el raíz no lo declara. Se declara acá, con alcance de carpeta, para no cambiar el tipo de módulo del proyecto generado. Mismo patrón que hooks/, hooks/validators/, tests/ y scripts/."
+}

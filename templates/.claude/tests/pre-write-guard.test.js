@@ -18,10 +18,15 @@ const HOOK = path.resolve(__dirname, '..', 'hooks', 'pre-write-guard.js');
 let sessionCounter = 0;
 
 /**
- * Ejecuta el hook con un TOOL_INPUT simulado.
+ * Ejecuta el hook con un payload simulado.
  *
- * Cada llamada usa un CLAUDE_SESSION_ID unico para que el dedup de Context
- * Injection y el Circuit Breaker no arrastren estado entre tests.
+ * Cada llamada usa un session_id unico para que el dedup de Context Injection
+ * y el Circuit Breaker no arrastren estado entre tests.
+ *
+ * Migrado en la tanda 3: el session_id va en el PAYLOAD, no en una variable de
+ * entorno, y el discovery flag vive en el proyecto, no en TMPDIR (HUE-002). El
+ * fixture usa lib/session.js para escribirlo, o sea el mismo contrato que lee
+ * el hook — si el formato cambia, el test se entera.
  *
  * Por defecto se pre-crea el flag de descubrimiento: las capas del hook corren
  * en orden y el Discovery Gate (capa 2) bloquearia antes de llegar al Architect
@@ -32,19 +37,41 @@ let sessionCounter = 0;
  * @param {{ discovered?: boolean }} [opts]
  * @returns {{ exitCode: number, stdout: string, stderr: string, sessionId: string }}
  */
+/** Deja el discovery flag donde el hook lo busca, usando su mismo modulo. */
+/** Proyectos temporales creados por los helpers, para borrarlos al final. */
+const proyectosTemp = [];
+
+function sembrarDescubrimiento(payload, linea = 'READ | indices/COMPONENTS.md') {
+  const session = require(path.resolve(__dirname, '..', 'hooks', 'lib', 'session.js'));
+  session.appendState(payload, 'discovery.flag', `${new Date().toISOString()} | ${linea}`);
+}
+
+/** Corre el hook con un flag sembrado a mano, para probar QUÉ satisface al Gate. */
+function runHookConFlag(input, linea) {
+  const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-gate-'));
+  proyectosTemp.push(proyecto);
+  const payload = { ...input, session_id: `gate-${Date.now()}-${sessionCounter++}`, cwd: proyecto };
+  if (linea) sembrarDescubrimiento(payload, linea);
+
+  const r = spawnSync('node', [HOOK], { input: JSON.stringify(payload), encoding: 'utf8', cwd: proyecto });
+  return { exitCode: r.status, stderr: r.stderr || '' };
+}
+
 function runHook(input, opts = {}) {
   const { discovered = true } = opts;
   const sessionId = `test-session-${Date.now()}-${sessionCounter++}`;
+  const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-'));
+  proyectosTemp.push(proyecto);
+  const payload = { ...input, session_id: sessionId, cwd: proyecto };
 
   if (discovered) {
-    const flagPath = path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`);
-    fs.writeFileSync(flagPath, `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`);
+    sembrarDescubrimiento(payload);
   }
 
   const result = spawnSync('node', [HOOK], {
-    input: JSON.stringify(input),
+    input: JSON.stringify(payload),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
+    cwd: proyecto,
   });
   return {
     exitCode: result.status,
@@ -60,17 +87,17 @@ function runHook(input, opts = {}) {
  */
 function runHookRepeated(input, times) {
   const sessionId = `test-breaker-${Date.now()}-${sessionCounter++}`;
-  fs.writeFileSync(
-    path.join(os.tmpdir(), `koa-discovery-${sessionId}.flag`),
-    `${new Date().toISOString()} | READ | indices/COMPONENTS.md\n`
-  );
+  const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-brk-'));
+  proyectosTemp.push(proyecto);
+  const payload = { ...input, session_id: sessionId, cwd: proyecto };
+  sembrarDescubrimiento(payload);
 
   const runs = [];
   for (let i = 0; i < times; i++) {
     const result = spawnSync('node', [HOOK], {
-      input: JSON.stringify(input),
+      input: JSON.stringify(payload),
       encoding: 'utf8',
-      env: { ...process.env, CLAUDE_SESSION_ID: sessionId }
+      cwd: proyecto,
     });
     runs.push({ exitCode: result.status, stderr: result.stderr || '' });
   }
@@ -257,6 +284,51 @@ describe('DISCOVERY GATE', () => {
   test('permite pasar del Gate una vez leidos los indices', () => {
     const r = runHook(makeInput(featurePath, 'export class X {}'), { discovered: true });
     assert.ok(!r.stderr.includes('DISCOVERY GATE'));
+  });
+
+  // ── HUE-001: el Gate pide INDICES, y comprobaba solo que el flag existiera ──
+  const escritura = () => makeInput(featurePath, 'export class X {}');
+
+  test('CERRADO: leer solo context/ ya no levanta el Gate', () => {
+    // discovery-tracker escribe el flag ante `indices/` Y ante `context/`. Abrir
+    // context/brief.md levantaba un bloqueo cuyo texto dice, literalmente, «lee
+    // los indices del proyecto».
+    const r = runHookConFlag(escritura(), 'READ | context/brief.md');
+    assert.equal(r.exitCode, 2);
+    assert.ok(r.stderr.includes('DISCOVERY GATE'));
+  });
+
+  test('un indice si lo levanta, aunque haya context/ antes', () => {
+    const proyecto = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-pwg-mix-'));
+    proyectosTemp.push(proyecto);
+    const payload = { ...escritura(), session_id: `mix-${Date.now()}`, cwd: proyecto };
+    sembrarDescubrimiento(payload, 'READ | context/brief.md');
+    sembrarDescubrimiento(payload, 'READ | indices/SERVICES.md');
+
+    const r = spawnSync('node', [HOOK], { input: JSON.stringify(payload), encoding: 'utf8', cwd: proyecto });
+    assert.ok(!(r.stderr || '').includes('DISCOVERY GATE'));
+  });
+
+  // ── DUP-004 / ADR-003 §2: el descubrimiento delegado SI cuenta ──
+  test('una lectura de discovery-scout levanta el Gate del hilo principal', () => {
+    // Estaba ocurriendo sin que nadie lo hubiera decidido, y es la ruta que el
+    // propio session-start recomienda. Queda decidido y fijado: si mañana se
+    // decide lo contrario, cambia este test, no el comportamiento por accidente.
+    const r = runHookConFlag(escritura(), 'SUBAGENT:discovery-scout | indices/SERVICES.md');
+    assert.ok(!r.stderr.includes('DISCOVERY GATE'),
+      'delegar el descubrimiento es el ahorro de contexto que justifica los subagentes');
+  });
+
+  test('pero un subagente leyendo context/ tampoco alcanza', () => {
+    const r = runHookConFlag(escritura(), 'SUBAGENT:discovery-scout | context/domain.md');
+    assert.equal(r.exitCode, 2);
+  });
+
+  test('el flag registra quien descubrio: el origen esta en la linea', () => {
+    // Sin el origen, ninguna de las dos decisiones de arriba se puede tomar.
+    const tracker = fs.readFileSync(
+      path.resolve(__dirname, '..', 'hooks', 'discovery-tracker.js'), 'utf-8');
+    assert.match(tracker, /SUBAGENT:\$\{input\.agent_type\}/);
   });
 });
 

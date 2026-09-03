@@ -17,6 +17,12 @@
  * agente responde, el hook lo frena, vuelve a responder, y el hook lo frena
  * otra vez con lo mismo — un bucle que quema tokens sin avanzar.
  *
+ * HUE-004: «ninguna casilla marcada» son dos situaciones, no una. Un spec recien
+ * generado por /plan tambien tiene cero marcadas, y ahi callar es correcto; pero
+ * doce archivos escritos con el criterio de done intacto es justo donde el aviso
+ * mas falta. Lo que las separa no son las casillas, son las escrituras de la
+ * sesion: sin ninguna, este hook calla.
+ *
  * Exit codes:
  *   0 = nada que reportar
  *   2 = avisar al agente (stderr) que quedan pendientes
@@ -60,18 +66,37 @@ for (const line of raw.split('\n')) {
   if (m) open.push(m[1].trim());
 }
 
-// Sin casillas marcadas nunca → el agente no adopto el flujo del task-spec.
-// No tiene sentido reportarle pendientes de un spec que no esta usando.
-if (open.length === 0 || done === 0) {
-  // Spec completo: limpiar la memoria de avisos para el proximo spec.
-  if (open.length === 0) {
-    try { fs.unlinkSync(SEEN_FILE); } catch { /* ignore */ }
-  }
+// Spec completo: limpiar la memoria de avisos para el proximo spec.
+if (open.length === 0) {
+  try { fs.unlinkSync(SEEN_FILE); } catch { /* ignore */ }
   bail();
 }
 
+// ─── Escrituras de la sesion ─────────────────────────────────────────────────
+// Sirve para dos cosas: decidir si «ninguna casilla marcada» es un spec recien
+// nacido o trabajo sin registrar, y armar la evidencia sobre los indices.
+function escrituras() {
+  try {
+    const w = JSON.parse(fs.readFileSync(path.join(TEMP_DIR, 'session-writes.json'), 'utf-8'));
+    return Array.isArray(w) ? w : [];
+  } catch {
+    return [];
+  }
+}
+const escritas = escrituras();
+
+// HUE-004 — «ninguna casilla marcada» no es una sola situacion.
+//
+// El hook callaba ante `done === 0` razonando «el agente no adopto el flujo».
+// Pero eso tapa el caso donde el aviso mas falta: doce archivos escritos y el
+// criterio de done intacto. Lo que distingue una cosa de la otra no son las
+// casillas, es si hubo trabajo: un spec recien generado por /plan tambien tiene
+// cero marcadas, y ahi callar es correcto.
+const nadaMarcado = done === 0;
+if (nadaMarcado && escritas.length === 0) bail();
+
 // ─── Anti-bucle: no repetir el mismo aviso ───────────────────────────────────
-const signature = `${specName}:${open.length}`;
+const signature = `${specName}:${open.length}:${done}`;
 try {
   if (fs.existsSync(SEEN_FILE)) {
     const seen = JSON.parse(fs.readFileSync(SEEN_FILE, 'utf-8'));
@@ -89,10 +114,9 @@ try {
 const evidence = [];
 try {
   const indexDir = path.join(cwd, 'indices');
-  const writesPath = path.join(TEMP_DIR, 'session-writes.json');
-  if (fs.existsSync(indexDir) && fs.existsSync(writesPath)) {
-    const writes = JSON.parse(fs.readFileSync(writesPath, 'utf-8'));
-    if (Array.isArray(writes) && writes.length > 0) {
+  if (fs.existsSync(indexDir)) {
+    const writes = escritas;
+    if (writes.length > 0) {
       let lastIndexMtime = 0;
       for (const f of fs.readdirSync(indexDir).filter(f => f.endsWith('.md'))) {
         const st = fs.statSync(path.join(indexDir, f));
@@ -110,8 +134,16 @@ try {
 } catch { /* fail-open */ }
 
 // ─── Reportar ────────────────────────────────────────────────────────────────
+// Dos situaciones distintas, dos encabezados distintos: el que viene marcando
+// casillas necesita saber que le falta; el que escribio sin marcar ninguna
+// necesita saber que el criterio de done sigue intacto (HUE-004).
+const encabezado = nadaMarcado
+  ? `\u{1F9ED} SPEC REFLECTION: ${escritas.length} archivo(s) escrito(s) y ninguna casilla marcada en ${specName}.\n`
+    + `   Los ${open.length} punto(s) del criterio de done siguen igual que cuando /plan lo genero.\n\n`
+  : `\u{1F9ED} SPEC REFLECTION: ${specName} tiene ${open.length} punto(s) sin cerrar (${done} completado(s)).\n\n`;
+
 process.stderr.write(
-  `\u{1F9ED} SPEC REFLECTION: ${specName} tiene ${open.length} punto(s) sin cerrar (${done} completado(s)).\n\n` +
+  encabezado +
   open.map(t => `  ☐ ${t}`).join('\n') + '\n\n' +
   (evidence.length > 0 ? evidence.map(e => `  ⚠️  ${e}`).join('\n') + '\n\n' : '') +
   `Para cada punto abierto, elige una:\n` +

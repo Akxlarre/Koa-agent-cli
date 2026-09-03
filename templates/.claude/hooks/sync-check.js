@@ -65,22 +65,49 @@ for (const filePath of writes) {
   } catch { /* skip */ }
 }
 
-// Limpiar tracker para la próxima sesión
-try { fs.unlinkSync(trackerPath); } catch { /* ignore */ }
+// ACO-001: acá se borraba session-writes.json «para la próxima sesión». Pero
+// `Stop` corre al final de cada RESPUESTA, no de la sesión —verificado contra la
+// documentación del runtime: «once per turn: UserPromptSubmit, Stop,
+// StopFailure»—, así que este hook dejaba sin datos a sus dos co-consumidores,
+// spec-diff-check y spec-reflection, desde el primer cierre.
+//
+// El artefacto es de ciclo `sesión` (lib/contracts.js) y ningún hook de `Stop`
+// borra estado de ciclo `sesión` (ADR-002 §1). La limpieza la hace session-start
+// con origen `startup`, que es el único momento en que la sesión empieza de
+// verdad.
 
 if (newerSourceFiles.length === 0) {
   process.exit(0);
 }
 
+// HUE-015: hasta que las migraciones entraron en `belongsToIndex`, este aviso no
+// podia dispararse por una sesion de esquema — y la lista de indices que sugiere
+// tampoco las nombraba. Se dice lo que corresponde a lo que se escribio.
+const huboMigraciones = newerSourceFiles.some(f => f.startsWith('supabase/migrations/'));
+const huboCodigo = newerSourceFiles.some(f => !f.startsWith('supabase/migrations/'));
+
+const sugerencias = [
+  ...(huboCodigo ? [
+    '  indices/COMPONENTS.md  — componentes nuevos',
+    '  indices/SERVICES.md    — servicios nuevos',
+    '  indices/FACADES.md     — facades nuevas',
+    '  indices/DIRECTIVES.md  — directivas nuevas',
+  ] : []),
+  ...(huboMigraciones ? [
+    '  indices/DATABASE.md    — tablas, FKs y politicas RLS nuevas',
+  ] : []),
+];
+
 // Avisar al agente
 process.stderr.write(
   `\u{1F4CB} SYNC CHECK: ${newerSourceFiles.length} archivo(s) fuente modificados son mas recientes que los indices:\n` +
   newerSourceFiles.map(f => `  - ${f}`).join('\n') + '\n\n' +
-  `Si creaste componentes/servicios/directivas NUEVAS, actualiza los indices:\n` +
-  `  indices/COMPONENTS.md  — componentes nuevos\n` +
-  `  indices/SERVICES.md    — servicios nuevos\n` +
-  `  indices/FACADES.md     — facades nuevas\n` +
-  `  indices/DIRECTIVES.md  — directivas nuevas\n\n` +
+  `Si creaste elementos NUEVOS, actualiza los indices:\n` +
+  sugerencias.join('\n') + '\n\n' +
+  (huboMigraciones
+    ? `\`npm run indices:sync\` regenera DATABASE.md desde las migraciones. `
+      + `El subagente index-syncer lo corre y completa lo que el script no deduce.\n\n`
+    : '') +
   `Si solo refactorizaste sin crear elementos nuevos, ignora este aviso.`
 );
 process.exit(2);

@@ -38,6 +38,23 @@ function walk(dir, out = []) {
 const FILES = walk(PAYLOAD);
 
 /**
+ * Los directorios donde vive el codigo que EMITE reglas.
+ *
+ * Este archivo corre en dos contextos: en el repo del CLI, donde los scripts
+ * viven bajo `boilerplate/scripts/`, y dentro de un proyecto generado, donde
+ * viven en `scripts/`. Mirar solo el primero hacia que en un proyecto generado
+ * las reglas de `architect.js` parecieran no emitidas por nadie — lo cazo correr
+ * la suite en el layout de un proyecto real, que es para lo que se corre ahi.
+ */
+function dirsDeCodigo() {
+  return [
+    path.join(PAYLOAD, '.claude', 'hooks'),
+    path.join(PAYLOAD, 'boilerplate', 'scripts'),
+    path.join(PAYLOAD, 'scripts'),
+  ].filter((d) => fs.existsSync(d));
+}
+
+/**
  * Anclas disponibles en un markdown: las explicitas `<a id="...">` y los slugs
  * que GitHub deriva de los encabezados.
  */
@@ -120,12 +137,7 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
    */
   function emittedRuleIds() {
     const ids = new Map(); // ID -> { file, anchor }
-    const sources = [
-      path.join(PAYLOAD, '.claude', 'hooks'),
-      path.join(PAYLOAD, 'boilerplate', 'scripts'),
-    ];
-    for (const dir of sources) {
-      if (!fs.existsSync(dir)) continue;
+    for (const dir of dirsDeCodigo()) {
       for (const file of walk(dir)) {
         const txt = fs.readFileSync(file, 'utf-8');
 
@@ -191,5 +203,229 @@ describe('DOC LINKS — reglas emitidas vs documentadas', () => {
       if (!cache.get(full).has(anchor)) missing.push(`${id} (${file}#${anchor})`);
     }
     assert.deepEqual(missing.sort(), [], `reglas sin ancla explicita:\n  ${missing.join('\n  ')}`);
+  });
+
+  // ── HUE-026 — la direccion inversa, que es la que nadie miraba ─────────────
+  //
+  // Los dos tests de arriba preguntan «regla emitida → esta documentada?». La
+  // pregunta que faltaba es «regla documentada → la emite alguien?», y su
+  // ausencia es la razon exacta por la que ARCH-14 vivio meses como fantasma:
+  // citada en verify/SKILL.md, con seccion propia en la doc, y sin un solo
+  // detector detras.
+  //
+  // Una regla documentada que nadie emite es peor que una sin documentar: el
+  // agente lee que existe un guardrail, confia en el, y no hay nadie del otro
+  // lado.
+
+  /** Los IDs con seccion propia en los docs del payload. */
+  function documentedRuleIds() {
+    const docs = new Map(); // ID -> archivo donde se documenta
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.startsWith('docs/')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/^#{2,4}\s+((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2}):/gm)) {
+        if (!docs.has(m[1])) docs.set(m[1], rel);
+      }
+    }
+    return docs;
+  }
+
+  /**
+   * Los IDs que alguien EMITE de verdad, mirando el codigo y no la doc.
+   * Se busca la forma en que un mensaje o un registro nombra una regla; una
+   * mencion en un comentario no cuenta como emitir.
+   */
+  function reallyEmittedIds() {
+    const emitidos = new Set();
+    const sinComentarios = (src) => src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+
+    for (const dir of dirsDeCodigo()) {
+      for (const file of walk(dir)) {
+        if (!file.endsWith('.js') && !file.endsWith('.mjs')) continue;
+        const txt = sinComentarios(fs.readFileSync(file, 'utf-8'));
+        for (const m of txt.matchAll(/\[((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})\]/g)) {
+          emitidos.add(m[1]);
+        }
+        for (const m of txt.matchAll(/'((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})'/g)) {
+          emitidos.add(m[1]);
+        }
+      }
+    }
+    return emitidos;
+  }
+
+  test('toda regla documentada la emite alguien', () => {
+    const documentadas = documentedRuleIds();
+    const emitidas = reallyEmittedIds();
+
+    assert.ok(documentadas.size > 10, `solo ${documentadas.size} reglas documentadas — revisa el regex`);
+    assert.ok(emitidas.size > 10, `solo ${emitidas.size} reglas emitidas — revisa el regex`);
+
+    const fantasmas = [...documentadas.entries()]
+      .filter(([id]) => !emitidas.has(id))
+      .map(([id, archivo]) => `${id} (documentada en ${archivo})`);
+
+    assert.deepEqual(fantasmas.sort(), [],
+      `reglas documentadas que no emite nadie:\n  ${fantasmas.join('\n  ')}\n` +
+      'El agente lee que existe el guardrail y no hay nadie del otro lado.');
+  });
+
+  test('y ninguna pieza del harness cita una regla que no existe', () => {
+    // ARCH-14 no solo estaba documentada sin detector: verify/SKILL.md la citaba
+    // como si fuera el mecanismo que atrapa los iconos sin registrar. El que los
+    // atrapa es ICON-01.
+    const conocidas = new Set([...documentedRuleIds().keys(), ...reallyEmittedIds()]);
+    const citas = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/\b((?:ARCH|A11Y|LLM|SEC-RLS|SEC-ENV|SQL|NAV|ICON)-\d{2})\b/g)) {
+        if (!conocidas.has(m[1])) citas.push(`${m[1]} citada en ${rel}`);
+      }
+    }
+    assert.deepEqual([...new Set(citas)].sort(), [],
+      'una regla citada y no existente manda al agente a buscar algo que no esta');
+  });
+
+  test('toda ruta de src/ que la doc cita existe en el boilerplate (INC-014)', () => {
+    // `visual-patterns.md` mandaba a `src/styles/_view-transitions.scss` y el
+    // archivo vive en `src/styles/motion/`. Una ruta vieja manda al agente a
+    // buscar algo que no está — el mismo daño que una regla citada e
+    // inexistente, y este archivo ya vigila ese caso para las reglas.
+    //
+    // `doc-links` verificaba referencias `archivo.md#ancla`, no rutas a código.
+    //
+    // Las excepciones van con su MOTIVO, no como una lista de silencios: una
+    // ruta que no existe y no está acá abajo hace fallar esto.
+    const EXCEPCIONES = {
+      'src/app/core/models/supabase.types.ts':
+        'lo genera `npm run supabase:types` desde el esquema real; no viaja en el payload',
+      'src/app/features/registro/registro.component.ts':
+        'es el ejemplo ilustrativo de spec-plan.md («no escribas src/..., escribe esto»)',
+    };
+
+    const boilerplate = path.join(PAYLOAD, 'boilerplate');
+    if (!fs.existsSync(boilerplate)) return; // en un proyecto generado, src/ está en la raíz
+
+    const rotas = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/`(src\/[\w./-]+\.(?:ts|html|scss|css|json))`/g)) {
+        const ruta = m[1];
+        if (fs.existsSync(path.join(boilerplate, ruta)) || EXCEPCIONES[ruta]) continue;
+        rotas.push(`${rel} → ${ruta}`);
+      }
+    }
+    assert.deepEqual([...new Set(rotas)].sort(), [],
+      'una ruta que la doc cita y no existe manda a buscar algo que no está');
+  });
+
+  test('todo `indices/X.md` que la doc cita es uno de los 15 (INC-016)', () => {
+    // `/fix-close` mandaba a registrar los gotchas de dominio en
+    // `indices/DOMAIN-GOTCHAS.md`, que no existe. El agente que siguiera esa
+    // instruccion crearia un decimosexto indice que nada sincroniza: ni el
+    // auto-indexer, ni `compact-recovery`, ni `AGENTS.md`.
+    //
+    // Un indice nuevo es una decision con consecuencias en cinco piezas. Que
+    // aparezca por una instruccion suelta en un comando es la forma mas cara de
+    // tomarla — sin tomarla.
+    const dir = path.join(PAYLOAD, 'indices');
+    if (!fs.existsSync(dir)) return;
+    const reales = new Set(fs.readdirSync(dir).filter((f) => f.endsWith('.md')));
+
+    // Placeholders: la doc explica el patron, no cita un archivo concreto.
+    const PLANTILLAS = new Set(['NOMBRE.md', 'NUEVO.md']);
+
+    const inventados = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      for (const m of fs.readFileSync(file, 'utf-8').matchAll(/indices\/([A-Z][\w-]*\.md)/g)) {
+        if (reales.has(m[1]) || PLANTILLAS.has(m[1])) continue;
+        inventados.push(`${rel} → indices/${m[1]}`);
+      }
+    }
+    assert.deepEqual([...new Set(inventados)].sort(), [],
+      'la doc manda a un indice que no existe: crearlo es una decision, no un descuido');
+  });
+
+  test('todo `npm run X` que la doc manda correr existe (HUE-024)', () => {
+    // Los subagentes tienen PROCEDIMIENTOS que mandan correr comandos —
+    // `arch-auditor` corre `lint:arch`, `index-syncer` corre `indices:sync`— y
+    // nadie verificaba que existieran. Ya pasó una vez: `INC-015`, donde
+    // `sdd/SKILL.md` y `/assign-claim` mandaban correr `assignments:sync` y el
+    // script no existía en ningún proyecto generado, así que el único camino de
+    // escritura de esa capa no se podía recorrer.
+    //
+    // Un comando inexistente no falla como un error de sintaxis: falla en la
+    // cara del usuario, a mitad de un procedimiento, con un mensaje de npm.
+    //
+    // Hoy están las 64 menciones y ninguna rota. Este test es lo que hace que
+    // siga siendo así.
+    const scaffolder = path.resolve(PAYLOAD, '..', 'lib', 'scaffolder.js');
+    if (!fs.existsSync(scaffolder)) return; // en un proyecto generado no está el CLI
+
+    const declarados = new Set(
+      [...fs.readFileSync(scaffolder, 'utf-8').matchAll(/'([\w:-]+)':\s*'/g)].map((m) => m[1]),
+    );
+    assert.ok(declarados.size >= 15, `solo ${declarados.size} scripts detectados en el scaffolder`);
+
+    const rotos = [];
+    let total = 0;
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      for (const m of fs.readFileSync(file, 'utf-8').matchAll(/npm run ([\w:-]+)/g)) {
+        total += 1;
+        if (!declarados.has(m[1])) rotos.push(`${rel} → npm run ${m[1]}`);
+      }
+    }
+    assert.ok(total >= 20, `solo ${total} menciones de npm run — revisá el regex`);
+    assert.deepEqual([...new Set(rotos)].sort(), [],
+      'la doc manda a correr un script que el scaffolder no declara');
+  });
+
+  test('y ningun doc miente sobre CUANTAS reglas valida el linter (INC-019)', () => {
+    // `CLAUDE-USER-GUIDE.md` decia 8 y eran 28. No es un typo: describe un
+    // linter con menos de un tercio de las reglas que tiene, y el usuario que
+    // lee eso no corre `lint:arch` esperando que le encuentre algo.
+    //
+    // La cifra se deriva de RULES, que es la fuente. Cualquier frase del payload
+    // que afirme un numero de reglas del linter tiene que coincidir con ella.
+    const architect = dirsDeCodigo()
+      .map((d) => path.join(d, 'architect.js'))
+      .find((p) => fs.existsSync(p));
+    assert.ok(architect, 'no se encontro architect.js');
+
+    const reales = new Set(
+      [...fs.readFileSync(architect, 'utf-8')
+        .matchAll(/^\s{4}'((?:ARCH|A11Y|LLM|SEC-RLS|NAV|ICON)-\d{2})':\s*\{/gm)]
+        .map((m) => m[1]),
+    );
+    assert.ok(reales.size >= 20, `solo ${reales.size} reglas detectadas en RULES — revisa el regex`);
+
+    const mentiras = [];
+    for (const file of FILES) {
+      const rel = path.relative(PAYLOAD, file);
+      if (!rel.endsWith('.md')) continue;
+      const txt = fs.readFileSync(file, 'utf-8');
+      for (const m of txt.matchAll(/\*{0,2}(\d{1,3})\*{0,2}\s+reglas?\b/gi)) {
+        // Solo las frases que hablan del LINTER. `.claude/rules/` tiene su
+        // propio conteo (16 reglas path-scoped) y no es esta cifra.
+        const ventana = txt.slice(Math.max(0, m.index - 120), m.index + 40).toLowerCase();
+        if (!/linter|lint:arch|architect/.test(ventana)) continue;
+        if (Number(m[1]) !== reales.size) {
+          mentiras.push(`${rel}: dice ${m[1]}, son ${reales.size}`);
+        }
+      }
+    }
+    assert.deepEqual(mentiras, [],
+      'un doc afirma un numero de reglas del linter que no es el que tiene');
   });
 });

@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # ARCH-13, SEC-RLS-01, SEC-RLS-02, SEC-RLS-03
 paths:
   - "supabase/**"
   - "src/app/core/services/supabase*"

@@ -18,58 +18,36 @@
  * Dedup: cada bloque se inyecta como máximo una vez cada N prompts, y solo si su
  * contenido cambió. Un recordatorio que aparece en cada turno deja de leerse.
  *
+ * Esa dedup nació acá y hoy vive en `lib/budget.js`: este hook fue el único que
+ * la tuvo, y los otros tres que inyectaban contexto pagaban el costo completo en
+ * cada llamada (CAR-001, CAR-002, CAR-004). Este archivo es el que ahora la usa
+ * en vez de tenerla.
+ *
+ * Con el mismo cambio se va el último `CLAUDE_SESSION_ID` del harness (HUE-002):
+ * la variable no existe, así que `sessionId` era siempre `'default'` y el estado
+ * de dedup era un archivo único en TMPDIR compartido por toda la máquina — dos
+ * proyectos abiertos a la vez se callaban el recordatorio entre sí.
+ *
  * stdout (JSON con additionalContext) → se agrega al contexto de Claude.
  * Exit 0 siempre: este hook informa, nunca bloquea un prompt del humano.
  */
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const cwd = process.cwd();
-const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
-const STATE_PATH = path.join(os.tmpdir(), `koa-prompt-ctx-${sessionId}.json`);
+const payload = require('./lib/payload.js');
+const budget = require('./lib/budget.js');
 
 // Cada cuántos prompts se puede repetir un bloque cuyo contenido no cambió.
 const REPEAT_EVERY = 8;
 
-// SEC-04: cap de stdin igual que el resto de los hooks.
-const MAX_STDIN_BYTES = 10 * 1024 * 1024;
-let data = '';
-let dataSize = 0;
-process.stdin.on('data', chunk => {
-  dataSize += chunk.length;
-  if (dataSize > MAX_STDIN_BYTES) process.exit(0);
-  data += chunk;
-});
-
-process.stdin.on('end', () => {
+payload.read().then((PAYLOAD) => {
   try {
-    emit();
+    emit(PAYLOAD);
   } catch {
     /* fail-open — jamás bloquear el prompt del humano */
   }
   process.exit(0);
 });
-
-function loadState() {
-  try {
-    if (fs.existsSync(STATE_PATH)) return JSON.parse(fs.readFileSync(STATE_PATH, 'utf-8'));
-  } catch { /* ignore */ }
-  return { n: 0, blocks: {} };
-}
-
-/**
- * Decide si un bloque debe inyectarse en este prompt.
- * Se inyecta si nunca se vio, si su contenido cambió, o si pasaron
- * REPEAT_EVERY prompts desde la última vez.
- */
-function shouldInject(state, key, content) {
-  const prev = state.blocks[key];
-  if (!prev) return true;
-  if (prev.content !== content) return true;
-  return state.n - prev.at >= REPEAT_EVERY;
-}
 
 /**
  * Devuelve el cuerpo de una seccion markdown de nivel 2, sin comentarios HTML.
@@ -96,10 +74,24 @@ function extractSection(raw, headingRe) {
   return cleaned.length > 0 ? cleaned : null;
 }
 
-function emit() {
-  const state = loadState();
-  state.n = (state.n || 0) + 1;
+/**
+ * Pasa un bloque por el presupuesto y lo agrega si corresponde emitirlo.
+ *
+ * `cutAt: null` porque `DETAIL:BEGIN` es un marcador de los índices: acá cortaría
+ * en medio de un brief que lo mencione. Ámbito de hilo (ADR-003 §1): «ya lo dije»
+ * es una afirmación sobre un contexto, y el subagente tiene el suyo.
+ */
+function agregar(PAYLOAD, parts, key, encabezado, body) {
+  const texto = budget.inject(PAYLOAD, `prompt-${key}`, body, {
+    repeatEvery: REPEAT_EVERY,
+    cutAt: null,
+    scope: 'hilo',
+  });
+  if (texto !== null) parts.push(`${encabezado}\n${texto}`);
+}
 
+function emit(PAYLOAD) {
+  const cwd = PAYLOAD.cwd;
   const parts = [];
 
   // ── 1. Out of scope del brief ─────────────────────────────────────────────
@@ -107,9 +99,9 @@ function emit() {
     const briefPath = path.join(cwd, 'context', 'brief.md');
     if (fs.existsSync(briefPath)) {
       const body = extractSection(fs.readFileSync(briefPath, 'utf-8'), /^##\s*Out of scope\b/i);
-      if (body && shouldInject(state, 'scope', body)) {
-        parts.push(`[FUERA DE ALCANCE esta sesión — no lo toques aunque parezca relacionado]\n${body}`);
-        state.blocks.scope = { content: body, at: state.n };
+      if (body) {
+        agregar(PAYLOAD, parts, 'scope',
+          '[FUERA DE ALCANCE esta sesión — no lo toques aunque parezca relacionado]', body);
       }
     }
   } catch { /* fail-open */ }
@@ -128,17 +120,11 @@ function emit() {
           .filter(l => /^\s*-\s*\[ \]/.test(l))
           .map(l => l.trim());
         if (pending.length > 0) {
-          const body = pending.join('\n');
-          if (shouldInject(state, 'spec', body)) {
-            parts.push(`[PENDIENTE en ${latest}]\n${body}`);
-            state.blocks.spec = { content: body, at: state.n };
-          }
+          agregar(PAYLOAD, parts, 'spec', `[PENDIENTE en ${latest}]`, pending.join('\n'));
         }
       }
     }
   } catch { /* fail-open */ }
-
-  try { fs.writeFileSync(STATE_PATH, JSON.stringify(state)); } catch { /* ignore */ }
 
   if (parts.length === 0) return;
 

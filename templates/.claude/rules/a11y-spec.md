@@ -1,4 +1,5 @@
 ---
+enforcement: mecanizada  # A11Y-01, A11Y-02, A11Y-03, LLM-01, LLM-02
 paths:
   - "src/app/**/*.html"
   - "src/app/features/**/*.ts"
@@ -26,8 +27,8 @@ El Architect Guard valida estos contratos automáticamente en cada escritura.
 - **PROHIBIDO**: `<button (click)="borrar()"><app-icon name="trash" /></button>`  
 - **OBLIGATORIO**: `<button (click)="borrar()" aria-label="Eliminar registro"><app-icon name="trash" /></button>`
 
-### A11Y-04 — `data-llm-action` en botones de mutación (ya cubierto por ai-readability.md)
-- Refuerzo: toda acción que modifica datos (`save`, `delete`, `submit`) debe tener `data-llm-action`.
+### `data-llm-action` en botones de mutación — lo emiten `LLM-01` y `LLM-02`
+- Toda acción que modifica datos (`save`, `delete`, `submit`) debe tener `data-llm-action`.
 
 ## Por qué importa
 Los guardrails agénticos (y los tests de accesibilidad automatizados) dependen de atributos

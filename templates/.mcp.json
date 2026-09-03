@@ -7,7 +7,8 @@
     },
     "angular": {
       "command": "npx",
-      "args": ["-y", "@angular/cli@latest", "mcp"]
+      "args": ["-y", "@angular/cli@{{ANGULAR_MAJOR}}", "mcp"],
+      "_comment_pin": "Pineado al mismo major con el que el CLI scaffoldea. Con @latest, el dia que Angular publica un major el servidor MCP habla de una version de Angular que este proyecto no tiene — y es la misma regla que lib/config.js le impone al usuario con tres parrafos (INC-018)."
     },
     "supabase": {
       "command": "npx",

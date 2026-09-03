@@ -64,6 +64,17 @@ export function clasificar(nombre, comando) {
  * Un script verificable sin ninguna de las dos queda reportado como **sin
  * comprobar**: no falla el smoke, pero se ve. Lo que no se puede es que pase
  * inadvertido.
+ *
+ * Las claves son **nombres exactos de scripts de `package.json`** (ACO-010). Es
+ * una dependencia que cruza la frontera del generador: los scripts los escribe
+ * `lib/scaffolder.js`, del otro lado del CLI, y esta tabla vive en el payload.
+ * Renombrar `lint:arch` allá deja la entrada de acá huérfana, y una entrada
+ * huérfana no rompe nada: el script pasa a `sin-comprobar`, que no hace fallar
+ * el smoke. Se degrada en silencio, que es el modo de fallar que este archivo
+ * entero existe para cazar.
+ *
+ * `comprobacionesHuerfanas()` lo hace visible en cada corrida, y un test del
+ * lado del generador lo contrasta contra los scripts que el scaffolder emite.
  */
 export const COMPROBACIONES = {
   typecheck: { modo: 'provocar', defecto: 'tipo' },
@@ -75,6 +86,17 @@ export const COMPROBACIONES = {
   'lint:arch:test': { modo: 'contar' },
   'claude:test-hooks': { modo: 'contar' },
 };
+
+/**
+ * Entradas de `COMPROBACIONES` sin script que las reclame.
+ *
+ * No hace fallar el smoke por sí sola: `test:functions` sólo existe cuando el
+ * proyecto se generó con Supabase, así que su ausencia es legítima. Lo que no
+ * puede es no verse.
+ */
+export function comprobacionesHuerfanas(scripts) {
+  return Object.keys(COMPROBACIONES).filter((n) => !(n in scripts));
+}
 
 /**
  * Cuántos tests reportó un runner, leyendo su salida.
@@ -110,14 +132,24 @@ export function contarTests(salida) {
  * @param {number} m.exitLimpio      exit code corriendo el script tal cual
  * @param {string} m.salida          stdout+stderr de esa corrida
  * @param {number|null} [m.exitProvocado]  exit code con el defecto introducido
+ * @param {string|null} [m.defectoInvalido] por qué el defecto ya no es un defecto
  * @returns {{estado:'ok'|'roto'|'decorativo'|'sin-comprobar', motivo:string}}
  */
-export function veredicto({ nombre, exitLimpio, salida, exitProvocado }) {
+export function veredicto({ nombre, exitLimpio, salida, exitProvocado, defectoInvalido }) {
   if (exitLimpio !== 0) {
     return {
       estado: 'roto',
       motivo: `sale ${exitLimpio} en un proyecto sano — el script no corre, no es que encontró algo`,
     };
+  }
+
+  // ACO-010: si el defecto que se inyecta dejó de violar algo, «pasa igual con
+  // un defecto adentro» no dice nada del script. Antes esto salía `decorativo` y
+  // acusaba a `lint:arch` de no mirar, cuando el que no miraba era el smoke.
+  // Va después de `roto` a propósito: un script que ni siquiera corre tiene un
+  // problema propio, y ese sí es del script.
+  if (defectoInvalido) {
+    return { estado: 'sin-comprobar', motivo: defectoInvalido };
   }
 
   const comprobacion = COMPROBACIONES[nombre];
@@ -150,8 +182,40 @@ export function veredicto({ nombre, exitLimpio, salida, exitProvocado }) {
 }
 
 /** Resumen para decidir el exit code del smoke. */
-export function resumir(veredictos) {
+export function resumir(veredictos, { scriptsEncontrados = null, seleccionados = null } = {}) {
   const cuenta = { ok: 0, roto: 0, decorativo: 0, 'sin-comprobar': 0 };
   for (const v of veredictos) cuenta[v.estado]++;
-  return { ...cuenta, falla: cuenta.roto > 0 || cuenta.decorativo > 0 };
+
+  // DEC-005: esto salia `✅ 0 script(s) comprobados` con exit 0 — en pequeño, el
+  // mismo patron que el smoke existe para condenar: un chequeo verde que no
+  // comprobo nada. Un package.json sin los scripts esperados, o un `--solo` mal
+  // escrito, producian un visto bueno vacio.
+  //
+  // Las dos formas de estar vacio no son la misma y no piden lo mismo:
+  //
+  //   ningun script encontrado   el filtro no matcheo nada, o no hay scripts.
+  //                              La auditoria no ocurrio.
+  //   ninguno verificable        los scripts existen y todos son externos, no
+  //                              terminan o son destructivos. Es un estado
+  //                              legitimo, pero tampoco es un visto bueno.
+  // Tres formas de estar vacio, y cada una pide algo distinto. Colapsarlas en
+  // un mensaje generico manda a mirar el lugar equivocado, que es el mismo error
+  // que INC-002.
+  let vacio = null;
+  if (veredictos.length === 0) {
+    if (scriptsEncontrados === 0) {
+      vacio = 'el package.json no declara ningun script';
+    } else if (seleccionados === 0) {
+      vacio = 'el filtro --solo no coincidio con ningun script del package.json';
+    } else {
+      vacio = 'ningun script resulto verificable: los seleccionados quedaron clasificados '
+            + 'como externos, que no terminan, o destructivos';
+    }
+  }
+
+  return {
+    ...cuenta,
+    vacio,
+    falla: cuenta.roto > 0 || cuenta.decorativo > 0 || vacio !== null,
+  };
 }

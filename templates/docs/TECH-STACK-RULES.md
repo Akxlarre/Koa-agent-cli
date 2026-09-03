@@ -33,9 +33,11 @@
 - Solución: `@if/@for` y bindings directos `[class.x]`, `[style.prop]`.
 
 <a id="arch-07"></a>
-### ARCH-07: No `@keyframes` en estilos de app
+### ARCH-07: No `@keyframes` en estilos de componente
 - Prohibido `@keyframes` en estilos dentro de `src/app/**`.
-- Solución: usar GSAP.
+- **`src/styles/` está fuera de alcance, y es a propósito.** Ahí vive la capa de motion curada del design system: `_animations.scss`, `motion/_view-transitions.scss` (las view transitions no se pueden hacer con GSAP) y los overrides de PrimeNG. El blueprint reparte siete `@keyframes` en esa capa y ninguno es una violación.
+- Lo que la regla prohíbe es la animación **ad-hoc en un componente**, que es lo que `GsapAnimationsService` existe para reemplazar.
+- Solución: usar GSAP, o una de las clases de motion del DS (`.animate-fade-in-up`, `.indicator-live`, `.badge-pulse`).
 
 <a id="arch-08"></a>
 ### ARCH-08: No hardcoded Tailwind colors
@@ -44,7 +46,8 @@
 
 <a id="arch-09"></a>
 ### ARCH-09: Complexity warning (shared components)
-- Warning si un `shared/**/*.component.ts` tiene una clase muy grande (recomendación: \(\le 200\) líneas de clase).
+- Warning si un `shared/**/*.component.ts` tiene una clase muy grande (recomendación: \(\le 200\) líneas de **cuerpo**: del primer miembro al último).
+- El `@Component` **no cuenta**: el template y los estilos inline son markup, no complejidad de la clase. La regla medía el span completo de la declaración —decoradores incluidos, que es como los guarda el AST de TypeScript— y con template inline eso denunciaba componentes de 48 líneas por tener 298 (`INC-008`). Cuando el decorador pesa más que la clase, el aviso lo aclara.
 - Solución: dividir en subcomponentes, extraer helpers y mantener `shared/` como UI presentacional.
 
 <a id="arch-10"></a>
@@ -64,6 +67,33 @@
 - Prohibido editar `src/app/core/models/supabase.types.ts` a mano.
 - Solución: `npm run supabase:types` lo regenera. Las interfaces de `dto/` deben **extender** de ahí, no duplicar sus campos.
 - Por qué: cualquier edición manual se pierde en la próxima regeneración, y el tipo deja de reflejar el esquema real.
+
+<a id="arch-27"></a>
+### ARCH-27: Decoradores `@Input()` / `@Output()`
+- Prohibido `@Input()` y `@Output()` en componentes nuevos.
+- Solución: las APIs de signals — `input()`, `input.required()`, `output()`.
+- Por qué: un `@Input()` no es reactivo por sí solo y obliga a `ngOnChanges` o a un setter para derivar estado; `input()` es un signal y `computed()` se encadena solo.
+- Lo emite `pre-write-guard` (regex sobre el contenido nuevo).
+
+<a id="arch-28"></a>
+### ARCH-28: `MessageService` de PrimeNG inyectado directo
+- Prohibido `inject(MessageService)` en un `*.component.ts` de `features/`, `shared/` o `layout/`.
+- Solución: `ToastService` (`core/services/toast.service.ts`).
+- Por qué: los toasts efímeros son una decisión de producto (duración, severidad, copy) y con `MessageService` directo cada componente la toma por su cuenta. Ver `.claude/rules/notifications.md`.
+- Lo emite `pre-write-guard`.
+
+<a id="sql-01"></a>
+### SQL-01: Nombre de migración fuera de convención
+- Formato obligatorio: `YYYYMMDDHHMMSS_<dominio>_<tipo>_<descripcion>.sql`.
+- Por qué: el orden de aplicación de las migraciones es el orden alfabético de sus nombres. Un nombre sin timestamp se aplica en un punto impredecible de la secuencia.
+- Lo emite `pre-write-guard` al crear el archivo (`Write`).
+
+<a id="sec-env-01"></a>
+### SEC-ENV-01: Credencial real en un environment file
+- Prohibido escribir un JWT de Supabase (`eyJ…`) o una URL de proyecto real en `src/environments/**`.
+- Solución: variables de entorno + `scripts/set-env.js`, que las inyecta en build.
+- Por qué: `environment.ts` se commitea. Un placeholder (`your-anon-key-here`) no dispara la regla; un JWT de verdad sí.
+- Lo emite `pre-write-guard`.
 
 <a id="a11y-01"></a>
 ### A11Y-01: `<app-icon>` sin `aria-label`
@@ -144,6 +174,6 @@ Antes de crear un componente presentacional, consulta en este orden:
 - **Tailwind v4:** Usar de forma predeterminada para el 90% del styling (utilidades como `p-4`, `flex`, `bg-surface`, `text-text-muted`). NUNCA usar colores Tailwind arbitrarios. TODO debe mapear a nuestros tokens de diseño.
 - **Vanilla SCSS:** Usar EXCLUSIVAMENTE para layouts complejos estructurales (ej: los mixins abstractos del `_bento-grid.scss`) o donde las utilidades de Tailwind se vuelvan ilegibles.
 - **Motion:**
-  - Navegación de rutas → **CSS View Transitions API** nativa (`_view-transitions.scss`).
+  - Navegación de rutas → **CSS View Transitions API** nativa (`src/styles/motion/_view-transitions.scss`).
   - Animación de componentes montados → **GSAP** (`GsapAnimationsService`). NO uses `@keyframes` para micro-interacciones complejas.
   - Cambio de Tema (Light/Dark) → **CSS Transitions** puros (manejados globalmente en el `body`).

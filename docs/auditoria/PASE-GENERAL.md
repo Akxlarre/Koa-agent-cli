@@ -4,6 +4,12 @@
 > Cada lente es una consulta cruzada sobre los campos que las fichas dejaron llenos, no una
 > relectura. Los números de abajo salieron de barridos y ejecuciones, no de memoria.
 
+> ⚠️ **Esto es una foto fechada, no un tablero.** Está escrito en presente porque así se
+> escribió el día del pase, y su presente ya pasó: la ejecución cerró los 74 y sumó 16 más.
+> El estado vigente vive en `HALLAZGOS.md`, que es la fuente (regla 4 del README). Acá abajo
+> no se toca el análisis —reescribirlo falsearía lo que el pase encontró—; lo que cambió
+> está medido al final, en **«Qué pasó después»**.
+
 ---
 
 ## Lente 1 · Matriz de contratos
@@ -230,7 +236,15 @@ Y el dato que lo resume: **el mecanismo que resolvería los tres casos ya existe
 | `CAR` Carga | 1 | 2 | 0 | **3** |
 | `DUP` Duplicación | 0 | 3 | 0 | **3** |
 | `SEC` (sub-tipo de DEC) | 1 | 0 | 0 | **1** |
-| **Total** | **7** | **34** | **33** | **74** |
+| **Total** | **8** | **32** | **34** | **74** |
+
+> **Corrección aritmética.** Esta fila decía `7 · 34 · 33`. Las filas suman bien y el gran
+> total también, pero las tres columnas de severidad no: sumadas dan **8 · 32 · 34**. El
+> documento llegó a dar **cuatro** números distintos para `S1` —7 acá, 8 en la columna real,
+> «los seis `S1` del harness» dos veces, y «Los 9 `S1`» en la sección de acción— y ninguno
+> era obviamente el equivocado, que es justo lo que hace cara una cifra sin derivar.
+> (Los 9 de la sección de acción son los 8 más `HUE-032`, que llegó de la fase de diseño.)
+> Se corrige la fila; el resto queda como estaba.
 
 `HUE` domina con el 40%. **El repositorio casi nunca hace algo mal; deja cosas sin cubrir.**
 
@@ -362,3 +376,66 @@ Tres verificaciones quedaron por lectura y no por ejecución, todas registradas 
 
 Las tres se cierran al escribir los tests que pide `HUE-011`. Las otras dos deudas
 —`C-04` y `C-05`— **quedaron cerradas** durante la auditoría, en `S-03` y `G-06`.
+
+> **Saldadas.** Verificado al revisar este documento: `bash-guard` capas 2 y 3 tiene sus
+> suites (*operaciones destructivas* y *Approval Gate*), `hotfix-autoclose` tiene 16 tests,
+> y la tercera **no estaba**: `lint-arch-wrapper` sólo aparecía como contexto en
+> `failure-tracker.test.js` y en `smoke-scripts.test.mjs`, que es distinto de correrlo. Se
+> escribió `scripts/lib/lint-arch-wrapper.test.mjs` (`HUE-034`), que ejecuta el camino de
+> fallo y comprueba lo que nadie comprobaba: que los **dos** productores de
+> `LESSONS_LEARNED.md` convivan. Viven en árboles distintos y no pueden importarse entre sí,
+> así que nada en el código los ata — sólo que el wrapper escriba fuera de los marcadores.
+
+
+---
+
+# Qué pasó después
+
+> Medido el 2026-09-03, al cerrar la ejecución. **Esto no reemplaza el análisis de arriba**:
+> lo fecha. La fuente del estado sigue siendo `HALLAZGOS.md`.
+
+## El conteo hoy
+
+| | El pase (2026-08-29) | Hoy |
+|---|---|---|
+| Hallazgos registrados | 74 | **91** |
+| Abiertos | 74 | **0** |
+| `S1` | 8 | 11 |
+
+Los 17 de más no son hallazgos que el pase no vio: son los que **encontró la ejecución**,
+que es el patrón que el propio pase predijo en su conclusión 1 («las herramientas están
+inventadas; la aplicación quedó a medias»). Varios salieron de arreglar otro —`INC-025`
+apareció al cablear `HUE-028`, `INC-026` al cerrar `HUE-023`— y **tres son míos**:
+`HUE-033` (un trinquete en rojo tres tandas porque yo corría dos suites de cuatro),
+`INC-023` e `INC-024` (un test que sólo pasaba en el layout donde lo escribí).
+
+## Las cinco conclusiones, hoy
+
+| # | Qué decía | Estado |
+|---|---|---|
+| 1 | Las herramientas inventadas y aplicadas a medias, 8 instancias | **cerrada en las 8**, y la ejecución sumó instancias del mismo patrón antes de agotarlo |
+| 2 | Los `S1` del harness están todos en hooks sin test | **cerrada**: todo hook tiene test, y `hook-wiring.test.js` verifica además que estén cableados — el eje que el pase no tenía |
+| 3 | Tres hooks creen que `Stop` es «fin de sesión» | **cerrada** en los tres |
+| 4 | Las dos mitades del repo no están al mismo nivel | **cerrada**: 0 `S1` en ambas, y `test/smoke-comprobaciones.test.mjs` es el primer mecanismo que las mira juntas |
+| 5 | La economía de contexto está resuelta donde no duele | **cerrada**, con el trinquete de `rules-budget` vigilándola |
+
+Dos afirmaciones concretas quedaron falsificadas por la ejecución y conviene decirlo:
+**«24 de 28 reglas sin fixture»** es hoy 0 de 28 —el baseline quedó vacío—, y **«el
+guardrail en frontmatter se usa una sola vez»** dejó de ser cierto al descubrirse que la
+causa era mecánica: el validador miraba un solo directorio (`HUE-028`).
+
+## Lo que el pase no podía ver
+
+El pase interroga al repositorio con las fichas. La ejecución agregó dos ejes que ninguna
+lente cubría, y los dos dieron hallazgos:
+
+- **Provocar cada mecanismo contra su propia violación**, no sólo verificar que su lógica
+  sea correcta. De ahí salió que el resumen del linter, con cuatro caracteres de más, deja
+  la provocación en `✅ 28/28` con una regla muerta adentro (`ACO-009`).
+- **Correr todo en el layout del proyecto generado**, no sólo en este repo. De ahí salió
+  `INC-024`, y el `contracts.js` que declara los 21 artefactos existe porque un agente
+  trabajando allá no tenía cómo enterarse de los contratos (`ACO-013`).
+
+El pase ya había nombrado el hueco de su método —«ninguna unidad interroga a la
+plataforma»— y proponía un **Nivel D**. Esto es el mismo hueco un escalón más abajo:
+ninguna unidad interroga al **entregable**.

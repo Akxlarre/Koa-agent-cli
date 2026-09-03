@@ -94,6 +94,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `ACO-010` | S3 | `S-06` | `smoke-scripts` depende de los nombres exactos de los scripts de `package.json` y de que `ARCH-04` siga activa | resuelto · las dos declaradas y mecanizadas: `comprobacionesHuerfanas()` contra los scripts que emite el scaffolder (test del lado A, único lugar donde los dos lados se ven), y el defecto declara su regla y la verifica contra `architect.js` |
 | `HUE-020` | **S1** | `G-02` | `parseJsonc` se come lo que siga a `//` dentro de un string: un `tsconfig.json` con `$schema` deja el proyecto sin path aliases y sin compilar | resuelto · `stripJsonComments` recorre respetando strings; el parche de `tsconfig` pasó a requerido |
 | `HUE-022` | **S1** | `G-10` | Los 9 parches son condicionales: si `ng new` cambia de forma no fallan, no hacen nada. Ningún test de integración corre `ng new` | resuelto · `patch()` con `requerido` (los tres archivos sin los que no hay proyecto paran el CLI) + `npm run test:integracion`, que corre `ng new` de verdad |
+| `HUE-034` | S2 | `S-02` | La tercera «deuda del método» que el pase declaró nunca se pagó: el camino de fallo de `lint-arch-wrapper` seguía verificado por lectura | resuelto · encontrado al revisar `PASE-GENERAL.md`. Es lo que `npm run lint:arch` invoca de verdad, y el **segundo** productor de un archivo cuyo otro productor reescribe una región entera |
 | `HUE-025` | S2 | `T-01` | La cobertura mide que la lógica sea correcta, casi nunca que el sistema la ejecute ni que alguien intente evadirla | resuelto · medido, son **dos ejes en estados opuestos**: evasión ya estaba bien (79 asserts de bloqueo contra 68 de paso), ejecución no tenía ningún mecanismo. `hook-wiring.test.js` cubre el segundo en sus tres direcciones |
 | `HUE-021` | S3 | `G-08` | Ningún test genera una feature y le corre `architect.js` encima | resuelto · no hacía falta `npm install`, solo **un paquete**: se instala el `typescript` que el propio proyecto declara y el linter corre sobre la salida real de `ng new` |
 | `HUE-023` | S3 | `A-01` | La calidad del resumen de los subagentes no es verificable por ningún mecanismo del repo | resuelto · la calidad no, y va a seguir sin serlo. Lo demás sí: el formato que promete, los permisos con los que corre, y lo que el harness afirma de él |
@@ -1568,6 +1569,57 @@ Lo que se arregla es la afirmación. `CLAUDE.md` ahora dice cuál de las dos cos
 protegiendo en cada caso, y un test prohíbe que la prosa describa como acotado a un
 agente que corre con `Bash`, `Write` o `Edit` — y exige que la distinción siga escrita,
 para que el test no se pueda satisfacer borrando la frase.
+
+**Estado:** resuelto
+
+---
+
+## HUE-034 · El camino de fallo de `lint-arch-wrapper`, sin ejecutar
+
+- **Tipo / severidad:** `HUE` · S2 · **Unidad:** `S-02` · **Contexto:** B (harness)
+
+**Qué encontré**
+
+`PASE-GENERAL.md` cerró declarando tres «deudas del método»: verificaciones hechas por
+lectura y no por ejecución. Verificado al revisar ese documento, **dos se pagaron** —las
+capas 2 y 3 de `bash-guard` tienen sus suites, `hotfix-autoclose` tiene 16 tests— y la
+tercera no. `lint-arch-wrapper` aparecía sólo como contexto en `failure-tracker.test.js` y
+en `smoke-scripts.test.mjs`, que es distinto de correrlo.
+
+**Por qué importa**
+
+Dos cosas, y ninguna es menor:
+
+- Es lo que `npm run lint:arch` **invoca de verdad**: `architect.js` se corre a través de
+  él. Un wrapper que se comiera el exit code volvería decorativo el linter entero, y las
+  28 reglas provocadas no lo notarían — la provocación llama a `architect.js` directo.
+- Es el **segundo productor** de `.claude/temp/LESSONS_LEARNED.md`, cuyo otro productor
+  (`failure-tracker`) reescribe una región `AUTO-GENERATED` completa en cada corrida. Los
+  dos viven en árboles distintos y no pueden importarse entre sí —uno es CommonJS bajo
+  `.claude/hooks/`, el otro ESM bajo `scripts/`—, así que **nada en el código los ata**: lo
+  único que los hace compatibles es que el wrapper appendee fuera de los marcadores.
+
+**Qué se hizo**
+
+`scripts/lib/lint-arch-wrapper.test.mjs`, con un `architect.js` doble cuyo exit code se
+controla —el linter real necesita `typescript` y un árbol Angular entero; el doble hace la
+ruta de fallo reproducible—. Cubre los siete caminos: falla y guarda la memoria, reimprime
+la salida del linter, vuelve a pasar y convierte el fallo en lección, no inventa lección
+sin fallo previo, memoria corrupta que falla abierto, `architect.js` ausente (que no es lo
+mismo que una violación), y el reenvío de flags. Más los tres de convivencia.
+
+Provocado en los dos que importan: comiéndose el exit del linter fallido → rojo; haciendo
+que el wrapper escriba **dentro** de la región auto-generada → rojos los dos tests de
+convivencia, que es el modo de fallo que `GATE-D1` existe para prevenir y que acá no lo
+cubría ningún gate, porque `GATE-D1` mira lo que escribe un agente, no lo que escribe un
+script del proyecto.
+
+**Nota sobre el método**
+
+Su primera versión resolvía `lessons.js` contra una sola profundidad y fallaba en el
+layout generado — `INC-024` otra vez, cometido por mí mientras cerraba `INC-024`. Resuelve
+contra los dos, y **falla** si no encuentra el módulo en ninguno: «no lo encontré» y
+«conviven bien» no pueden dar el mismo verde.
 
 **Estado:** resuelto
 

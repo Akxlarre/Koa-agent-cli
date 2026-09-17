@@ -354,7 +354,7 @@ describe('El README no promete un producto distinto del que hay', () => {
     // ninguna es una promesa que el lector no puede cumplir.
     const propios = Object.keys(pkg.scripts);
     const scaffolder = fs.readFileSync(path.join(RAIZ, 'lib', 'scaffolder.js'), 'utf-8');
-    const citados = [...new Set([...txt.matchAll(/npm run ([\w:]+)/g)].map((m) => m[1]))];
+    const citados = [...new Set([...txt.matchAll(/npm run ([\w:-]+)/g)].map((m) => m[1]))];
     assert.ok(citados.length >= 5, `solo ${citados.length} comandos citados`);
     const fantasmas = citados.filter((c) => !propios.includes(c) && !scaffolder.includes(`'${c}'`));
     assert.deepEqual(fantasmas, []);

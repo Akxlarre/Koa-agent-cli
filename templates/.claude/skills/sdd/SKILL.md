@@ -35,7 +35,7 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash
 | 3. Plan | `/spec-plan` | `specs/specs/NNNN-slug/plan.md` | Claude redacta basado en spec + índices |
 | 4. Tareas | `/spec-tasks` | `specs/specs/NNNN-slug/tasks.md` | Claude descompone plan en checklist atómico |
 | 5. Implementar | (libre) | código + tests | Claude ejecuta tareas; hooks validan |
-| 6. Verificar | `/spec-verify` | `specs/specs/NNNN-slug/acceptance.md` | AC verifier (Haiku) marca AC con evidencia |
+| 6. Verificar | `/spec-verify` | `specs/specs/NNNN-slug/acceptance.md` | Claude marca cada AC con evidencia; el usuario decide el cierre |
 
 ## Estructura canónica de un proyecto con SDD activo
 
@@ -125,7 +125,10 @@ ellos y el resto del tablero es tuyo.
 | `spec-gate.js` | PreToolUse Edit\|Write\|MultiEdit | Bloquea escrituras en código de producto si no hay spec activa o si la spec no tiene plan |
 | `plan-injector.js` | PreToolUse Edit\|Write\|MultiEdit | Inyecta spec + plan activo como contexto adicional en cada edición |
 | `hotfix-autoclose.js` | SessionEnd | Red de seguridad: cierra el `hotfix-*` que quedó abierto. El cierre normal es `/hotfix-close` |
-| AC verifier | Stop (prompt hook) | Definido inline en `.claude/settings.json`: verifica si los AC de la spec activa fueron cumplidos en la sesión |
+
+La verificación de los AC **no es un hook**: es `/spec-verify`, un comando que corre el
+agente principal cuando alguien lo invoca. Nada la dispara sola al terminar una respuesta
+o una sesión — si no se corrió, no hubo verificación.
 
 **Importante: los hooks son fail-open.** Si un proyecto no tiene `specs/`, el hook no bloquea
 nada — esto los hace seguros de embarcar por defecto sin romper proyectos que no usan SDD.
@@ -154,7 +157,7 @@ nada — esto los hace seguros de embarcar por defecto sin romper proyectos que 
 3. **El plan se deriva de la spec; las tareas del plan.** Nunca al revés.
 4. **Out-of-scope es sagrado.** Si el usuario pide algo que está fuera del scope declarado, sugiere crear una spec nueva, no extender la actual.
 5. **Acceptance Criteria son Gherkin.** Given/When/Then. Verificables. Nada de "el sistema debe ser rápido".
-6. **El AC verifier es la fuente de verdad del cierre.** No marques una spec como `done` sin haber pasado `/spec-verify`.
+6. **`/spec-verify` es la fuente de verdad del cierre.** No marques una spec como `done` sin haberlo corrido. No es un verificador independiente —corre en el agente principal, no en un subagente ni en un hook—, así que su veredicto vale lo que valga la evidencia que cita (commit, test, archivo y línea), y el cierre lo decide el usuario.
 
 ## Plantillas
 
@@ -176,7 +179,7 @@ SDD **complementa**, no reemplaza, el sistema actual:
 |-----------------|-------------------|
 | Discovery Gate (lee índices antes de código) | Sí — corre DESPUÉS del spec-gate |
 | Architect Guard (valida forma del código) | Sí — sin cambios |
-| Sync Check (índices actualizados) | Sí — convive con AC Verifier |
+| Sync Check (índices actualizados) | Sí — sin cambios |
 | `indices/*.md` | Se referencian en `plan.md` para reutilizar |
 | `.claude/rules/*.md` | Se mencionan en `plan.md` como restricciones |
 

@@ -149,6 +149,7 @@ Agregar filas al final; la ficha de detalle va debajo de la tabla.
 | `INC-022` | **S2** | `diseño` | La plantilla canónica de `ASSIGNMENTS.md` no traía **ningún** marcador `AUTO-GENERATED`, y `assignments-sync` se niega a escribir sin ellos: el único camino de escritura de la capa fallaba incluso en un proyecto que hubiera hecho todo bien | resuelto · marcadores en la plantilla + el error dice cómo arreglar un tablero viejo |
 | `INC-023` | S2 | `S-01` | `ARCH-07` se llamaba «No @keyframes in app styles» y su mensaje decía «archivo de estilos», pero solo mira `src/app/**`. El blueprint reparte **siete** `@keyframes` en `src/styles/` que la lectura literal convertiría en violaciones | resuelto · el alcance era correcto y las palabras no: las tres puntas dicen «estilos de componente», como el hook siempre dijo |
 | `HUE-033` | **S2** | `ejecución` | El trinquete de `CAR-003` estuvo **en rojo desde el commit siguiente al que lo fijó**, y no me enteré: la suite de `scripts/lib/` no entraba en la verificación de cada tanda. El mecanismo funcionó; el que no corría era yo | resuelto · el presupuesto vuelve a estar bajo el tope sin subirlo, y las cuatro suites entran en la verificación |
+| `INC-028` | S2 | `K-07` | `sdd/SKILL.md` describe un «AC verifier (Haiku)» como hook de prompt en `Stop`, «definido inline en `.claude/settings.json`», y dos plantillas cuentan con él: no hay hook de prompt, ni subagente, ni archivo | resuelto · el texto dice lo que hay: `/spec-verify`, en el agente principal. El detector que lo habría atrapado encontró el mismo invento en `HOOKS-SYSTEM.md`: Sync Check descrito como hook de prompt evaluado por Haiku, cuando es un `command` |
 
 ---
 
@@ -3428,3 +3429,63 @@ el que estaba mal era el test. Una firma que promete algo que la función ignora
 exactamente ese error. El parámetro ya no está, ni en la función ni en los 8 llamadores.
 
 **Estado:** resueltos
+
+---
+
+## INC-028 · Un verificador que el SDD daba por hecho y nadie cableó
+
+- **Tipo / severidad:** `INC` · S2 · **Unidad:** `K-07` (`sdd`) · **Contexto:** B (harness)
+
+**Qué encontré**
+
+Tres archivos del SDD describen un mecanismo que no existe:
+
+| Dónde | Qué decía |
+|---|---|
+| `sdd/SKILL.md`, tabla de fases | «AC verifier (Haiku) marca AC con evidencia» |
+| `sdd/SKILL.md`, tabla de hooks | «AC verifier · Stop (prompt hook) · Definido inline en `.claude/settings.json`» |
+| `sdd/SKILL.md`, regla 6 | «El AC verifier es la fuente de verdad del cierre» |
+| `sdd/SKILL.md`, convivencia | «Sync Check … convive con AC Verifier» |
+| `templates/tasks.md`, T5.4 | «AC Verifier devuelve `{ok: true}`» |
+| `templates/acceptance.md`, encabezado | «Verifier: ac-verifier (Haiku)» |
+
+`settings.json` cablea en `Stop` tres hooks, los tres `command`. No hay ningún
+`ac-verifier` en `agents/`, y `/spec-verify` corre en el agente principal.
+
+**Por qué importa**
+
+Es `HUE-023` / `INC-026` con otra forma: un texto del harness promete una garantía que
+ningún mecanismo da. Y esta vez la promesa es justo la del cierre. Un agente que trabaja
+en un proyecto generado le cree a la skill que un verificador aparte —otro modelo, otra
+ventana, disparado solo al terminar— va a revisar sus AC. El que verifica es él mismo, y
+sólo si alguien corre el comando.
+
+**Qué se hizo**
+
+Alinear el texto, no implementar el verificador. `settings.test.js` exige que todo hook
+sea `command`, y `sync-check.js` existe justamente porque el harness dejó atrás el hook de
+prompt de `Stop`: no lee la conversación, lee el filesystem. `/spec-verify` es la
+verificación, y los tres archivos ahora lo dicen.
+
+El detector va en las dos suites que ya miraban lo cableado:
+
+- `hook-wiring.test.js`: toda fila de una tabla `| Hook | Evento |` es un archivo que
+  `settings.json` corre en ese evento, y ningún texto describe un hook de prompt o de
+  agente —ni cita su respuesta, `{ "ok": true }`— si no hay uno cableado.
+- `agent-contracts.test.js`: todo modelo que la prosa nombra lo declara un subagente de esa
+  misma línea, y todo «subagente `x`» existe.
+
+Provocado contra el payload sin corregir: rojos en cuatro de las seis líneas del hallazgo
+y en cuatro de `docs/HOOKS-SYSTEM.md`, que describía Sync Check como hook de prompt
+evaluado por Haiku. También se corrigió. El de tablas y el de modelos traen además el
+control que demuestra que no marcan la afirmación verdadera: la fila de
+`hotfix-autoclose.js` en `SessionEnd`, y `` `code-judge` (opus) ``.
+
+**Lo que no atrapa**
+
+Las dos líneas que nombraban al verificador sin describirlo: «El AC verifier es la fuente
+de verdad del cierre» y «convive con AC Verifier». Para distinguir un nombre propio
+inventado de una frase cualquiera hace falta una lista de nombres, y una lista es justo lo
+que estos tests evitan mantener.
+
+**Estado:** resuelto

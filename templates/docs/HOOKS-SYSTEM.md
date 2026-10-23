@@ -39,7 +39,7 @@ Claude recibe un prompt del humano
     │       └─ Todo OK → PERMITIDO (esto es guía, no código de la app: pre-write-guard.js no aplica)
     │
     ├─ Claude termina de responder
-    │   └─ Stop → prompt hook → "¿Actualizaste los índices?" → si no → sigue trabajando
+    │   └─ Stop → sync-check.js → ¿fuentes más nuevos que los índices? → sí → sigue trabajando
     │
     ├─ Un tool falla
     │   └─ PostToolUseFailure → failure-tracker.js → registra en LESSONS_LEARNED.md
@@ -225,13 +225,15 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
   - **Deduplicación** — errores repetidos incrementan un contador en vez de duplicarse
   - **Contexto** — registra el tool, error y archivo/comando involucrado
 
-### 6. Sync Check (prompt hook)
+### 6. Sync Check (`sync-check.js`)
 - **Evento**: Stop
 - **Matcher**: ninguno (se ejecuta en cada respuesta)
-- **Tipo**: `prompt` (evaluado por modelo Haiku)
-- **Función**: Cuando Claude termina de responder, Haiku evalúa si se crearon
-  componentes/servicios nuevos sin actualizar los índices. Si detecta drift,
-  fuerza a Claude a continuar y actualizar los índices.
+- **Función**: Cuando Claude termina de responder, compara la fecha de modificación de
+  cada archivo de la sesión que va a un índice (`session-writes.json`, que deja
+  `write-tracker.js`) contra la del índice más reciente de `indices/`. Si alguno es más
+  nuevo, sale con `exit 2` y le lista a Claude esos archivos y los índices que
+  probablemente toque, así que sigue trabajando. No lee la conversación ni le pregunta a
+  un modelo: mira el filesystem.
 
 ### 7. Circuit Breaker (dentro de `pre-write-guard.js`)
 - **Evento**: PreToolUse (Edit|Write|MultiEdit)

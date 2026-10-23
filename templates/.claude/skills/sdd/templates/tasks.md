@@ -113,7 +113,7 @@
   - **DoD:** Cada AC marcado con evidencia en `acceptance.md`
 
 - [ ] **T5.4** — Ejecutar `/spec-verify`
-  - **DoD:** AC Verifier devuelve `{ok: true}` o tickets restantes resueltos
+  - **DoD:** `acceptance.md` con veredicto ✅ PASA, o los gaps que quedan aceptados por el usuario con su justificación
 
 ---
 

@@ -6,6 +6,41 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [Unreleased]
+
+### Lo que cambia en un proyecto generado
+
+- **El SDD ya no promete un verificador que no existe** (`INC-028`). `sdd/SKILL.md`
+  describía un «AC verifier (Haiku)» como hook de prompt en `Stop`, «definido inline en
+  `.claude/settings.json`», y lo llamaba la fuente de verdad del cierre; la plantilla de
+  `tasks.md` esperaba que devolviera `{ok: true}` y la de `acceptance.md` lo ponía como
+  firma. No había hook de prompt, ni subagente, ni archivo. La verificación de los AC es
+  `/spec-verify`, que corre el agente principal cuando alguien lo invoca, y eso dicen
+  ahora los tres archivos: nada se dispara solo, y el cierre lo decide el usuario.
+- **`docs/HOOKS-SYSTEM.md` describe Sync Check como lo que es**: un hook `command` que
+  compara fechas de modificación contra `indices/`, no un hook de prompt evaluado por
+  Haiku. Es el documento al que `.claude/CLAUDE.md` manda para el detalle de los hooks. No
+  lo encontró una lectura: lo encontró el detector nuevo.
+
+### Para el que trabaja sobre este repositorio
+
+- `hook-wiring.test.js` y `agent-contracts.test.js` miran también lo que la prosa del
+  harness **afirma**, no solo lo que está cableado: toda fila de una tabla
+  `| Hook | Evento |` tiene que ser un archivo que `settings.json` corre en ese evento,
+  ningún texto describe un hook de prompt o de agente si no hay uno cableado, y todo
+  modelo o subagente que la prosa nombra lo declara un frontmatter. De las diez líneas que
+  describían mecanismos inexistentes atrapan ocho; las dos que se escapan nombraban al
+  verificador sin describirlo («convive con AC Verifier»), y eso un regex no lo distingue
+  sin una lista de nombres.
+
+### Migración
+
+Ninguna acción obligatoria. Para traer las plantillas corregidas, volvé a correr el CLI en
+modo **Inject Only**. Los `acceptance.md` que ya escribiste siguen diciendo «Verifier:
+ac-verifier (Haiku)»: es solo texto, y no lo lee ningún hook.
+
+---
+
 ## [7.2.0] — 2026-09-03
 
 La versión de la auditoría. 91 hallazgos registrados y cerrados sobre las 102 unidades

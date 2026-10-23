@@ -24,6 +24,9 @@
  * Este archivo cubre el eje de ejecución en sus tres direcciones. La verdad se
  * DERIVA del filesystem y de `settings.json`; no hay lista que mantener salvo
  * la de los opt-in declarados, que sólo puede achicarse.
+ *
+ * Y una cuarta, que no mira si el hook corre sino lo que se AFIRMA de él
+ * (INC-028): la prosa del harness no puede describir un hook que no existe.
  */
 
 const { test, describe } = require('node:test');
@@ -32,6 +35,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CLAUDE = path.resolve(__dirname, '..');
+const PROYECTO = path.resolve(CLAUDE, '..');
 const HOOKS = path.join(CLAUDE, 'hooks');
 const SETTINGS = path.join(CLAUDE, 'settings.json');
 
@@ -154,5 +158,181 @@ describe('HUE-025 — los validadores que se cablean desde un frontmatter', () =
         { encoding: 'utf8' });
       assert.equal(r.status, 0, `${ruta} no parsea:\n${r.stderr}`);
     }
+  });
+});
+
+// ─── INC-028 — lo que la prosa dice que corre ───────────────────────────────
+
+/**
+ * La prosa del harness: lo que el agente lee y le cree.
+ *
+ * Los `.md` de `.claude/` —menos `temp/`, que es estado de sesión—, los de
+ * `docs/` y los dos puntos de entrada. Los `.js` no: el comentario de
+ * `sync-check.js` dice que «reemplaza el Stop prompt hook anterior», y eso es
+ * historia, no una promesa.
+ */
+function prosa() {
+  const out = [];
+  const walk = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'temp' || e.name === 'node_modules') continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith('.md')) out.push(full);
+    }
+  };
+  walk(CLAUDE);
+  walk(path.join(PROYECTO, 'docs'));
+  for (const f of ['CLAUDE.md', 'AGENTS.md']) {
+    if (fs.existsSync(path.join(PROYECTO, f))) out.push(path.join(PROYECTO, f));
+  }
+  return out.map((f) => ({ archivo: path.relative(PROYECTO, f), texto: fs.readFileSync(f, 'utf-8') }));
+}
+
+/** Las líneas de un markdown, numeradas y sin el frontmatter: eso es cableado, no prosa. */
+function lineas(texto) {
+  const ls = texto.split('\n');
+  const desde = ls[0].trim() === '---'
+    ? ls.findIndex((l, i) => i > 0 && l.trim() === '---') + 1
+    : 0;
+  return ls.map((l, i) => ({ n: i + 1, l })).slice(desde);
+}
+
+/**
+ * Las formas en que un texto describe un hook que evalúa un modelo.
+ *
+ * `prompt` y `agent` son los dos tipos de hook que le pasan la decisión a un
+ * modelo en vez de correr un comando, y los dos responden `{ "ok": true }` o
+ * `{ "ok": false, "reason": … }`: citar esa respuesta también es describir uno.
+ */
+const HOOK_DE_MODELO = [
+  /\b(?:prompt|agent)(?:[ -]based)?[ -]hooks?\b/i,
+  /\bhooks? (?:de tipo |basados? en |de )`?(?:prompt|agent)\b/i,
+  /\*\*Tipo\*\*:\s*`(?:prompt|agent)`/i,
+  /\btype:\s*["']?(?:prompt|agent)\b/i,
+  /`\{\s*"?ok"?\s*:\s*(?:true|false)\b[^`]*`/i,
+];
+
+/** Las líneas de `texto` que describen un hook de prompt o de agente. */
+function hooksDeModeloDescritos(texto) {
+  return lineas(texto).filter(({ l }) => HOOK_DE_MODELO.some((re) => re.test(l)));
+}
+
+const CONFIG = JSON.parse(settings);
+
+/**
+ * Las filas de toda tabla `| Hook | Evento | …`: lo que un doc afirma que corre,
+ * y cuándo. Se corta en `|` sin escapar — `Edit\|Write` es una sola celda.
+ */
+function filasDeHooks(texto) {
+  const ls = texto.split('\n');
+  const filas = [];
+  ls.forEach((l, i) => {
+    if (!/^\|\s*Hook\s*\|\s*Evento\s*\|/.test(l)) return;
+    for (let j = i + 2; j < ls.length && ls[j].startsWith('|'); j++) {
+      const [hook = '', evento = ''] = ls[j].split(/(?<!\\)\|/).slice(1).map((c) => c.trim());
+      filas.push({ n: j + 1, hook, evento });
+    }
+  });
+  return filas;
+}
+
+/**
+ * La fila nombra un evento, y lo que nombra como hook no es un archivo que
+ * `settings.json` corra en ese evento.
+ *
+ * Un evento `—` es la forma en que la doc dice «esto no es un hook»
+ * (`lib/guard-rules.js`) o «no viene cableado» (los opt-in): no afirma que nada
+ * corra, y no se juzga.
+ */
+function sinCablear({ hook, evento }) {
+  const ev = /^[A-Z]\w+/.exec(evento)?.[0];
+  if (!ev) return false;
+  const archivo = /[\w./-]+\.js\b/.exec(hook)?.[0];
+  if (!archivo) return true;
+  const comandos = (CONFIG.hooks?.[ev] || []).flatMap((g) => (g.hooks || []).map((h) => h.command || ''));
+  return !comandos.some((c) => c.includes(archivo));
+}
+
+describe('INC-028 — la prosa no describe hooks que el sistema no corre', () => {
+  // Las tres direcciones de arriba miran el disco y `settings.json`. Faltaba la
+  // que mira la PROSA. `sdd/SKILL.md` tenía una fila «AC verifier | Stop (prompt
+  // hook) | Definido inline en `.claude/settings.json`», y dos plantillas del SDD
+  // contaban con él. No había hook de tipo prompt, ni subagente, ni archivo: un
+  // agente en un proyecto generado le confiaba el cierre de su spec a un
+  // verificador que no existe.
+  //
+  // Es peor que un hook descableado, que por lo menos está en disco: a este no
+  // había dónde ir a buscarlo.
+  const PROSA = prosa();
+
+  test('hay prosa que mirar', () => {
+    // Sin esto, un `docs/` que no se encuentra deja todo lo de abajo en verde
+    // sin haber leído nada.
+    assert.ok(PROSA.length >= 20, `solo ${PROSA.length} archivos de prosa`);
+    assert.ok(PROSA.some((p) => p.archivo.endsWith('HOOKS-SYSTEM.md')), 'no se encontró docs/HOOKS-SYSTEM.md');
+  });
+
+  test('ninguna describe un hook de prompt o de agente si no hay uno cableado', () => {
+    // `settings.test.js` exige hoy que todo hook sea `command`, así que no puede
+    // haber ninguno. El chequeo es grueso a propósito: el día que se cablee uno,
+    // describirlo pasa a ser legítimo y esto deja de distinguir. Afinarlo es
+    // parte de esa decisión, que no se toma sin tocar `settings.test.js`.
+    const tipos = new Set(Object.values(CONFIG.hooks || {})
+      .flatMap((grupos) => (grupos || []).flatMap((g) => (g.hooks || []).map((h) => h.type))));
+    for (const { texto } of PROSA) {
+      // Los `hooks:` de un frontmatter también cablean (`/plan`, `/spec-new`).
+      const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(texto)?.[1] || '';
+      if (/^hooks:/m.test(fm)) for (const m of fm.matchAll(/\btype:\s*["']?(\w+)/g)) tipos.add(m[1]);
+    }
+    if (tipos.has('prompt') || tipos.has('agent')) return;
+
+    const descritos = PROSA.flatMap(({ archivo, texto }) =>
+      hooksDeModeloDescritos(texto).map(({ n, l }) => `${archivo}:${n} — ${l.trim()}`));
+    assert.deepEqual(descritos, [],
+      'la prosa describe un hook que evalúa un modelo y no hay ninguno cableado. Si es historia ' +
+      '(«antes era un prompt hook»), va en el CHANGELOG o en el comentario del hook: la prosa del ' +
+      'payload describe lo que corre hoy');
+  });
+
+  test('y las cuatro formas que tenía el hallazgo no pasarían', () => {
+    // Literales. Si el detector deja de ver alguna, el test de arriba pasa en
+    // verde sin estar mirando.
+    for (const l of [
+      '| AC verifier | Stop (prompt hook) | Definido inline en `.claude/settings.json` |',
+      '  - **DoD:** AC Verifier devuelve `{ok: true}` o tickets restantes resueltos',
+      '### 6. Sync Check (prompt hook)',
+      '- **Tipo**: `prompt` (evaluado por modelo Haiku)',
+    ]) {
+      assert.equal(hooksDeModeloDescritos(l).length, 1, l);
+    }
+  });
+
+  test('toda fila de una tabla `| Hook | Evento |` es un archivo cableado en ese evento', () => {
+    // La dirección literal del hallazgo: el texto nombra un hook y lo ubica en un
+    // evento. Las dos cosas se pueden contrastar con `settings.json`.
+    const filas = PROSA.flatMap(({ archivo, texto }) =>
+      filasDeHooks(texto).map((f) => ({ archivo, ...f })));
+    assert.ok(filas.filter((f) => /^[A-Z]/.test(f.evento)).length >= 5,
+      `solo ${filas.length} filas en tablas de hooks: ¿cambió el encabezado?`);
+
+    const fantasmas = filas.filter(sinCablear)
+      .map((f) => `${f.archivo}:${f.n} — ${f.hook} | ${f.evento}`);
+    assert.deepEqual(fantasmas, [],
+      'la tabla describe un hook que el sistema no corre en ese evento');
+  });
+
+  test('y una fila sin archivo, o en el evento equivocado, no pasaría', () => {
+    // Los dos modos de fallar: la fila del hallazgo, y la de `INC-007` (el
+    // auto-cierre del hotfix vivió en Stop y es de SessionEnd).
+    const tabla = [
+      '| Hook | Evento | Función |',
+      '|------|--------|---------|',
+      '| AC verifier | Stop (prompt hook) | Definido inline en `.claude/settings.json` |',
+      '| `hotfix-autoclose.js` | Stop | Cierra el hotfix abierto |',
+      '| `hotfix-autoclose.js` | SessionEnd | Cierra el hotfix abierto |',
+    ].join('\n');
+    assert.deepEqual(filasDeHooks(tabla).filter(sinCablear).map((f) => f.n), [3, 4]);
   });
 });

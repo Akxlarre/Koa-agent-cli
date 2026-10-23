@@ -442,8 +442,8 @@ Tres mecanismos que no miran el código del usuario sino al propio harness:
 | Mecanismo | Qué sostiene |
 |---|---|
 | `hooks/lib/contracts.js` → `docs/CONTRATOS.md` | Los **21 artefactos compartidos**: qué pieza escribe cada uno, quién lo lee, cuándo se borra. Agregar un consumidor sin declararlo rompe el test. La copia viaja al proyecto generado, que antes no tenía cómo enterarse de que `sync-check` borra el archivo del que depende `spec-diff-check` (`ACO-013`) |
-| `hook-wiring.test.js` | Que el sistema **ejecute** lo que la suite prueba: hook en disco sin cablear, entrada muerta en `settings.json`, validador referenciado desde un frontmatter que no existe. Es `ARCH-26` aplicado a los hooks en vez de al linter (`HUE-025`) |
-| `agent-contracts.test.js` | Lo verificable de un subagente: el formato que promete, sus permisos, y que la prosa del harness no afirme garantías que el frontmatter no da (`HUE-023`, `INC-026`) |
+| `hook-wiring.test.js` | Que el sistema **ejecute** lo que la suite prueba: hook en disco sin cablear, entrada muerta en `settings.json`, validador referenciado desde un frontmatter que no existe. Es `ARCH-26` aplicado a los hooks en vez de al linter (`HUE-025`). Y que la prosa no describa un hook que no corre: una fila de tabla en un evento donde ese archivo no está cableado, o un hook de prompt que nadie cableó (`INC-028`) |
+| `agent-contracts.test.js` | Lo verificable de un subagente: el formato que promete, sus permisos, y que la prosa del harness no afirme garantías que el frontmatter no da (`HUE-023`, `INC-026`) — ni subagentes o modelos que ningún frontmatter declara (`INC-028`) |
 
 **Y hay una frontera declarada**: la calidad del resumen de un subagente no la verifica
 nada, ni la va a verificar. Lo que sí se sostiene es todo lo demás que se afirma de él.

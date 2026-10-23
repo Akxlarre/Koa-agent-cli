@@ -5,6 +5,7 @@
 > **Owner:** {{OWNER}}
 > **Priority:** {{P0|P1|P2}}
 > **Modifica:** ninguna
+> **Historia:** ninguna
 
 ---
 
@@ -13,6 +14,9 @@
 > specs referenciadas tienen que mencionar a ésta de vuelta, y `npm run lint:specs` lo verifica
 > en las dos direcciones. Sin eso, la spec vieja sigue prometiendo algo que ya vive en otro lado
 > y nadie se entera hasta construirla.
+>
+> **`Historia:`** el `H-NNN` del backlog de `specs/ROADMAP.md` del que nació esta spec, o
+> `ninguna`. `/spec-new H-NNN` lo completa y marca la historia como tomada.
 
 ---
 
@@ -32,9 +36,11 @@
 
 ## 2. User Stories
 
+> **Una spec = una historia.** Si aparece una segunda, no va acá: va al backlog con
+> `/backlog` y se toma después con `/spec-new H-NNN`. El `spec-gate` bloquea el código de
+> una spec activa con más de una historia, y `npm run lint:specs` la marca.
+
 - **US1**: Como {{rol}}, quiero {{capacidad}} para {{outcome}}.
-- **US2**: Como {{rol}}, quiero {{capacidad}} para {{outcome}}.
-- **US3**: …
 
 ---
 
@@ -57,7 +63,7 @@
 ## 4. Out of scope
 
 > Explícito. Lo que NO entra en esta spec, aunque podría parecer relacionado.
-> Si surge durante la implementación, crear spec nueva — NO extender ésta.
+> Si surge durante la implementación, va al backlog (`/backlog`) — NO extender ésta.
 
 - ❌ {{cosa que NO va}}
 - ❌ {{otra cosa que NO va}}

@@ -46,7 +46,10 @@ payload.read().then((PAYLOAD) => {
  * Dos cosas se borran:
  *   - session-writes.json, que sync-check borraba en cada `Stop` creyendo que
  *     era el fin de la sesión, dejando sin datos a spec-diff-check y a
- *     spec-reflection desde el primer cierre (ACO-001).
+ *     spec-reflection desde el primer cierre (ACO-001). Con él se va
+ *     spec-scope-base.json, la foto que spec-reflection toma de ese mismo
+ *     archivo: una foto de la sesión anterior haría pasar por «ya estaba» lo
+ *     que se escriba de nuevo en esta.
  *   - el estado de sesiones viejas, por antigüedad, para que .claude/temp/ no
  *     crezca sin límite.
  *
@@ -56,8 +59,9 @@ payload.read().then((PAYLOAD) => {
 function limpiarSiEsUnArranqueReal(PAYLOAD) {
   try {
     if (PAYLOAD.source !== 'startup') return;
-    fs.rmSync(path.join(PAYLOAD.cwd, '.claude', 'temp', 'session-writes.json'),
-      { force: true });
+    for (const f of ['session-writes.json', 'spec-scope-base.json']) {
+      fs.rmSync(path.join(PAYLOAD.cwd, '.claude', 'temp', f), { force: true });
+    }
     session.cleanup(PAYLOAD, { source: 'startup' });
   } catch { /* fail-open — arrancar nunca falla por no poder limpiar */ }
 }

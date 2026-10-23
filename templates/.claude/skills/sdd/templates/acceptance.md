@@ -2,7 +2,7 @@
 
 > **Spec:** [spec.md](./spec.md) · **Plan:** [plan.md](./plan.md) · **Tasks:** [tasks.md](./tasks.md)
 > **Verified:** {{DATE}}
-> **Verifier:** ac-verifier (Haiku) · validado por {{OWNER}}
+> **Verifier:** `/spec-verify` (agente principal) · validado por {{OWNER}}
 
 ---
 

@@ -214,6 +214,26 @@ describe('ACO-001 / INC-020 — la limpieza de ciclo sesion vive aca', () => {
       'un arranque real empieza de cero');
   });
 
+  test('y con él la foto que spec-reflection toma de ese archivo', () => {
+    // Una foto de la sesión anterior haría pasar por «ya estaba» lo que se
+    // vuelva a escribir en esta, y la deriva de alcance quedaría muda.
+    const root = makeProject();
+    conWrites(root);
+    const base = path.join(root, '.claude', 'temp', 'spec-scope-base.json');
+    fs.writeFileSync(base, JSON.stringify({ spec: 'task-spec-x.md', previas: ['src/app/x.ts'] }));
+    runHookConOrigen(root, 'startup');
+    assert.equal(fs.existsSync(base), false);
+  });
+
+  test('pero en un resume la foto sigue: la tarea está en curso', () => {
+    const root = makeProject();
+    conWrites(root);
+    const base = path.join(root, '.claude', 'temp', 'spec-scope-base.json');
+    fs.writeFileSync(base, '{}');
+    runHookConOrigen(root, 'resume');
+    assert.ok(fs.existsSync(base));
+  });
+
   for (const source of ['resume', 'compact', 'fork', 'clear']) {
     test(`con origen "${source}" NO lo borra — la sesion sigue viva`, () => {
       const root = makeProject();

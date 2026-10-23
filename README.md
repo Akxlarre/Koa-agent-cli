@@ -117,7 +117,7 @@ my-app/
 │
 ├── .claude/               # The agentic harness — the actual product
 │   ├── CLAUDE.md          # Agent directive: stack, rules, workflow
-│   ├── hooks/             # Real-time guardrails — 18 across 9 events
+│   ├── hooks/             # Real-time guardrails — 19 across 9 events
 │   │   └── validators/    # Generic, flag-driven structure validators
 │   ├── agents/            # 6 subagents with their own context windows
 │   ├── rules/             # 16 path-scoped rules — 8 mechanized, 8 social
@@ -151,18 +151,19 @@ my-app/
 This is the part that matters. `.claude/` is not documentation — it's infrastructure that
 runs.
 
-### Hooks — 18 wired across 9 events
+### Hooks — 19 wired across 9 events
 
 | Hook | Trigger | What it does |
 |---|---|---|
 | `session-start` | On session open | Injects core indexes, the brief's objective and any unfinished task-spec — so the agent never starts blind |
 | `prompt-context` | Before each prompt | Re-surfaces what's out of scope this session and what's still open on the spec |
-| `spec-gate` | Before any write | With a `specs/` folder present, blocks code that has no active spec and plan behind it |
+| `spec-gate` | Before any write | With a `specs/` folder present, blocks code that has no active spec and plan behind it — or whose spec bundles several user stories, or whose tasks are cut by layer instead of by usable slice |
 | `pre-write-guard` | Before any write | Four layers: File Protection → Discovery Gate → Architect Guard → Context Injection |
 | `harness-gate` | Before any write | Guards the harness itself: a "lesson" with no applicability criterion is a recipe, not a rule |
 | `plan-injector` | Before any write | Injects the live spec, plan and open tasks as context |
 | `bash-guard` | Before Bash | Blocks source-file creation via shell (forces Edit/Write so the guards can run), plus the Approval Gate |
 | `spec-diff-check` | Before `git commit` | Blocks the commit if new components or facades aren't registered in the indexes |
+| `commit-guard` | Before `git commit` | Blocks a commit that changes an existing test's assertions alongside the code that turns it green, or that carries more than 400 lines of product code — too big to review |
 | `discovery-tracker` | After any file read | Tracks when indexes are read; unlocks the Discovery Gate |
 | `write-tracker` | After writes | Records modified files for the Sync Check |
 | `post-edit` | After writes | Runs Prettier automatically |
@@ -170,7 +171,7 @@ runs.
 | `compact-recovery` | On context compaction | Re-injects the indexes the agent had already read, so it doesn't lose memory mid-session |
 | `subagent-cleanup` | On subagent stop | Clears the temp files a subagent leaves behind |
 | `hotfix-autoclose` | On session end | Safety net: closes a hotfix left open |
-| `spec-reflection` | On agent stop | Returns the task-spec's done criteria that are still open |
+| `spec-reflection` | On agent stop | Returns the task-spec's done criteria that are still open, and anything written that the spec never declared |
 | `sync-check` | On agent stop | Compares file timestamps vs. indexes; reminds the agent to update its memory |
 | `context-guardian` | On agent stop | "Did you learn anything today?" when `learnings.md` has been still for over 14 days |
 
@@ -390,17 +391,20 @@ exactly what is safe to replace. Breaking changes are documented per version in 
 
 ## Feature generator
 
-Beyond the initial scaffold, the CLI generates full vertical slices inside any Koa project (it
-checks for `blueprint.json` first):
+Beyond the initial scaffold, the CLI scaffolds a whole feature across its layers inside any Koa
+project (it checks for `blueprint.json` first):
 
 ```bash
 npx create-koa-agent generate feature products
 ```
 
 Pick the page type — **list** (bento grid + card/skeleton), **detail** (2/3 + 1/3), or **form**
-(narrow page) — and it writes the whole slice following the architecture: routable page,
+(narrow page) — and it writes every layer following the architecture: routable page,
 repository, facade with optimistic updates, and colocated Vitest specs. It never overwrites a
 file that already exists.
+
+That's the skeleton of the layers, not a delivery slice. Features are built on it one user
+story at a time, each one usable and reviewed before the next — see the `sdd` skill.
 
 ## Stack
 

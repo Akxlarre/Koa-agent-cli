@@ -204,6 +204,88 @@ describe('TRACKS — cada tipo pide su propio contrato', () => {
   });
 });
 
+describe('EL PLACEHOLDER NO ES UN PLAN', () => {
+  // /spec-new crea plan.md con una linea de placeholder para que la carpeta nazca
+  // con su forma final. El gate preguntaba si el archivo EXISTIA, asi que justo
+  // despues de /spec-new —cuando mas importa— «no tiene plan.md» no podia salir.
+  const PLACEHOLDER = '# (vacío — se genera con /spec-XXX cuando corresponda)\n';
+
+  test('una spec recien creada por /spec-new bloquea: su plan es el placeholder', () => {
+    escribir('specs/.active', '0001-x');
+    escribir('specs/specs/0001-x/spec.md', '# Spec\n');
+    escribir('specs/specs/0001-x/plan.md', PLACEHOLDER);
+    const r = correr('src/app/x.component.ts');
+    assert.equal(r.exit, 2);
+    assert.match(r.stderr, /no tiene plan\.md/);
+  });
+
+  test('un tasks.md placeholder no se juzga: el plan alcanza para empezar', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/tasks.md', PLACEHOLDER);
+    assert.equal(correr('src/app/x.component.ts').exit, 0);
+  });
+});
+
+describe('LA FORMA DEL SDD — una historia, tareas por slice (lib/sdd-forma.js)', () => {
+  const SLICE = '## Slice S1 — me registro\n- [ ] S1.1 test en rojo\n- [ ] S1.2 verde\n'
+    + '- [ ] S1.V Verificación de uso: `verify`\n- [ ] S1.R `/review` del slice\n';
+
+  test('una spec activa con dos historias bloquea, y dice adonde va la segunda', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/spec.md', '> **Status:** in_progress\n'
+      + '- **US1**: Como visitante, quiero registrarme para tener cuenta.\n'
+      + '- **US2**: Como usuario, quiero crear tareas para no olvidarme.\n');
+    const r = correr('src/app/x.component.ts');
+    assert.equal(r.exit, 2);
+    assert.match(r.stderr, /no tiene la forma del SDD/);
+    assert.match(r.stderr, /2 historias/);
+    assert.match(r.stderr, /\/backlog/);
+  });
+
+  test('con una sola historia pasa', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/spec.md',
+      '- **US1**: Como visitante, quiero registrarme para tener cuenta.\n');
+    assert.equal(correr('src/app/x.component.ts').exit, 0);
+  });
+
+  test('un tasks.md cortado por capas bloquea', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/tasks.md',
+      '## Fase 1 — Datos y modelo\n- [ ] T1.1\n## Fase 3 — Capa UI\n- [ ] T3.1\n');
+    const r = correr('src/app/x.component.ts');
+    assert.equal(r.exit, 2);
+    assert.match(r.stderr, /cortado por capas/);
+  });
+
+  test('un tasks.md por slices, cada uno usado y revisado, pasa', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/tasks.md', SLICE);
+    assert.equal(correr('src/app/x.component.ts').exit, 0);
+  });
+
+  test('un slice que no termina en /review bloquea', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/tasks.md', SLICE.replace(/.*\/review.*\n/, ''));
+    const r = correr('src/app/x.component.ts');
+    assert.equal(r.exit, 2);
+    assert.match(r.stderr, /Slice S1 no termina en \/review/);
+  });
+
+  test('la forma solo se le pide a las specs: un fix sigue sin plan ni tasks', () => {
+    escribir('specs/.active', 'fix-001-kpi');
+    escribir('specs/fixes/fix-001-kpi/fix.md', '# Fix\n');
+    escribir('specs/fixes/fix-001-kpi/tasks.md', '## Fase 1 — Datos\n- [ ] x\n');
+    assert.equal(correr('src/app/x.component.ts').exit, 0);
+  });
+
+  test('y nada de esto toca lo que no es codigo de producto', () => {
+    conSpecActiva();
+    escribir('specs/specs/0001-reportes/tasks.md', '## Fase 1 — Datos\n- [ ] x\n');
+    assert.equal(correr('docs/guia.md').exit, 0);
+  });
+});
+
 describe('RUTAS LEGACY — se aceptan las dos ubicaciones', () => {
   test('spec directamente bajo specs/<id>/', () => {
     escribir('specs/.active', '0001-x');

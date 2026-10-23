@@ -33,13 +33,20 @@ Claude recibe un prompt del humano
     ├─ Intenta Bash("echo > src/app/nuevo.ts")
     │   └─ PreToolUse → bash-guard.js → BLOQUEADO "Usa Edit/Write"
     │
+    ├─ Intenta Bash("git commit -m ...")
+    │   └─ PreToolUse → spec-diff-check.js + commit-guard.js
+    │       ├─ ¿Componente nuevo sin registrar en indices/? → BLOQUEADO
+    │       ├─ ¿Cambia aserciones de un test existente junto con código? → BLOQUEADO [COMMIT-01]
+    │       └─ ¿Más de 400 líneas de código de producto? → BLOQUEADO [COMMIT-02]
+    │
     ├─ Intenta Edit(".claude/rules/visual-system.md")
     │   └─ PreToolUse → harness-gate.js
     │       ├─ ¿Cita un fix-NNN sin criterio de aplicabilidad? → BLOQUEADO "Reescribe como regla"
     │       └─ Todo OK → PERMITIDO (esto es guía, no código de la app: pre-write-guard.js no aplica)
     │
     ├─ Claude termina de responder
-    │   └─ Stop → prompt hook → "¿Actualizaste los índices?" → si no → sigue trabajando
+    │   └─ Stop → spec-reflection.js → ¿criterio de done abierto? ¿escribió algo no declarado?
+    │          → sync-check.js → ¿fuentes más nuevos que los índices? → si algo falta → sigue trabajando
     │
     ├─ Un tool falla
     │   └─ PostToolUseFailure → failure-tracker.js → registra en LESSONS_LEARNED.md
@@ -139,7 +146,7 @@ objetivo equivocado.
 
 | Hook | Evento | Función |
 |------|--------|---------|
-| `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escribir código de producto sin una spec activa con su plan. **Fail-open**: sin carpeta `specs/` no bloquea nada. |
+| `sdd/spec-gate.js` | PreToolUse (Edit/Write) | Bloquea escribir código de producto sin una spec activa con su plan (el placeholder que deja `/spec-new` no cuenta como plan). También si la spec activa no tiene la forma del SDD (`lib/sdd-forma.js`): más de una historia, o un `tasks.md` cortado por capas o con un slice que no termina usado (`verify`) y revisado (`/review`). **Fail-open**: sin carpeta `specs/` no bloquea nada. |
 | `sdd/plan-injector.js` | PreToolUse (Edit/Write) | Inyecta la spec y el plan activos como contexto en cada edición. |
 | `lib/guard-rules.js` | — | No es un hook: es el registro de las reglas que emite `pre-write-guard`. Cada una con su ID, su doc y el fixture que la provoca. |
 | `subagent-cleanup.js` | SubagentStop | Borra el estado de hilo del subagente que termina (dedup, anti-bucle, breaker). El estado de sesión —discovery flag, `session-writes.json`— sobrevive. |
@@ -225,13 +232,15 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
   - **Deduplicación** — errores repetidos incrementan un contador en vez de duplicarse
   - **Contexto** — registra el tool, error y archivo/comando involucrado
 
-### 6. Sync Check (prompt hook)
+### 6. Sync Check (`sync-check.js`)
 - **Evento**: Stop
 - **Matcher**: ninguno (se ejecuta en cada respuesta)
-- **Tipo**: `prompt` (evaluado por modelo Haiku)
-- **Función**: Cuando Claude termina de responder, Haiku evalúa si se crearon
-  componentes/servicios nuevos sin actualizar los índices. Si detecta drift,
-  fuerza a Claude a continuar y actualizar los índices.
+- **Tipo**: `command`. Todos los hooks del harness lo son; ninguno lo evalúa un modelo
+  (`settings.test.js` lo verifica). Este chequeo fue antes un hook `prompt` evaluado por
+  Haiku; `sync-check.js` lo reemplazó y este documento siguió describiendo el viejo.
+- **Función**: compara el `mtime` de los fuentes que la sesión escribió
+  (`session-writes.json`) contra el de los índices. Si hay fuentes más nuevos, fuerza a
+  Claude a continuar y sincronizar los índices.
 
 ### 7. Circuit Breaker (dentro de `pre-write-guard.js`)
 - **Evento**: PreToolUse (Edit|Write|MultiEdit)
@@ -267,9 +276,24 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
   responde, el hook lo frena, vuelve a responder y el hook lo frena otra vez con lo
   mismo. Si el spec avanza (o retrocede), el aviso vuelve a salir.
 
-  Si el spec no tiene **ninguna** casilla marcada, el hook calla: el agente no está
-  usando el flujo del task-spec y no tiene sentido reclamarle pendientes de un
-  documento que no adoptó.
+  **Ninguna casilla marcada son dos situaciones** (`HUE-004`): un spec recién generado
+  por `/plan` —ahí calla— y archivos escritos con el criterio de done intacto —ahí avisa,
+  porque es donde más falta—. Lo que las separa son las escrituras de la sesión.
+
+  **Deriva de alcance.** El task-spec declara en `## Artefactos afectados` qué va a
+  tocar, y `session-writes.json` dice qué tocó. Lo escrito y no declarado vuelve al
+  agente: o es trabajo que nadie pidió, y se revierte, o era parte de la tarea, y se
+  declara y se le avisa al humano. Es la alarma de «agregó cosas que no le pedí»,
+  convertida en un chequeo. Una carpeta declarada (`src/app/features/x/`) cubre lo que
+  tiene adentro, un glob lo que matchea, y un componente declarado cubre su `.html` y
+  su `.scss`.
+
+  La comparación es contra lo escrito **desde que el spec existe**: la primera vez que
+  el hook ve un spec guarda una foto de `session-writes.json` en `spec-scope-base.json`.
+  Una sesión puede tener varios task-specs, y lo de la tarea anterior no es deriva de
+  esta. No se usa el timestamp del nombre: el agente puede escribirlo en UTC o en hora
+  local, y en una zona detrás de UTC la tarea entera quedaría «antes» del spec y el
+  chequeo callaría siempre.
 
 ### 9. Prettier (post-edit.js)
 - **Evento**: PostToolUse
@@ -313,6 +337,40 @@ aplicarla: informa el comando exacto y espera. `supabase start`, `migration new`
   en lugares donde nadie lo hace cumplir, o código real donde nadie lo lee como tal.
   Ver también el skill `/harness-feedback`, que alimenta estas superficies de guía con
   fricción real reportada por el propio agente al cerrar sesión.
+
+<a id="commit-guard"></a>
+
+### 11. Commit Guard (`commit-guard.js`)
+- **Evento**: PreToolUse
+- **Matcher**: `Bash` — solo actúa sobre `git commit`
+- **Función**: decide lo que un commit del agente puede llevar. Sale de las dos formas
+  más baratas de perder el control cuando una IA programa en pasos grandes.
+
+  | Regla | Qué bloquea | Por qué |
+  |---|---|---|
+  | `COMMIT-01` | Un commit que cambia código de producto **y además** quita o cambia aserciones de un test que ya estaba en HEAD (`expect`, `assert`, `.toBe…`, `it(`), le agrega `.skip`/`.only`, o lo borra | Es la trampa para llegar a verde: tocar el test en el mismo commit que el código, donde el diff no lo deja ver |
+  | `COMMIT-02` | Un commit con más de 400 líneas de código de producto | Un diff así no se revisa: se acepta. Se entrega por slices, y un slice entra en un `/review` |
+
+  Lo que **no** frena, a propósito: un commit que solo toca tests (cambiar un test a la
+  vista es legítimo, y es justo el commit del test en rojo de cada slice); agregar tests
+  nuevos o casos nuevos a un spec existente; el primer commit del repo; y los merges,
+  rebases y cherry-picks, que traen trabajo ya hecho. Para el tamaño no cuentan tests,
+  docs, índices, config ni los tipos que genera `supabase gen types`. El tope está puesto
+  para que un `generate feature` entero (~250 líneas sin sus specs) entre con aire.
+
+  Qué entra en el commit se calcula **antes** de que el comando corra: en
+  `git add -A && git commit` todavía no hay nada stageado cuando el hook mira. Por eso
+  lee los `git add` del mismo comando y el `-a` del commit.
+
+  **La salida para un caso legítimo es el humano.** Un hook intercepta las herramientas
+  del agente, no la terminal de la persona. Un renombre mecánico de 600 líneas, o un
+  refactor que cambia una API y su test con ella, lo commitea el humano. Es la misma
+  salida que el Approval Gate le da a `supabase db push`.
+
+  `claude:tdd` —el script que corre los tests y corrige hasta verde sin supervisión—
+  tiene además los permisos cerrados: `--disallowedTools "Edit(**/*.spec.ts)"`, Bash
+  limitado a `npm run test:ci` y `--max-turns 25`. Ahí no se puede editar un test, y no
+  porque el prompt lo pida.
 
 ## Linter Arquitectónico Completo (`architect.js` v2.0)
 

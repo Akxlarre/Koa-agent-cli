@@ -53,6 +53,11 @@ Before writing a single line of code:
 
 ### 3. EXECUTE — Write code following all rules
 
+- Work one vertical slice at a time: the smallest piece someone can **use**, crossing
+  whatever layers it needs (migration → repository → facade → page). Never "all the
+  database first, then the UI": nothing works until the end and the diff is unreviewable
+- Commit the failing test on its own before the code that makes it pass, and never
+  change that test's assertions in the same commit as the code (Claude Code blocks it)
 - Reuse existing components, facades, and models
 - Every new component goes in the correct folder (see Folder Structure)
 - Hooks validate writes automatically in Claude Code — in other tools, self-enforce

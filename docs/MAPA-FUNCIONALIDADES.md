@@ -50,7 +50,7 @@ existe para convertir *guidelines* en *guardrails*.
 | Invocación | Qué hace | Requisitos |
 |---|---|---|
 | `npx create-koa-agent` | Modo interactivo: **Full Scaffold** o **Inject-only** | Node 20+, npm, npx |
-| `npx create-koa-agent generate feature [nombre] [--type list\|detail\|form] [--singular Nombre]` | Genera un vertical slice completo dentro de un proyecto ya creado | `blueprint.json` + `src/app/` |
+| `npx create-koa-agent generate feature [nombre] [--type list\|detail\|form] [--singular Nombre]` | Genera el andamio de un feature, todas sus capas, dentro de un proyecto ya creado | `blueprint.json` + `src/app/` |
 | `TEST_MODE=inject node bin/index.js` | Prueba el CLI sin scaffolding completo | — |
 
 ### Flags de stack
@@ -156,9 +156,12 @@ Correr el CLI dentro de una carpeta que ya existe **no pisa el trabajo ajeno**:
 En `inject-only` el CLI **no** reclama autoridad sobre `stack` (no instaló nada).
 `managedPaths` se deriva de `CLI_OWNED` para que lo declarado y lo ejecutado no diverjan.
 
-## 1.5 `generate feature` — el vertical slice
+## 1.5 `generate feature` — el andamio de un feature
 
-Tres arquetipos, misma arquitectura canónica **UI → Facade → Repository → SupabaseService**:
+Tres arquetipos, misma arquitectura canónica **UI → Facade → Repository → SupabaseService**.
+Escribe todas las capas de una vez, así que es el esqueleto por capas, no un slice de
+entrega: sobre él se construye una historia a la vez, cada una usable y revisada antes de
+la siguiente (skill `sdd`).
 
 | `--type` | Archivos | Qué genera |
 |---|---|---|
@@ -184,10 +187,10 @@ Lo que recibe el proyecto generado. Seis capas que se refuerzan entre sí.
 ┌─ CAPA 2 · REGLAS path-scoped (15) ────────────────────────────────┐
 │  .claude/rules/*.md — se inyectan SOLO si el archivo editado matchea│
 └────────────────────────────────────────────────────────────────────┘
-┌─ CAPA 3 · GUARDRAILS (18 hooks, 9 eventos) ───────────────────────┐
+┌─ CAPA 3 · GUARDRAILS (19 hooks, 9 eventos) ───────────────────────┐
 │  El único mecanismo que puede DECIR QUE NO. exit 2 = bloqueado.    │
 └────────────────────────────────────────────────────────────────────┘
-┌─ CAPA 4 · PROCEDIMIENTO (16 skills · 12 commands · 6 subagentes) ─┐
+┌─ CAPA 4 · PROCEDIMIENTO (16 skills · 13 commands · 6 subagentes) ─┐
 │  Cómo se hace cada cosa, y a quién se delega para no gastar contexto│
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CAPA 5 · VERIFICACIÓN DETERMINISTA (scripts/) ───────────────────┐
@@ -265,6 +268,7 @@ verdad de quién emite cada código, así que la etiqueta no puede mentir.
 
 ▼ PreToolUse · Edit|Write|MultiEdit   ← los 4 en cadena
   1. sdd/spec-gate.js ····· ¿hay specs/ y no hay spec activa con plan? → BLOQUEA
+                            ¿la spec trae más de una historia, o tareas por capas? → BLOQUEA
   2. pre-write-guard.js ··· 4 capas: File Protection · Discovery Gate · Architect Guard
                             · Context Injection (+ CIRCUIT BREAKER a los 3 bloqueos iguales)
   3. harness-gate.js ······ Generalization Gate sobre rules/, learnings, ANTI-PATTERNS, CLAUDE.md
@@ -274,6 +278,8 @@ verdad de quién emite cada código, así que la etiqueta no puede mentir.
   bash-guard.js ··········· prohíbe crear .ts/.html/.scss por Bash · rm destructivos
                             · install/uninstall sin confirmar · Approval Gate de Supabase
   spec-diff-check.js ······ intercepta `git commit`: ¿componentes/facades nuevos sin índice? → BLOQUEA
+  commit-guard.js ········· intercepta `git commit`: ¿cambia aserciones de tests existentes junto
+                            con código? (COMMIT-01) ¿más de 400 líneas de producto? (COMMIT-02) → BLOQUEA
 
 ▼ PostToolUse · Read
   discovery-tracker.js ···· detectó Read("indices/*.md") → escribe el discovery flag
@@ -292,6 +298,7 @@ verdad de quién emite cada código, así que la etiqueta no puede mentir.
 ▼ Stop  (los 4 en cadena)
   sdd/hotfix-autoclose.js · SessionEnd: red de seguridad; cierra el hotfix que quedo abierto
   spec-reflection.js ······ devuelve las casillas `- [ ]` del task-spec que siguen abiertas
+                            y lo escrito que `## Artefactos afectados` no declara (deriva de alcance)
   sync-check.js ··········· compara mtime de session-writes vs indices/ → ¿faltó sincronizar?
   context-guardian.js ····· "¿aprendiste algo hoy?" si learnings.md lleva >14 días quieto
 ```
@@ -322,7 +329,7 @@ Inspirado en HarnessCompass (arXiv:2608.01918). Dos familias:
 |---|---|---|---|
 | **Discovery flag** | `$TMPDIR/koa-discovery-{sessionId}.flag`, líneas con `indices/NOMBRE.md` | `discovery-tracker.js`, `session-start.js` | `pre-write-guard.js`, `compact-recovery.js` |
 | **session-writes** | `.claude/temp/session-writes.json` | `write-tracker.js` | `sync-check.js`, `spec-diff-check.js`, `spec-reflection.js`, `index-syncer` |
-| **task-spec** | `task-spec-YYYYMMDD-HHMMSS.md`, casillas `- [ ]`, headers `##` exactos | skill `/plan` | `spec-reflection.js`, `prompt-context.js`, `compact-recovery.js`, el validador del frontmatter de `/plan` |
+| **task-spec** | `task-spec-YYYYMMDD-HHMMSS.md`, casillas `- [ ]`, headers `##` exactos, rutas de `## Artefactos afectados` | skill `/plan` | `spec-reflection.js`, `prompt-context.js`, `compact-recovery.js`, el validador del frontmatter de `/plan` |
 | **AUTO-GENERATED** | `<!-- AUTO-GENERATED:BEGIN/END -->` | `indices-sync.js`, `assignments-sync.js` | todo el que edite un índice a mano |
 
 > Los hooks tienen **9 tests de contrato** (`npm run claude:test-hooks`).
@@ -366,7 +373,7 @@ promete** sí lo es. Corre después de tocar el prompt de un juez, antes de conf
 | **Angular** | `angular-component`, `angular-signals`, `angular-forms`, `angular-primeng` | Model-invoked por `paths:` — se activan al tocar el archivo correspondiente |
 | **Diseño** | `design-system`, `form-ux` | Tokens, Frosted Cards, Bento Grid, dark mode |
 | **Datos** | `supabase-data-model` | Migraciones, RLS, queries |
-| **SDD** | `sdd` | Motor Spec-Driven Development (11 comandos) |
+| **SDD** | `sdd` | Motor Spec-Driven Development por historias y slices (13 comandos) |
 | **Meta** | `writing-great-skills` | Cómo escribir skills (referencia, user-invoked) |
 
 ### El motor SDD — incluido pero **dormido**
@@ -376,12 +383,12 @@ embarcar por defecto sin romper a quien no lo usa.
 
 ```
 CAPA DE EQUIPO (opcional)          CICLO SDD                        CIERRE
-/assign-new  "hay que hacer X"     /spec-new    → spec.md      ┐
-/assign-list "¿qué me toca?"       /spec-activate → .active    │  código + tests
-/assign-claim ASG-A-003            /spec-plan   → plan.md      ├─ (hooks validan
-      └─ genera el track con        /spec-tasks  → tasks.md     │   cada escritura)
-         TU código de autor         ...implementar...          │
-                                    /spec-verify → acceptance.md ┘
+/assign-new  "hay que hacer X"     /backlog     → H-NNN, una línea ┐
+/assign-list "¿qué me toca?"       /spec-new H-NNN → spec.md   │  un slice a la vez:
+/assign-claim ASG-A-003            /spec-activate → .active    │  test en rojo → verde
+      └─ genera el track con        /spec-plan   → plan.md      ├─ → verify → /review
+         TU código de autor         /spec-tasks  → slices       │  → commit (hooks
+                                    /spec-verify → acceptance.md ┘   validan cada paso)
 
 Tracks livianos:  /fix-new + /fix-close   (bug con root cause + test de regresión)
                   /hotfix                  (el "cómo" es obvio — cierra con /hotfix-close)
@@ -441,7 +448,7 @@ Tres mecanismos que no miran el código del usuario sino al propio harness:
 
 | Mecanismo | Qué sostiene |
 |---|---|
-| `hooks/lib/contracts.js` → `docs/CONTRATOS.md` | Los **21 artefactos compartidos**: qué pieza escribe cada uno, quién lo lee, cuándo se borra. Agregar un consumidor sin declararlo rompe el test. La copia viaja al proyecto generado, que antes no tenía cómo enterarse de que `sync-check` borra el archivo del que depende `spec-diff-check` (`ACO-013`) |
+| `hooks/lib/contracts.js` → `docs/CONTRATOS.md` | Los **22 artefactos compartidos**: qué pieza escribe cada uno, quién lo lee, cuándo se borra. Agregar un consumidor sin declararlo rompe el test. La copia viaja al proyecto generado, que antes no tenía cómo enterarse de que `sync-check` borra el archivo del que depende `spec-diff-check` (`ACO-013`) |
 | `hook-wiring.test.js` | Que el sistema **ejecute** lo que la suite prueba: hook en disco sin cablear, entrada muerta en `settings.json`, validador referenciado desde un frontmatter que no existe. Es `ARCH-26` aplicado a los hooks en vez de al linter (`HUE-025`) |
 | `agent-contracts.test.js` | Lo verificable de un subagente: el formato que promete, sus permisos, y que la prosa del harness no afirme garantías que el frontmatter no da (`HUE-023`, `INC-026`) |
 
@@ -501,11 +508,12 @@ ARCH-02 (componentes sin Services), ARCH-03 (spec compañero), ARCH-04 (OnPush).
                    si falta "## Criterio de done", la sesión no termina.
                 Marcá las casillas [x] al avanzar: 3 hooks dependen de ellas.
 
-3 · EJECUTAR    Escribís código.
+3 · EJECUTAR    Un slice a la vez: test en rojo commiteado solo → verde → usarlo → commit.
                 → las reglas path-scoped se inyectan solas según el archivo
                 → spec-gate / pre-write-guard / harness-gate / plan-injector corren en cadena
                 → write-tracker anota, post-edit formatea
                 ⛔ 3 bloqueos idénticos = circuit breaker: parás y escalás al humano.
+                ⛔ commit-guard: el test no se toca junto con el código, y un commit entra en un /review.
 
 4 · VALIDAR     arch-auditor → lint:arch + tsc comprimidos.
                 /review → code-judge juzga el DISEÑO contra la rúbrica.
@@ -514,7 +522,8 @@ ARCH-02 (componentes sin Services), ARCH-03 (spec compañero), ARCH-04 (OnPush).
 5 · SINCRONIZAR index-syncer reconcilia indices/*.md con el código real.
                 ⛔ spec-diff-check bloquea el `git commit` si hay componentes o facades
                    nuevos sin registrar en su índice.
-                Stop hooks: pendientes del spec · índices atrasados · "¿aprendiste algo?"
+                Stop hooks: pendientes del spec · lo escrito sin declarar · índices atrasados
+                · "¿aprendiste algo?"
 ```
 
 ## El bucle de mejora del propio harness

@@ -39,10 +39,10 @@ formattedValue = computed(() =>
 
 ## Doctrina de Ejecución (Test-Resolution Bucle Cerrado)
 
-1. **Diseña el Contrato Primero:** Antes de implementar lógica funcional en un Facade, Service, util o Smart Component, **escribe su `.spec.ts` primero**. Esto define la expectativa de forma inmutable.
-2. **Implementación de Lógica:** Escribe el código fuente intentando satisfacer las pruebas.
-3. **Auto-Validación Obligatoria:** Si introduces nueva lógica de negocio, **no puedes dar la tarea por finalizada asumiendo éxito**. Tienes prohibido informarle al humano "ya lo codifiqué" sin antes haber validado empíricamente.
-4. **Auto-Corrección:** Ejecuta los tests con `npm run test:ci`. Si fallan, analiza la salida, planifica un parche y corrige tu propio código. Repite hasta que la consola certifique el `PASS`.
+1. **El contrato primero:** antes de implementar lógica en un Facade, Service, util o Smart Component, escribe su `.spec.ts`, comprueba que falle por la razón correcta y **commitealo solo**.
+2. **Lo mínimo para el verde:** escribe el código que satisface las pruebas sin tocar sus aserciones. El `commit-guard` bloquea el commit que cambia aserciones existentes junto con código (`COMMIT-01`); si el test estaba mal, va en un commit aparte y se le avisa al humano.
+3. **Auto-Validación Obligatoria:** prohibido decirle al humano "ya lo codifiqué" sin haber corrido `npm run test:ci`.
+4. **Auto-Corrección:** si fallan, corrige tu código —no el test— y repite hasta que la consola certifique el `PASS`.
 
 ## Prohibiciones Estrictas
 

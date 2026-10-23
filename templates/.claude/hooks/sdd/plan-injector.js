@@ -98,8 +98,9 @@ payload.read().then((input) => {
       context += '\n\n----- INSTRUCCIONES -----\n' +
         '1. Cada cambio que hagas debe mapear a un AC de la SPEC o a una tarea de TASKS.\n' +
         '2. Si lo que vas a escribir esta fuera del scope declarado -> DETENETE y avisale al usuario.\n' +
-        '3. Si descubris una tarea no listada que SI esta en scope -> agregala al final de tasks.md antes de hacerla.\n' +
-        '4. Al cerrar la spec corre /spec-verify para validar AC contra evidencia.\n';
+        '3. Si descubris una tarea no listada que SI esta en scope -> agregala a su slice en tasks.md antes de hacerla.\n' +
+        '4. Un slice a la vez: test en rojo commiteado, verde, usarlo (verify), /review, commit. No arranques el siguiente con este sin usar.\n' +
+        '5. Al cerrar la spec corre /spec-verify para validar AC contra evidencia.\n';
     }
 
     // CAR-001: si es lo mismo que ya se dijo en este hilo, no se repite.

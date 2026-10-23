@@ -131,7 +131,8 @@ que correspondan a tu código, tomar el máximo + 1; si no hay ninguno, empezar 
 - Crear `specs/specs/NNNN-<mi_codigo>-slug/` con `spec.md`, `plan.md`, `tasks.md`, `acceptance.md` — mismo scaffold que `/spec-new`.
 - En `spec.md`, la sección **"1. Contexto de negocio"** se pre-llena con el Contexto/Objetivo confirmado (o ajustado) en el paso 6 — no el texto crudo de la Asignación si el usuario lo corrigió ahí (no la dejes en placeholder — ya tienes contenido real). El resto (User Stories, AC, Out of scope, etc.) queda con placeholders — eso lo escribe quien reclamó, no tú.
 - Agrega al final de "9. Notas / decisiones abiertas": `- Originado de Asignación ASG-X-NNN (specs/assignments/ASG-X-NNN-slug.md)`.
-- Actualiza `specs/ROADMAP.md`: agrega fila a "Backlog" con el owner = quien reclamó.
+- Actualiza `specs/ROADMAP.md`: agrega fila a "Specs escritas, sin activar" con el owner = quien reclamó.
+- Una spec = una historia: si la Asignación trae varias, la primera es la US1 y las demás van a `## Historias` con `/backlog`.
 - **NO** toques `specs/.active` (igual que `/spec-new`: el usuario revisa antes de activar con `/spec-activate`).
 
 #### Si es `fix`:

@@ -1,11 +1,25 @@
 ---
-description: Descomponer plan.md de la spec activa en tareas atómicas con DoD (tasks.md)
+description: Descomponer plan.md de la spec activa en slices verticales con DoD (tasks.md)
 allowed-tools: Read, Write, Bash
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node $CLAUDE_PROJECT_DIR/.claude/hooks/validators/validate-file-contains.js
+            --directory specs
+            --pattern "tasks.md"
+            --recursive
+            --max-age 60
+            --require-file
+            --contains "## Slice S1"
+            --contains "## Cierre"
 ---
 
-# /spec-tasks — Descomponer plan en tareas atómicas
+# /spec-tasks — Descomponer el plan en slices
 
-Vas a producir `tasks.md` de la spec activa transformando el plan en checklist atómico ejecutable.
+Vas a producir `tasks.md` de la spec activa transformando la tabla de slices del plan
+(sección 9) en un checklist ejecutable, **un bloque por slice**.
 
 ## Procedimiento
 
@@ -20,12 +34,12 @@ cat specs/.active
 ### 2. Verificar que la spec tenga `plan.md` aprobado
 
 - Leer `specs/<active>/plan.md`
-- Si no existe → abortar: "No hay plan. Corre /spec-plan primero."
-- Si está marcado como `Status: draft` en frontmatter, advertir al usuario
+- Si no existe, o es todavía el placeholder `# (vacío…` → abortar: "No hay plan. Corre /spec-plan primero."
+- Si está marcado como `Status: draft`, advertir al usuario
 
 ### 3. Leer también `spec.md`
 
-Necesitas los AC para cruzar cada tarea con el AC que cumple (campo `AC ref:`).
+Necesitas los AC para cruzar cada slice con el AC que cubre (campo `AC ref:`).
 
 ### 4. Generar `tasks.md`
 
@@ -34,44 +48,63 @@ Lee la plantilla `.claude/skills/sdd/templates/tasks.md` y complétala:
 #### Reemplazos básicos
 - `{{ID}}`, `{{TITLE}}`, `{{DATE}}`
 
-#### Fases obligatorias (ajustar según aplique al feature)
+#### Un `## Slice` por fila de la tabla de slices del plan
 
-1. **Fase 1 — Datos y modelo**: solo si hay cambios en BD o modelos
-2. **Fase 2 — Capa Facade**: solo si el feature toca datos
-3. **Fase 3 — Capa UI**: si hay UI involucrada
-4. **Fase 4 — Conexión y animación**: wire-up Smart↔Dumb, GSAP
-5. **Fase 5 — Validación**: lint, tests, QA manual, /spec-verify
-6. **Fase 6 — Cierre**: indices, ROADMAP, .active
+Cada slice es la porción más chica que alguien puede **usar**, y cruza las capas que
+necesite. Lleva siempre las mismas cinco tareas, en este orden:
 
-Si una fase no aplica al feature, elimínala. No dejes fases vacías.
+1. **S·.1** — Test en rojo del AC, y commit del test solo
+2. **S·.2** — Lo mínimo para ponerlo en verde, en todas las capas que haga falta
+3. **S·.3** — Refactor con los tests en verde (si hace falta)
+4. **S·.V** — Verificación de uso: `verify` en el navegador
+5. **S·.R** — `/review` del diff del slice y commit
 
-#### Reglas para cada tarea
+El **S1** es el esqueleto que camina: el happy path más fino de punta a punta. Después,
+un slice por AC o edge case. Cerrá con la sección `## Cierre` de la plantilla y dejá el
+**checklist técnico por capa** tal cual: es lo que cada capa cumple dentro del slice que
+la toque.
 
-- **Atómica**: cabe en un sitting (~30-90 min máx)
-- **Verificable**: tiene Definition of Done explícito como sub-checklist
-- **Trazable**: tiene `AC ref:` cuando aplica (qué AC de la spec cumple)
-- **Ordenada**: dependencias primero (datos → facade → UI → wire-up)
+#### Reglas para cada slice
 
-#### Ejemplo de tarea bien escrita
+- **Usable**: al terminarlo hay algo que se prueba en el navegador. Si no, está cortado
+  por capa: juntalo con el slice que lo vuelve usable.
+- **Chico**: su diff entra en un `/review` (el `commit-guard` bloquea commits de más de
+  400 líneas de código de producto).
+- **Trazable**: `AC ref:` con el AC o edge case que cubre.
+- **Ordenado por dependencias adentro**: migración → repository → facade → página, pero
+  solo lo que ESE slice usa. La columna que necesita el S3 la agrega la migración del S3.
 
-```markdown
-- [ ] **T2.2** — Implementar `pre-enrollment.facade.ts`
-  - **AC ref:** AC1, AC2, AC-E1
-  - **DoD:**
-    - [ ] Tests PASAN (`npm run test:ci`)
-    - [ ] Estructura: estado privado → estado público readonly → métodos
-    - [ ] `catchError` en cada llamada async
-    - [ ] Signal de error expuesto
-    - [ ] Documentado en `indices/FACADES.md`
-```
-
-#### Ejemplo de tarea mal escrita (NO)
+#### Ejemplo de slice bien cortado
 
 ```markdown
-- [ ] Implementar el backend  ← demasiado grande, sin DoD, sin AC ref
+## Slice S2 — el email repetido muestra "ese email ya está registrado"
+
+> **AC ref:** AC-E1
+
+- [ ] **S2.1** — Test en rojo en `auth.facade.spec.ts` + commit del test solo
+- [ ] **S2.2** — `AuthFacade.register()` mapea el 23505 a ese mensaje; el form lo muestra
+- [ ] **S2.3** — Refactor (si hace falta)
+- [ ] **S2.V** — Verificación de uso: `verify` registrando dos veces el mismo email
+- [ ] **S2.R** — `/review` del diff del slice y commit
 ```
 
-### 5. Escribir y reportar
+#### Ejemplo de corte mal hecho (NO)
+
+```markdown
+## Fase 1 — Datos y modelo     ← por capa: nada se puede usar hasta la Fase 4
+## Fase 2 — Capa Facade
+## Fase 3 — Capa UI
+```
+
+### 5. Verificar la forma y reportar
+
+```bash
+npm run lint:specs
+```
+
+Tiene que salir en 0. El `spec-gate` hace la misma pregunta en cada escritura: con un
+`tasks.md` sin `## Slice`, o con un slice que no termina en `verify` y `/review`, no deja
+escribir código de esta spec.
 
 Imprime:
 
@@ -79,18 +112,17 @@ Imprime:
 ✅ Tasks generadas: specs/<active>/tasks.md
 
 Resumen:
-  - <N> tareas atómicas en <M> fases
-  - <X> tareas mapean a AC específicos
-  - Orden recomendado: Datos → Facade → UI → Conexión → Validación → Cierre
+  - <N> slices, cada uno usable al terminarlo
+  - S1 (esqueleto): <qué se puede usar>
+  - <X> AC y edge cases cubiertos
 
-Para empezar a ejecutar:
-  "Implementa la tarea T1.1"
-  (el plan-injector va a inyectar la spec y el plan como contexto en cada Edit)
+Para empezar:
+  "Arranquemos el S1" — un slice a la vez: test en rojo, verde, usarlo, /review, commit.
 ```
 
 ## Reglas
 
-- NO mezclar fases. Datos antes de UI siempre.
-- NO crear tareas que no mapeen al `plan.md`. Si descubres algo no planificado, sugiere actualizar el plan primero.
+- NO cortar por capas. "Toda la BD", "todos los facades", "la UI" no son slices.
+- NO crear slices que no mapeen al `plan.md`. Si descubres algo no planificado, sugiere actualizar el plan primero.
 - NO incluir DoD genéricos tipo "está terminado". DoD = lista verificable.
-- Si el feature es trivial (1-2 archivos), genera 2-3 tareas, no fuerces 6 fases.
+- Si el feature es trivial (1-2 archivos), es UN slice. No fuerces más.

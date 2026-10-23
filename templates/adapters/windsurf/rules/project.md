@@ -15,7 +15,7 @@ Full guidelines are in `AGENTS.md`. This file covers the most critical rules of 
 
 1. **DISCOVER** — Read `indices/` (COMPONENTS, SERVICES, FACADES, MODELS, DIRECTIVES, PIPES) and `context/brief.md` before writing code. Never create something that already exists.
 2. **PLAN** — State which files you will touch before coding.
-3. **EXECUTE** — Follow rules below. Reuse existing code first.
+3. **EXECUTE** — One usable vertical slice at a time, never layer by layer. Failing test committed alone first. Reuse existing code first.
 4. **VALIDATE** — Run `npm run lint:arch`.
 5. **SYNC** — Update `indices/*.md` at the end of the session.
 

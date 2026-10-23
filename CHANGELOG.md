@@ -6,6 +6,81 @@ Para migrar un proyecto existente entre versiones, sigue las instrucciones de ca
 
 ---
 
+## [Unreleased]
+
+El SDD deja de ser cascada. Las plantillas de Koa cortaban el trabajo por capas —«1.
+Migración, 2. Facade, 3. Smart, 4. Dumb, 5. Conexión, 6. QA»— y no por culpa del modelo:
+lo pedía la plantilla. Así nada se podía usar hasta la última fase, y el diff que llegaba a
+revisión era el feature entero. Esta versión cambia la forma de trabajar —historias de una
+línea, una por spec, entregadas en slices usables— y la hace cumplir con mecanismos, no con
+prosa. También cierra las dos alarmas que el SDD dejaba abiertas: que el agente toque los
+tests para ponerlos en verde, y que agregue cosas que nadie pidió.
+
+### Lo que más importa si ya tenés un proyecto generado
+
+**Se entrega por slices, no por capas.** `tasks.md` tiene un bloque `## Slice` por AC: test
+en rojo commiteado solo, lo mínimo para el verde, `verify` en el navegador, `/review` de su
+diff, commit. El orden por dependencias sigue, pero **dentro** del slice. `plan.md` trae una
+tabla de slices en lugar del «orden de implementación», y `/spec-tasks` valida su salida
+desde el frontmatter. El `spec-gate` bloquea el código de una spec activa cuyo `tasks.md`
+esté cortado por capas o tenga un slice que no termina usado y revisado.
+
+**Una spec = una historia, y el backlog es barato.** `/backlog` agrega historias de una línea
+(`Como…, quiero…, para…`) a la sección `## Historias` de `specs/ROADMAP.md`, sin carpeta ni
+plantilla. `/spec-new H-NNN` toma una y la vuelve spec. El `spec-gate` bloquea una spec
+activa con más de una historia. La forma vive en `.claude/hooks/lib/sdd-forma.js` y la usan,
+con el mismo código, el `spec-gate` y `npm run lint:specs`, que ahora audita también las
+tareas y el backlog.
+
+**`commit-guard`, un hook nuevo en `git commit`.** `COMMIT-01` bloquea el commit que cambia
+aserciones de un test existente —o le agrega `.skip`/`.only`, o lo borra— junto con código de
+producto: es la trampa más barata para llegar a verde. `COMMIT-02` bloquea más de 400 líneas
+de código de producto en un commit, porque un diff así no se revisa, se acepta. No frena
+commits de solo tests, el primer commit, merges ni rebases, y no frena al humano: un caso
+legítimo lo commitea la persona.
+
+**Deriva de alcance.** `spec-reflection` coteja lo que la sesión escribió con lo que el
+task-spec declara en `## Artefactos afectados`. Lo no declarado vuelve al agente: o se
+revierte, o se declara y se le avisa al humano. Compara contra lo escrito desde que el spec
+existe, con una foto en `spec-scope-base.json` (artefacto nuevo: son 22).
+
+**`claude:tdd` con los permisos cerrados.** Era un bucle sin supervisión, con `Edit` y Bash
+libres, y la orden «auto-corrige hasta que pase en verde». Ahora no puede editar
+`*.spec.ts` (`--disallowedTools "Edit(**/*.spec.ts)"`), Bash solo corre `npm run test:ci`, y
+el bucle tiene tope (`--max-turns 25`).
+
+### Correcciones que cambian comportamiento
+
+- **El `spec-gate` ya no confunde el placeholder con un plan.** `/spec-new` crea `plan.md` con
+  una línea de placeholder, y el gate solo preguntaba si el archivo existía: justo después de
+  `/spec-new`, «la spec no tiene plan» no podía salir nunca.
+- **El «AC verifier (Haiku)» no existía.** La skill `sdd` y dos plantillas lo describían como
+  un hook de `Stop` cableado en `settings.json`, y ahí no había nada. Los AC los verifica
+  `/spec-verify`, corrido por el agente principal, y los firma el humano.
+- **`HOOKS-SYSTEM.md` describía `sync-check` como un hook `prompt` evaluado por Haiku.** Es un
+  hook de comando desde que lo reemplazó; el documento seguía contando el viejo. También decía
+  que `spec-reflection` calla sin casillas marcadas, que dejó de ser cierto con `HUE-004`.
+- **`generate feature` ya no se presenta como «vertical slice».** Escribe todas las capas de un
+  feature de una vez: es el andamio, no un slice de entrega.
+
+### Migración
+
+1. Reinyectá el harness (`npx create-koa-agent` → Inject Only).
+2. Si una spec **activa** tiene más de una historia, o un `tasks.md` por fases de capa, el
+   `spec-gate` va a bloquear sus escrituras: dejá la primera historia, mandá las demás al
+   backlog con `/backlog`, y regenerá las tareas con `/spec-tasks`. Las specs `done` y
+   `archived` no se juzgan.
+3. En `specs/ROADMAP.md`, agregá la sección `## Historias` de
+   `.claude/skills/sdd/templates/ROADMAP.md` (`/backlog` la crea si falta) y renombrá la tabla
+   «Backlog» a «Specs escritas, sin activar», que es donde ahora escriben `/spec-new` y
+   `/assign-claim`.
+4. Inject Only no reescribe `package.json`. Reemplazá el script `claude:tdd` por:
+   `claude -p "Ejecuta las pruebas unitarias (npm run test:ci). Si fallan, corrige el código de producción hasta que pasen. Los tests son el contrato: no los edites. Si uno parece estar mal, detente y explica por qué." --allowedTools Read Glob Grep Edit "Bash(npm run test:ci)" --disallowedTools "Edit(**/*.spec.ts)" --max-turns 25`
+5. Desde ahora, un commit del agente con más de 400 líneas de código de producto se bloquea.
+   Si es una unidad de verdad (un renombre mecánico), hacelo vos desde la terminal.
+
+---
+
 ## [7.2.0] — 2026-09-03
 
 La versión de la auditoría. 91 hallazgos registrados y cerrados sobre las 102 unidades

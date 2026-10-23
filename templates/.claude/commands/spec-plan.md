@@ -111,8 +111,13 @@ Lee la plantilla `.claude/skills/sdd/templates/plan.md` y complétala con:
    - Marca con `[x]` solo las reglas que SÍ aplican
    - Si una regla no aplica, deja `[ ]` (no la borres — sirve de checklist visual)
 
-7. **Plan de testing, riesgos y orden de implementación**:
+7. **Plan de testing y riesgos** (secciones 7 y 8):
    - Sé concreto. Riesgos reales (ej: "el endpoint público sin auth puede ser abusado → rate limit"), no genéricos.
+
+8. **Slices de entrega** (sección 9) — **obligatoria en todas las tallas, también en S**:
+   - Un slice por AC o edge case, cada uno usable al terminarlo y cruzando las capas que necesite.
+   - El S1 es el happy path más fino de punta a punta. Nunca "S1: toda la BD, S2: los facades".
+   - Si la spec trae más de una historia, no la planifiques: es una spec por historia. Devolvé el bloque "🚨 SPEC NECESITA AJUSTES" pidiendo mover las demás al backlog con `/backlog`.
 
 ### 7. Escribir el archivo y reportar
 

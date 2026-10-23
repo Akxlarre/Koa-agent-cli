@@ -27,7 +27,7 @@ Cualquier cambio aquí afecta a TODOS los proyectos Angular generados futuros, n
 Los hooks en `templates/.claude/hooks/` tienen dependencias entre sí.
 Antes de modificar uno, verifica qué otros dependen de él.
 
-**La fuente son los datos, no esta tabla.** Los 21 artefactos compartidos —qué pieza
+**La fuente son los datos, no esta tabla.** Los 22 artefactos compartidos —qué pieza
 escribe cada uno, quién lo lee, cuándo se borra y quién lo comparte— viven declarados en
 `templates/.claude/hooks/lib/contracts.js`, y `contracts.test.js` los contrasta
 contra el filesystem: agregar un consumidor sin declararlo rompe el test.

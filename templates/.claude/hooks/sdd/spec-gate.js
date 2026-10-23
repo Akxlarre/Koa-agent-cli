@@ -9,7 +9,15 @@
  *   - Si el archivo a tocar NO es codigo de produccion (es .md, config, spec, etc.) -> permite
  *   - Si hay `specs/.active` con ID valido y `specs/<id>/spec.md` existe -> permite
  *   - Si la spec activa NO tiene `plan.md` -> BLOQUEA (debe correr /spec-plan)
+ *   - Si la spec activa no tiene la forma del SDD -> BLOQUEA (lib/sdd-forma.js):
+ *     mas de una historia, o un `tasks.md` cortado por capas / con un slice que
+ *     no termina usado y revisado
  *   - Si NO hay spec activa -> BLOQUEA (debe correr /spec-new o /spec-activate)
+ *
+ * «Tiene plan.md» significa que tiene PLAN, no que el archivo exista: /spec-new
+ * crea `plan.md` con un placeholder de una linea para que la carpeta nazca con
+ * su forma final, y este gate lo daba por plan. El chequeo no podia fallar en
+ * el flujo normal — justo despues de /spec-new, que es cuando mas importa.
  *
  * Exit codes:
  *   0 = permitir
@@ -25,6 +33,7 @@ const fs = require('fs');
 const path = require('path');
 const payload = require('../lib/payload.js');
 const paths = require('../lib/paths.js');
+const forma = require('../lib/sdd-forma.js');
 
 payload.read().then((PAYLOAD) => {
   try {
@@ -140,13 +149,34 @@ payload.read().then((PAYLOAD) => {
       process.exit(2);
     }
 
-    if (!fs.existsSync(planMd)) {
+    const leer = (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '');
+
+    if (forma.esPlaceholder(leer(planMd))) {
       process.stderr.write(
         '\u{1F6E1}\u{FE0F} SPEC GATE: La spec "' + activeId + '" no tiene plan.md.\n' +
         'No podes escribir codigo sin un plan tecnico aprobado.\n\n' +
         'Que hacer:\n' +
         '  - /spec-plan  (Claude genera plan.md basado en spec.md + indices)\n' +
         '  - Revisa y aprueba el plan antes de continuar\n'
+      );
+      process.exit(2);
+    }
+
+    // GATE 5 - La forma: una historia, tareas por slice (lib/sdd-forma.js).
+    // Es la misma pregunta que `npm run lint:specs`, hecha en el unico momento
+    // en que no se puede olvidar: cuando se va a escribir el codigo.
+    const problemas = [
+      ...forma.revisarSpec(leer(specMd)).map((p) => 'spec.md ' + p),
+      ...forma.revisarTareas(leer(path.join(specDir, 'tasks.md'))).map((p) => 'tasks.md ' + p),
+    ];
+    if (problemas.length > 0) {
+      process.stderr.write(
+        '\u{1F6E1}\u{FE0F} SPEC GATE: La spec "' + activeId + '" no tiene la forma del SDD.\n' +
+        problemas.map((p) => '  - ' + p).join('\n') + '\n\n' +
+        'Por que: una spec con varias historias, o unas tareas por capas, dejan todo sin\n' +
+        'poder usarse hasta el final y llegan a revision como un diff enorme. Se entrega por\n' +
+        'slices: cada uno usable, verificado y revisado antes del siguiente.\n' +
+        'Arreglala y volve a intentar; `npm run lint:specs` hace la misma pregunta.\n'
       );
       process.exit(2);
     }

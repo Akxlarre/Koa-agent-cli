@@ -54,8 +54,11 @@ coincidan.
 [Lista de reglas relevantes: ARCH-01, A11Y-01, VISUAL-03, etc.]
 
 ## Pasos de ejecucion
-- [ ] [paso 1 — concreto y verificable]
-- [ ] [paso 2]
+### Slice 1 — [lo que se puede usar al terminarlo]
+- [ ] Test en rojo + commit del test solo
+- [ ] Lo minimo para ponerlo en verde, en todas las capas que pida
+- [ ] Verificado usandolo (`verify` o a mano)
+- [ ] `/review` del diff del slice + commit
 
 ## Criterio de done
 - [ ] ng build sin errores
@@ -66,6 +69,22 @@ coincidan.
 ```
 
 3. Muestra el task-spec al usuario y espera aprobacion antes de escribir codigo.
+
+## Los pasos van por slice, no por capa
+
+Si la tarea agrega comportamiento, corta `## Pasos de ejecucion` en slices: cada uno es
+la porcion mas chica que alguien puede **usar**, cruza las capas que necesite y termina
+verificado y revisado. "Primero la migracion, despues el facade, al final la pagina" deja
+todo sin poder probarse hasta el ultimo paso. Un refactor o un fix de un archivo es un
+solo slice; no fuerces mas.
+
+## Artefactos afectados es una declaracion, y se coteja
+
+**Spec Reflection** cruza la tabla con lo que de verdad escribiste en la sesion. Lo que
+escribas y no este declarado te lo devuelve al terminar la respuesta: o es trabajo que
+nadie pidio, y se revierte, o era parte de la tarea, y se declara y se le avisa al humano
+por que entro. Escribe rutas concretas entre backticks; una carpeta que termina en `/`
+cubre todo lo que tiene adentro, y un componente declarado cubre su `.html` y su `.scss`.
 
 ## Las casillas no son decorativas
 

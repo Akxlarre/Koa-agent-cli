@@ -14,13 +14,14 @@ respeta. Los dos campos que más cuesta adivinar leyendo el código:
   principal y cada subagente por separado), `proyecto` (vive en el repo).
 
 <!-- AUTO-GENERATED:BEGIN -->
-**21 artefactos declarados.**
+**22 artefactos declarados.**
 
 | Artefacto | Ruta | Lo escribe | Lo lee | lifetime | scope |
 |---|---|---|---|---|---|
 | `session-writes.json` | `.claude/temp/session-writes.json` | `.claude/hooks/write-tracker.js` | `.claude/hooks/sync-check.js`<br>`.claude/hooks/spec-diff-check.js`<br>`.claude/hooks/spec-reflection.js` | sesion | sesion |
 | `discovery-flag` | `.claude/temp/session/<sid>/discovery.flag` | `.claude/hooks/discovery-tracker.js`<br>`.claude/hooks/session-start.js` | `.claude/hooks/pre-write-guard.js`<br>`.claude/hooks/compact-recovery.js` | sesion | sesion |
 | `spec-reflection-seen.json` | `.claude/temp/spec-reflection-seen.json` | `.claude/hooks/spec-reflection.js` | `.claude/hooks/spec-reflection.js` | turno | hilo |
+| `spec-scope-base.json` | `.claude/temp/spec-scope-base.json` | `.claude/hooks/spec-reflection.js` | `.claude/hooks/spec-reflection.js`<br>`.claude/hooks/session-start.js` | sesion | sesion |
 | `breaker.json` | `.claude/temp/session/<sid>/thread-<tid>/breaker.json` | `.claude/hooks/pre-write-guard.js` | `.claude/hooks/pre-write-guard.js` | sesion | hilo |
 | `ctx-<categoria>.json` | `.claude/temp/session/<sid>/thread-<tid>/ctx-<categoria>.json` | `.claude/hooks/pre-write-guard.js` | `.claude/hooks/pre-write-guard.js` | sesion | hilo |
 | `budget-<clave>.json` | `.claude/temp/session/<sid>/thread-<tid>/budget-<clave>.json` | `.claude/hooks/lib/budget.js` | `.claude/hooks/lib/budget.js` | sesion | hilo |
@@ -54,6 +55,12 @@ ACO-001: sync-check lo borraba en cada Stop, dejando sin datos a los otros dos.
 
 HUE-002: vivia en TMPDIR bajo la clave "default", global a toda la maquina.
 
+### `spec-scope-base.json`
+
+**Formato:** { spec: "<nombre del task-spec>", previas: string[] } — lo que session-writes.json ya tenia la primera vez que spec-reflection vio ese spec
+
+La deriva de alcance coteja lo escrito DESDE que el spec existe: una sesion puede tener varios task-specs. No sale del timestamp del nombre porque el agente puede escribirlo en UTC o en hora local, y en una zona detras de UTC el chequeo callaria siempre. session-start lo borra junto con session-writes.json, que es lo que fotografia.
+
 ### `breaker.json`
 
 **Formato:** objeto { "<archivo>::<violacion>": intentos }; al 3er intento corta y escala
@@ -74,7 +81,7 @@ Lo escribe budget.js por cuenta de quien lo llama: prompt-context —de donde sa
 
 ### `task-spec`
 
-**Formato:** encabezados ## exactos + casillas "- [ ]" / "- [x]"; el nombre ordena por fecha
+**Formato:** encabezados ## exactos + casillas "- [ ]" / "- [x]"; el nombre ordena por fecha. Las rutas entre backticks de "## Artefactos afectados" son una declaracion: spec-reflection las coteja con session-writes.json
 
 El contrato con mas consumidores. Era el unico de los cinco sin test (HUE-006): los cinco consumidores tenian el suyo, y lo que NO tenia ninguno era lo que los ata — los encabezados, el orden del nombre y las casillas. Eso prueba .claude/tests/task-spec.test.js, corriendo los consumidores de verdad.
 

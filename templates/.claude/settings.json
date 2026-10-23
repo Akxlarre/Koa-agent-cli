@@ -53,6 +53,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/spec-diff-check.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/commit-guard.js"
           }
         ]
       }

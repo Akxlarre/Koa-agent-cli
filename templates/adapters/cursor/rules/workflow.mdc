@@ -35,7 +35,7 @@ List every file you will touch. If the task spans more than 2 files, write out y
 
 ### 3. EXECUTE — follow all rules in AGENTS.md
 
-Reuse existing components, facades, and models. New components go in the canonical folder structure (`core/`, `features/`, `shared/`, `layout/`).
+One vertical slice at a time: the smallest usable piece, across the layers it needs — never all the database first, then the UI. Commit the failing test alone before the code that makes it pass. Reuse existing components, facades, and models. New components go in the canonical folder structure (`core/`, `features/`, `shared/`, `layout/`).
 
 ### 4. VALIDATE
 

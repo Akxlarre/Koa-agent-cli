@@ -64,6 +64,20 @@ const CONTRACTS = {
     scope: 'hilo',
   },
 
+  'spec-scope-base.json': {
+    path: '.claude/temp/spec-scope-base.json',
+    format: '{ spec: "<nombre del task-spec>", previas: string[] } — lo que session-writes.json '
+        + 'ya tenia la primera vez que spec-reflection vio ese spec',
+    producers: ['.claude/hooks/spec-reflection.js'],
+    consumers: ['.claude/hooks/spec-reflection.js', '.claude/hooks/session-start.js'],
+    lifetime: 'sesion',
+    scope: 'sesion',
+    nota: 'La deriva de alcance coteja lo escrito DESDE que el spec existe: una sesion puede '
+        + 'tener varios task-specs. No sale del timestamp del nombre porque el agente puede '
+        + 'escribirlo en UTC o en hora local, y en una zona detras de UTC el chequeo callaria '
+        + 'siempre. session-start lo borra junto con session-writes.json, que es lo que fotografia.',
+  },
+
   'breaker.json': {
     path: '.claude/temp/session/<sid>/thread-<tid>/breaker.json',
     format: 'objeto { "<archivo>::<violacion>": intentos }; al 3er intento corta y escala',
@@ -106,7 +120,9 @@ const CONTRACTS = {
 
   'task-spec': {
     path: '.claude/temp/task-spec-YYYYMMDD-HHMMSS.md',
-    format: 'encabezados ## exactos + casillas "- [ ]" / "- [x]"; el nombre ordena por fecha',
+    format: 'encabezados ## exactos + casillas "- [ ]" / "- [x]"; el nombre ordena por fecha. '
+        + 'Las rutas entre backticks de "## Artefactos afectados" son una declaracion: '
+        + 'spec-reflection las coteja con session-writes.json',
     producers: ['.claude/skills/plan/SKILL.md'],
     consumers: [
       '.claude/hooks/spec-reflection.js',

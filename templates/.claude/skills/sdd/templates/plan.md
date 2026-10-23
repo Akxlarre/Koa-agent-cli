@@ -114,6 +114,8 @@ Usuario → <SmartComponent>
 
 ## 7. Plan de testing
 
+> Cada slice arranca con su test en rojo, commiteado solo. Acá va qué prueba cada uno.
+
 - Tests unitarios: …
 - Tests de integración (si aplican): …
 - QA manual (golden path + edge cases): …
@@ -128,14 +130,24 @@ Usuario → <SmartComponent>
 
 ---
 
-## 9. Orden de implementación
+## 9. Slices de entrega
 
-1. Migración SQL + tipos DTO
-2. Facade + .spec.ts
-3. Smart Component
-4. Dumb Components
-5. Conexión UI ↔ Facade
-6. QA + AC verification
+> Se entrega por **slices verticales**, no por capas. Un slice es la porción más chica que
+> alguien puede **usar**: cruza las capas que necesite (migración → repository → facade →
+> página) y termina en algo que se prueba en el navegador. El orden por dependencias vale
+> **dentro** del slice, no entre todo el feature.
+>
+> El S1 es el esqueleto que camina: el happy path más fino de punta a punta. Cada slice
+> siguiente agrega un AC o un edge case. `/spec-tasks` convierte esta tabla en `tasks.md`.
+
+| Slice | AC que cubre | Qué se puede usar al terminarlo | Capas que toca |
+|-------|--------------|---------------------------------|----------------|
+| S1 | AC1 | (ej. "me registro con email y contraseña y quedo con sesión") | migración, repository, facade, página |
+| S2 | AC-E1 | … | … |
+
+**Lo que no es un slice:** "toda la base de datos", "todos los facades", "la UI". Un plan
+cortado así deja todo sin poder usarse hasta la última fase, y el diff que llega a revisión
+es el feature entero.
 
 ---
 

@@ -205,3 +205,99 @@ describe('HUE-004 — CERRADO: "nada marcado" no es una sola situacion', () => {
     assert.ok(!r.stderr.includes('ninguna casilla marcada'));
   });
 });
+
+describe('DERIVA DE ALCANCE — lo escrito contra "## Artefactos afectados"', () => {
+  // «Que no agregue cosas que no pediste.» El task-spec declara qué va a tocar y
+  // session-writes.json dice qué tocó. El flujo real es: /plan genera el spec y
+  // termina su turno esperando aprobación (primer Stop: la foto), y DESPUÉS se
+  // escribe el código. Cada test lo recorre en ese orden.
+  const NOMBRE = 'task-spec-20260101-120000.md';
+  const conArtefactos = (filas, casillas = '- [x] build\n- [ ] tests\n') => '## Objetivo\nx\n\n'
+    + '## Artefactos afectados\n| Archivo | Cambio | Indice |\n|---|---|---|\n'
+    + filas.map((f) => `| \`${f}\` | Crear | COMPONENTS.md |`).join('\n')
+    + '\n\n## Criterio de done\n' + casillas;
+
+  /** /plan genera el spec y termina su turno: ese primer Stop toma la foto. */
+  function specRecienAprobado(body) {
+    const root = makeProject({ spec: { name: NOMBRE, body } });
+    runHook(root);
+    return root;
+  }
+  const escribio = (root, rutas) => fs.writeFileSync(
+    path.join(root, '.claude', 'temp', 'session-writes.json'), JSON.stringify(rutas));
+
+  test('lo escrito y no declarado vuelve al agente; lo declarado no', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/tareas/tareas.component.ts']));
+    escribio(root, ['src/app/features/tareas/tareas.component.ts', 'src/app/core/services/export.service.ts']);
+    const r = runHook(root);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /escribiste 1 archivo\(s\) que .* no declara/);
+    assert.match(r.stderr, /✗ src\/app\/core\/services\/export\.service\.ts/);
+    assert.ok(!r.stderr.includes('✗ src/app/features/tareas/tareas.component.ts'), r.stderr);
+    assert.match(r.stderr, /revertilo/);
+  });
+
+  test('un componente declarado cubre su .html y su .scss', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/tareas/tareas.component.ts'], '- [x] a\n'));
+    escribio(root, ['src/app/features/tareas/tareas.component.ts',
+      'src/app/features/tareas/tareas.component.html', 'src/app/features/tareas/tareas.component.scss']);
+    assert.equal(runHook(root).exitCode, 0);
+  });
+
+  test('una carpeta declarada cubre lo que tiene adentro, y un glob lo que matchea', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/tareas/', 'supabase/migrations/*.sql'], '- [x] a\n'));
+    escribio(root, ['src/app/features/tareas/lista/lista.component.ts', 'supabase/migrations/20260101_tareas.sql']);
+    assert.equal(runHook(root).exitCode, 0);
+  });
+
+  test('lo escrito ANTES de que el spec existiera no es deriva de este spec', () => {
+    // Una sesión con dos tareas: lo de la primera no aparece como no declarado
+    // en la segunda.
+    const root = makeProject({
+      spec: { name: NOMBRE, body: conArtefactos(['src/app/features/b/b.component.ts'], '- [x] a\n') },
+      writes: ['src/app/features/a/a.component.ts'],
+    });
+    runHook(root); // primer Stop del spec nuevo: la foto incluye lo de la tarea anterior
+    escribio(root, ['src/app/features/a/a.component.ts', 'src/app/features/b/b.component.ts']);
+    assert.equal(runHook(root).exitCode, 0);
+  });
+
+  test('con el criterio de done completo, la deriva igual se reporta', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/b/b.component.ts'], '- [x] a\n- [x] b\n'));
+    escribio(root, ['src/app/features/b/b.component.ts', 'src/app/features/extra/extra.component.ts']);
+    const r = runHook(root);
+    assert.equal(r.exitCode, 2);
+    assert.ok(!r.stderr.includes('punto(s) sin cerrar'), 'no hay pendientes que listar');
+    assert.match(r.stderr, /✗ src\/app\/features\/extra\/extra\.component\.ts/);
+  });
+
+  test('declararlo cierra el aviso', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/b/b.component.ts'], '- [x] a\n'));
+    escribio(root, ['src/app/features/b/b.component.ts', 'src/app/features/extra/extra.component.ts']);
+    assert.equal(runHook(root).exitCode, 2);
+    fs.writeFileSync(path.join(root, '.claude', 'temp', NOMBRE),
+      conArtefactos(['src/app/features/b/b.component.ts', 'src/app/features/extra/extra.component.ts'], '- [x] a\n'));
+    assert.equal(runHook(root).exitCode, 0);
+  });
+
+  test('la tabla con el ejemplo de la plantilla no declara nada, y lo dice', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/...'], '- [x] a\n'));
+    escribio(root, ['src/app/features/x/x.component.ts']);
+    const r = runHook(root);
+    assert.equal(r.exitCode, 2);
+    assert.match(r.stderr, /sigue con el ejemplo de la plantilla/);
+  });
+
+  test('un spec sin la sección no tiene nada que cotejar', () => {
+    const root = specRecienAprobado('## Done\n- [x] a\n');
+    escribio(root, ['src/app/features/x/x.component.ts']);
+    assert.equal(runHook(root).exitCode, 0);
+  });
+
+  test('tampoco insiste: el mismo estado de deriva se avisa una vez', () => {
+    const root = specRecienAprobado(conArtefactos(['src/app/features/b/b.component.ts'], '- [x] a\n'));
+    escribio(root, ['src/app/features/extra/extra.component.ts']);
+    assert.equal(runHook(root).exitCode, 2);
+    assert.equal(runHook(root).exitCode, 0);
+  });
+});

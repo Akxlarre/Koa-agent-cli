@@ -23,9 +23,21 @@ Vas a crear el scaffold completo de una nueva spec siguiendo el patrón SDD de K
 
 ## Argumento recibido
 
-Título del feature: **$ARGUMENTS**
+Título del feature, o el id de una historia del backlog: **$ARGUMENTS**
 
 (Si está vacío, pídele al usuario que provea un título descriptivo. Ejemplo: "Registro de usuario con email".)
+
+### Si el argumento es un `H-NNN` — la historia se vuelve spec
+
+Es el camino normal: la historia esperó en el backlog de una línea y alguien la toma
+ahora. Busca su línea en la sección `## Historias` de `specs/ROADMAP.md`:
+
+- Si no está, o ya está marcada `[x]`, avísale al usuario y detente.
+- El **título** sale de la capacidad de la historia (lo que va después de "quiero").
+- La historia entera es la **US1** de la spec, tal cual está escrita. Es la única: una
+  spec = una historia.
+- En la cabecera, `> **Historia:** H-NNN`.
+- Al terminar, marca la línea del backlog: `- [x] **H-NNN** · <texto> → spec NNNN`.
 
 ## Procedimiento
 
@@ -75,11 +87,15 @@ Lee la plantilla `.claude/skills/sdd/templates/spec.md` y reemplaza los placehol
 - `{{OWNER}}` → el usuario (pregunta si no lo sabes)
 - `{{P0|P1|P2}}` → pregúntale al usuario la prioridad
 
-Las secciones internas (User Stories, AC, etc.) las dejas con los placeholders `{{...}}` para que el usuario las complete. NO inventes contenido de negocio.
+Las secciones internas (User Stories, AC, etc.) las dejas con los placeholders `{{...}}` para que el usuario las complete. NO inventes contenido de negocio. La excepción es la US1 cuando la spec nace de un `H-NNN`: esa ya la escribió el usuario en el backlog.
+
+**Una sola historia.** Si al redactar aparece una segunda, no la sumes: agrégala al
+backlog con `/backlog` y sigue con la primera. El `spec-gate` bloquea el código de una
+spec activa con más de una historia.
 
 ### 6. Actualizar `specs/ROADMAP.md`
 
-Agrega una fila a la tabla "Backlog" con el nuevo ID, título, prioridad y dueño.
+Agrega una fila a la tabla "Specs escritas, sin activar" con el nuevo ID, título, prioridad y dueño. Si la spec nació de un `H-NNN`, marca además esa historia como tomada (ver arriba).
 
 ### 7. Reportar al usuario
 
@@ -107,5 +123,6 @@ Próximos pasos:
 
 - NO actives la spec automáticamente (eso es trabajo de `/spec-activate`).
 - NO redactes user stories ni AC sin pedírselos al usuario — la spec es su contrato.
+- NO metas dos historias en una spec: la segunda va al backlog (`/backlog`).
 - NO toques `specs/.active` en este comando.
 - Si el usuario invoca `/spec-new` sin argumento, pídele el título antes de hacer nada.

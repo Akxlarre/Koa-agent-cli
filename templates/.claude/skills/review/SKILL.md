@@ -37,6 +37,11 @@ ninguno aunque toque veinte.
    Si no hay cambios, detente y dilo. No revises codigo ya commiteado salvo que
    el humano lo pida explicitamente.
 
+   **Se revisa por slice.** Si el diff pasa de ~400 lineas de codigo de producto
+   (sin contar tests ni docs), no es un slice: es varios, y un juez que lee
+   miles de lineas aprueba lo que no llego a mirar. Partilo y revisa cada parte;
+   el `commit-guard` bloquearia ese commit igual (`COMMIT-02`).
+
 2. Deja el diff en un archivo para el juez:
 
    ```bash

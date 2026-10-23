@@ -200,3 +200,39 @@ describe('EL VALIDADOR acepta lo que /plan produce y rechaza lo que le falta', (
     assert.notEqual(validar(raiz).exit, 0);
   });
 });
+
+// ─── La tabla de Artefactos afectados: el cuarto acuerdo ────────────────────
+
+describe('ARTEFACTOS AFECTADOS — lo que /plan declara, spec-reflection lo coteja', () => {
+  // La plantilla de la skill trae la tabla con una fila de ejemplo. Si la skill
+  // cambiara su forma —otra columna primero, rutas sin backticks— el cotejo
+  // dejaría de encontrar lo declarado y reportaría como deriva el trabajo pedido.
+  const plantilla = /```markdown\n([\s\S]*?)\n```/.exec(fuenteSkill)[1];
+
+  test('la plantilla declara con rutas entre backticks, como lee el hook', () => {
+    assert.match(plantilla, /## Artefactos afectados\n\|[^\n]*\n\|[-| ]+\n\| `[^`]+` \|/);
+  });
+
+  test('un spec hecho con la plantilla coteja lo escrito contra lo declarado', () => {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-spec-'));
+    creados.push(raiz);
+    const temp = path.join(raiz, '.claude', 'temp');
+    fs.mkdirSync(temp, { recursive: true });
+    const nombre = 'task-spec-20260101-120000.md';
+    fs.writeFileSync(path.join(temp, nombre), plantilla
+      .replace('`src/app/features/...`', '`src/app/features/tareas/tareas.component.ts`')
+      .replace(/- \[ \]/g, '- [x]'));
+
+    const stop = () => spawnSync('node', [path.join(HOOKS, 'spec-reflection.js')], { cwd: raiz, encoding: 'utf8' });
+    stop(); // el turno de /plan: la foto de lo que ya había
+    fs.writeFileSync(path.join(temp, 'session-writes.json'), JSON.stringify([
+      'src/app/features/tareas/tareas.component.ts',
+      'src/app/features/tareas/tareas.component.html',
+      'src/app/core/services/no-pedido.service.ts',
+    ]));
+    const r = stop();
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /no-pedido\.service\.ts/);
+    assert.ok(!r.stderr.includes('✗ src/app/features/tareas/'), r.stderr);
+  });
+});
